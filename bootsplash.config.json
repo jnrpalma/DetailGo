@@ -1,0 +1,7 @@
+{
+  "background": "#111827",
+  "logo": "assets/logotest.png",
+  "logoWidth": 220,
+  "assetsPath": "assets/bootsplash",
+  "platforms": ["android", "android12"]
+}

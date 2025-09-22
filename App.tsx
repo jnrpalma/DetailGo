@@ -1,45 +1,47 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
+ * App Estética Automotiva
+ * Fluxo inicial: Splash nativa -> Splash in-app -> Login
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import React, { useEffect, useState } from 'react';
+import RNBootSplash from 'react-native-bootsplash';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import LoginScreen from './src/screens/LoginScreen';
+import SplashScreen from './src/screens/SplashScreen';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+// Helper sleep
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+export default function App() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      // Carregue configs iniciais aqui (fonts, tokens, API, etc.)
+      await sleep(600); // pequeno delay para transição suave
+    };
+
+    bootstrap()
+      .catch(() => {})
+      .finally(() => {
+        setReady(true);
+        RNBootSplash.hide({ fade: true }); // esconde splash nativa
+      });
+  }, []);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <StatusBar barStyle="dark-content" />
+      {ready ? (
+        <LoginScreen
+          onSubmit={(email, password) => {
+            console.log('Login com:', email, password);
+          }}
+        />
+      ) : (
+        <SplashScreen />
+      )}
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
