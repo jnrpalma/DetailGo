@@ -7,8 +7,8 @@ import React, { useEffect, useState } from 'react';
 import RNBootSplash from 'react-native-bootsplash';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import LoginScreen from './src/screens/LoginScreen';
-import SplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/features/auth/screens/LoginScreen';
+import SplashScreen from './src/features/auth/screens/SplashScreen';
 
 // Helper sleep
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
