@@ -1,3 +1,4 @@
+// android/build.gradle (ROOT)
 buildscript {
     ext {
         buildToolsVersion = "36.0.0"
@@ -12,10 +13,26 @@ buildscript {
         mavenCentral()
     }
     dependencies {
+        // NOTE: mantenha as versões compatíveis com seu Gradle/AGP local.
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // Plugin do Google Services (processa google-services.json)
+        classpath("com.google.gms:google-services:4.4.3")
     }
 }
 
-apply plugin: "com.facebook.react.rootproject"
+allprojects {
+    repositories {
+        mavenLocal()
+        maven {
+            // React Native (ex.: hermes, etc.)
+            url(new File(['node', '-e', 'require("path").resolve(process.cwd(), "node_modules")'].execute(null, rootDir).text.trim(), "react-native/android").absolutePath)
+        }
+        google()
+        mavenCentral()
+    }
+}
+
+// Se você tiver um settings.gradle / build.gradle.kts em outro lugar,
+// mantenha conforme seu projeto React Native original.

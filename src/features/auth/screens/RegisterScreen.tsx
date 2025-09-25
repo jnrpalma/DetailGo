@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,6 +13,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@app/types';
+
+// modular imports do RNFirebase
+import { getAuth, createUserWithEmailAndPassword } from '@react-native-firebase/auth';
+import { getFirestore, doc, setDoc, serverTimestamp } from '@react-native-firebase/firestore';
 
 type Props = {
   onSubmit?: (data: {
@@ -46,17 +51,74 @@ export default function RegisterScreen({ onSubmit, submitLabel = 'Cadastrar' }: 
 
   const canSubmit = namesValid && emailValid && phoneValid && passwordValid && confirmValid && !submitting;
 
+  const submitToFirebase = async (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    password: string;
+  }) => {
+    const { email, password, firstName, lastName, phone } = data;
+    try {
+      const auth = getAuth();
+      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = userCred.user.uid;
+
+      const db = getFirestore();
+      const userRef = doc(db, 'users', uid);
+      const userDoc = {
+        uid,
+        firstName,
+        lastName,
+        email,
+        phone,
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(userRef, userDoc);
+
+      Alert.alert('Cadastro', 'Conta criada com sucesso!');
+      navigation.navigate('Login');
+    } catch (error: any) {
+      const code = error?.code ?? '';
+      let message = error?.message ?? 'Erro ao criar usuário';
+
+      if (code === 'auth/email-already-in-use') {
+        message = 'Este e-mail já está em uso.';
+      } else if (code === 'auth/invalid-email') {
+        message = 'E-mail inválido.';
+      } else if (code === 'auth/weak-password') {
+        message = 'A senha é muito fraca (mínimo 6 caracteres).';
+      } else if (code === 'permission-denied') {
+        message = 'Sem permissão para gravar no Firestore. Verifique regras no Console Firebase.';
+      } else if (code === 'auth/admin-restricted-operation') {
+        message = 'Operação restrita — verifique provedores habilitados no Firebase Console.';
+      }
+
+      Alert.alert('Erro', message);
+      throw error;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     try {
       setSubmitting(true);
-      await onSubmit?.({
+      const data = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
         phone: phoneDigits(phone),
         password,
-      });
+      };
+
+      if (onSubmit) {
+        await onSubmit(data);
+      } else {
+        await submitToFirebase(data);
+      }
+    } catch (err) {
+      console.warn('Erro no registro:', err);
     } finally {
       setSubmitting(false);
     }
@@ -65,98 +127,52 @@ export default function RegisterScreen({ onSubmit, submitLabel = 'Cadastrar' }: 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.wrapper}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Crie sua conta</Text>
           <Text style={styles.subtitle}>Preencha seus dados para continuar</Text>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
           <View style={styles.row}>
             <View style={styles.col}>
               <Text style={styles.label}>Nome</Text>
-              <TextInput
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder="Seu nome"
-                style={[styles.input, !!firstName && firstName.trim().length < 2 && styles.inputError]}
-                returnKeyType="next"
-              />
+              <TextInput value={firstName} onChangeText={setFirstName} placeholder="Seu nome"
+                style={[styles.input, !!firstName && firstName.trim().length < 2 && styles.inputError]} returnKeyType="next" />
             </View>
             <View style={styles.col}>
               <Text style={styles.label}>Sobrenome</Text>
-              <TextInput
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder="Seu sobrenome"
-                style={[styles.input, !!lastName && lastName.trim().length < 2 && styles.inputError]}
-                returnKeyType="next"
-              />
+              <TextInput value={lastName} onChangeText={setLastName} placeholder="Seu sobrenome"
+                style={[styles.input, !!lastName && lastName.trim().length < 2 && styles.inputError]} returnKeyType="next" />
             </View>
           </View>
 
           <Text style={[styles.label, { marginTop: 12 }]}>E-mail</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="voce@exemplo.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            style={[styles.input, !!email && !emailValid && styles.inputError]}
-            returnKeyType="next"
-          />
+          <TextInput value={email} onChangeText={setEmail} placeholder="voce@exemplo.com" autoCapitalize="none"
+            keyboardType="email-address" autoCorrect={false} style={[styles.input, !!email && !emailValid && styles.inputError]}
+            returnKeyType="next" />
           {!!email && !emailValid && <Text style={styles.helperError}>E-mail inválido.</Text>}
 
           <Text style={[styles.label, { marginTop: 12 }]}>Telefone</Text>
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="(11) 91234-5678"
-            keyboardType="phone-pad"
-            style={[styles.input, !!phone && !phoneValid && styles.inputError]}
-            returnKeyType="next"
-          />
+          <TextInput value={phone} onChangeText={setPhone} placeholder="(11) 91234-5678" keyboardType="phone-pad"
+            style={[styles.input, !!phone && !phoneValid && styles.inputError]} returnKeyType="next" />
           {!!phone && !phoneValid && <Text style={styles.helperError}>Informe um telefone válido.</Text>}
 
           <Text style={[styles.label, { marginTop: 12 }]}>Senha</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="mínimo 6 caracteres"
-            secureTextEntry
-            style={[styles.input, !!password && !passwordValid && styles.inputError]}
-            returnKeyType="next"
-          />
+          <TextInput value={password} onChangeText={setPassword} placeholder="mínimo 6 caracteres" secureTextEntry
+            style={[styles.input, !!password && !passwordValid && styles.inputError]} returnKeyType="next" />
           {!!password && !passwordValid && <Text style={styles.helperError}>Mínimo de 6 caracteres.</Text>}
 
           <Text style={[styles.label, { marginTop: 12 }]}>Confirme a senha</Text>
-          <TextInput
-            value={confirm}
-            onChangeText={setConfirm}
-            placeholder="repita a senha"
-            secureTextEntry
-            style={[styles.input, !!confirm && !confirmValid && styles.inputError]}
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-          />
+          <TextInput value={confirm} onChangeText={setConfirm} placeholder="repita a senha" secureTextEntry
+            style={[styles.input, !!confirm && !confirmValid && styles.inputError]} returnKeyType="go" onSubmitEditing={handleSubmit} />
           {!!confirm && !confirmValid && <Text style={styles.helperError}>As senhas não conferem.</Text>}
 
-          <TouchableOpacity
-            style={[styles.button, !canSubmit && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={[styles.button, !canSubmit && styles.buttonDisabled]} onPress={handleSubmit} disabled={!canSubmit} activeOpacity={0.85}>
             {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{submitLabel}</Text>}
           </TouchableOpacity>
 
-          {/* 🔗 Link para voltar ao login */}
           <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ marginTop: 16, alignItems: 'center' }}>
-            <Text style={{ color: '#111827', fontSize: 14, fontWeight: '600' }}>
-              Já tem conta? Entrar
-            </Text>
+            <Text style={{ color: '#111827', fontSize: 14, fontWeight: '600' }}>Já tem conta? Entrar</Text>
           </TouchableOpacity>
         </View>
 
