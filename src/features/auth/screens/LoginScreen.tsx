@@ -1,3 +1,4 @@
+// @features/auth/screens/LoginScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,17 +9,19 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@app/types';
 
-type Props = { onSubmit: (email: string, password: string) => void | Promise<void> };
+import { getAuth, signInWithEmailAndPassword } from '@react-native-firebase/auth';
+
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
-export default function LoginScreen({ onSubmit }: Props) {
+export default function LoginScreen() {
   const navigation = useNavigation<NavProp>();
 
   const [email, setEmail] = useState('');
@@ -31,9 +34,22 @@ export default function LoginScreen({ onSubmit }: Props) {
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      await onSubmit(email.trim(), password);
+      const auth = getAuth();
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      // login ok -> navegue para a tela principal (adicione sua lógica)
+      // por enquanto vai para uma tela fictícia "Home" ou apenas mostra uma mensagem
+      Alert.alert('Login', 'Autenticado com sucesso!');
+      // navigation.navigate('Home'); // descomente se tiver rota Home
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      let message = 'Erro ao autenticar.';
+      if (code === 'auth/invalid-email') message = 'E-mail inválido.';
+      else if (code === 'auth/wrong-password') message = 'E-mail ou senha inválidos.';
+      else if (code === 'auth/user-not-found') message = 'Usuário não encontrado.';
+      Alert.alert('Erro', message);
+      console.warn('Login error:', err);
     } finally {
       setSubmitting(false);
     }

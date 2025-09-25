@@ -1,7 +1,3 @@
-/**
- * App Estética Automotiva
- * Fluxo: Splash nativa (BootSplash) -> Login
- */
 import React, { useEffect } from 'react';
 import RNBootSplash from 'react-native-bootsplash';
 import { StatusBar } from 'react-native';
@@ -10,7 +6,7 @@ import AppNavigator from '@app/AppNavigator';
 
 export default function App() {
   useEffect(() => {
-    RNBootSplash.hide({ fade: true }); // some a splash nativa assim que o app está pronto
+    RNBootSplash.hide({ fade: true });
   }, []);
 
   return (
