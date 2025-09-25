@@ -1,7 +1,7 @@
 {
-  "background": "#111827",
-  "logo": "assets/logotest.png",
-  "logoWidth": 220,
+  "background": "#050404",
+  "logo": "assets/images/logo@4x.png",
+  "logoWidth": 120,
   "assetsPath": "assets/bootsplash",
   "platforms": ["android", "android12"]
 }

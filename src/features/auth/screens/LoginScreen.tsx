@@ -1,14 +1,26 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet,
-  Text, TextInput, TouchableOpacity, View
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@app/types';
 
 type Props = { onSubmit: (email: string, password: string) => void | Promise<void> };
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 export default function LoginScreen({ onSubmit }: Props) {
+  const navigation = useNavigation<NavProp>();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -69,6 +81,11 @@ export default function LoginScreen({ onSubmit }: Props) {
           >
             {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
           </TouchableOpacity>
+
+          {/* Link para cadastro */}
+          <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkWrapper}>
+            <Text style={styles.linkText}>Não tem conta? Criar conta</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.footer}>© {new Date().getFullYear()} Estética Automotiva</Text>
@@ -79,17 +96,41 @@ export default function LoginScreen({ onSubmit }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  wrapper: { flex: 1, paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24, justifyContent: 'space-between', backgroundColor: '#fff' },
+  wrapper: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 48,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+  },
   header: { alignItems: 'center', gap: 8 },
   title: { fontSize: 22, fontWeight: '700', color: '#111827' },
   subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
   form: { marginTop: 16 },
   label: { fontSize: 14, color: '#374151', marginBottom: 6 },
-  input: { height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 14, backgroundColor: '#FFFFFF', fontSize: 16 },
+  input: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+  },
   inputError: { borderColor: '#EF4444' },
   helperError: { color: '#EF4444', fontSize: 12, marginTop: 6 },
-  button: { height: 50, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+  button: {
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#111827',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  linkWrapper: { marginTop: 16, alignItems: 'center' },
+  linkText: { color: '#111827', fontSize: 14, fontWeight: '600' },
   footer: { textAlign: 'center', color: '#9CA3AF', fontSize: 12 },
 });
