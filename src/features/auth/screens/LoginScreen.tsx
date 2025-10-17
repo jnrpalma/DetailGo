@@ -52,6 +52,7 @@ export default function LoginScreen() {
       console.warn('Login error:', err);
     } finally {
       setSubmitting(false);
+    
     }
   };
 
