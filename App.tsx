@@ -1,18 +1,14 @@
-import React, { useEffect } from 'react';
-import RNBootSplash from 'react-native-bootsplash';
-import { StatusBar } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import AppNavigator from '@app/AppNavigator';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { AuthProvider } from '@features/auth/context/AuthContext';
+import RootNavigator from 'src/navigation/RootNavigator';
 
 export default function App() {
-  useEffect(() => {
-    RNBootSplash.hide({ fade: true });
-  }, []);
-
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
-      <AppNavigator />
-    </SafeAreaProvider>
+    <AuthProvider>
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
