@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Image,
   ImageBackground,
@@ -11,33 +12,32 @@ import {
   View,
   Alert,
   LogBox,
+  Pressable,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary, ImageLibraryOptions, Asset } from 'react-native-image-picker';
 
-import { getAuth, updateProfile } from '@react-native-firebase/auth';
+import { getAuth } from '@react-native-firebase/auth';
 
 // Firestore API modular
-import {
-  getFirestore,
-  doc,
-  onSnapshot,
-  setDoc,
-} from '@react-native-firebase/firestore';
+import { getFirestore, doc, onSnapshot, setDoc } from '@react-native-firebase/firestore';
+
+// se você já tem o AuthContext:
+import { useAuth } from '@features/auth/context/AuthContext';
 
 type UserProfile = {
   firstName?: string;
   lastName?: string;
-  // urls (se algum dia migrar pro Storage)
   coverUrl?: string;
   photoURL?: string;
-  // base64
-  coverB64?: string; // "data:image/jpeg;base64,...."
-  photoB64?: string; // idem
+  coverB64?: string;
+  photoB64?: string;
 };
 
 const COVER_H = 240;
 const AVATAR = 160;
+const MENU_W = 260; // largura do drawer
 
 LogBox.ignoreLogs([
   'SafeAreaView has been deprecated',
@@ -49,18 +49,54 @@ export default function DashboardScreen() {
   const user = auth.currentUser!;
   const uid = user.uid;
 
-  const [profile, setProfile] = useState<UserProfile>({
-    photoURL: user.photoURL ?? undefined,
-  });
+  const { signOut } = useAuth(); // para botão "Sair"
+
+  const [profile, setProfile] = useState<UserProfile>({ photoURL: user.photoURL ?? undefined });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
 
+  // ---- MENU STATE / ANIMAÇÃO ----
+  const [menuOpen, setMenuOpen] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current; // 0 fechado, 1 aberto
+
+  const openMenu = () => {
+    setMenuOpen(true);
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeMenu = () => {
+    Animated.timing(anim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setMenuOpen(false);
+    });
+  };
+
+  const drawerTx = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-MENU_W, 0],
+  });
+
+  const overlayOpacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.5],
+  });
+
+  // ---- MOCK ----
   const mockServices = [
     { id: '1', title: 'Higienização Completa' },
     { id: '2', title: 'Polimento Técnico' },
     { id: '3', title: 'Vitrificação de Pintura' },
   ];
 
-  // Carrega perfil
+  // ---- CARREGAR PERFIL ----
   useEffect(() => {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
@@ -77,14 +113,14 @@ export default function DashboardScreen() {
     return unsub;
   }, [uid, user.photoURL]);
 
-  // --- helpers: escolher imagem e obter Base64 controlado ---
+  // ---- IMAGE PICK (base64) ----
   const pickAsBase64 = async () => {
     const opts: ImageLibraryOptions = {
       mediaType: 'photo',
       selectionLimit: 1,
-      includeBase64: true,     // <-- essencial
-      quality: 0.6,            // reduz tamanho (0–1)
-      maxWidth: 640,           // limita dimensões (ajuda muito no tamanho)
+      includeBase64: true,
+      quality: 0.6,
+      maxWidth: 640,
       maxHeight: 640,
     };
     const res = await launchImageLibrary(opts);
@@ -101,10 +137,7 @@ export default function DashboardScreen() {
       const b64 = await pickAsBase64();
       if (!b64) return;
       setSaving('cover');
-
-      // grava no firestore (merge)
       await setDoc(doc(getFirestore(), 'users', uid), { coverB64: b64 }, { merge: true });
-
       setProfile((p) => ({ ...p, coverB64: b64 }));
     } catch (e: any) {
       console.warn('saveCover error:', e?.code, e?.message, e);
@@ -119,11 +152,7 @@ export default function DashboardScreen() {
       const b64 = await pickAsBase64();
       if (!b64) return;
       setSaving('avatar');
-
-      // atualiza auth (opcional – o Auth aceita uma URL; como é dataURI, só use se precisar exibir pelo user.photoURL)
-      // Para evitar side effects, vamos manter só em Firestore e usar no app.
       await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
-
       setProfile((p) => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
       console.warn('saveAvatar error:', e?.code, e?.message, e);
@@ -133,7 +162,6 @@ export default function DashboardScreen() {
     }
   };
 
-  // decide a fonte da capa/ avatar (b64 tem prioridade; depois url; depois fallback)
   const coverSource =
     profile.coverB64
       ? { uri: profile.coverB64 }
@@ -142,33 +170,47 @@ export default function DashboardScreen() {
       : { uri: 'https://singlecolorimage.com/get/1f46d3/1200x600' };
 
   const avatarSource =
-    profile.photoB64
-      ? { uri: profile.photoB64 }
-      : profile.photoURL
-      ? { uri: profile.photoURL }
-      : undefined;
+    profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
+
+  // ---- AÇÕES DO MENU ----
+  const goProfile = () => {
+    closeMenu();
+    Alert.alert('Meu Perfil', 'Aqui você navega para a tela de Perfil. (TODO)');
+    // navigation.navigate('Perfil') // quando criar a rota
+  };
+
+  const goHistory = () => {
+    closeMenu();
+    Alert.alert('Histórico', 'Aqui você navega para a tela de Histórico. (TODO)');
+    // navigation.navigate('Historico') // quando criar a rota
+  };
+
+  const doSignOut = async () => {
+    closeMenu();
+    try {
+      await signOut();
+      // RootNavigator vai redirecionar para Login automaticamente
+    } catch (e) {
+      Alert.alert('Erro', 'Falha ao sair. Tente novamente.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         {/* HEADER */}
         <View style={styles.headerWrapper}>
-          <ImageBackground
-            style={styles.header}
-            imageStyle={styles.headerImg}
-            source={coverSource}
-          >
-            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8}>
+          <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
+            {/* Botão menu (hambúrguer) */}
+            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
               <View style={styles.menuLine} />
-              <View style={[styles.menuLine, { width: 20 }]} />
+              <View style={[styles.menuLine, { width: 22 }]} />
+              <View style={[styles.menuLine, { width: 18 }]} />
             </TouchableOpacity>
 
+            {/* Trocar capa */}
             <TouchableOpacity onPress={saveCover} style={styles.coverBtn} activeOpacity={0.9}>
-              {saving === 'cover' ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.coverBtnTxt}>Trocar capa</Text>
-              )}
+              {saving === 'cover' ? <ActivityIndicator color="#fff" /> : <Text style={styles.coverBtnTxt}>Trocar capa</Text>}
             </TouchableOpacity>
           </ImageBackground>
         </View>
@@ -195,7 +237,6 @@ export default function DashboardScreen() {
         {/* BODY */}
         <View style={styles.body}>
           <Text style={styles.sectionTitle}>Últimos serviços</Text>
-
           <FlatList
             data={mockServices}
             keyExtractor={(item) => item.id}
@@ -209,14 +250,64 @@ export default function DashboardScreen() {
             showsVerticalScrollIndicator={false}
           />
         </View>
+
+        {/* -------- OVERLAY + DRAWER ------- */}
+        {(menuOpen || /* render durante animação */ true) && (
+          <>
+            {/* Overlay clicável para fechar */}
+            <Animated.View
+              pointerEvents={menuOpen ? 'auto' : 'none'}
+              style={[StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }]}
+            >
+              <Pressable style={{ flex: 1 }} onPress={closeMenu} />
+            </Animated.View>
+
+            {/* Gaveta */}
+            <Animated.View
+              style={[
+                styles.drawer,
+                {
+                  transform: [{ translateX: drawerTx }],
+                },
+              ]}
+            >
+              {/* Cabeçalho do menu */}
+              <View style={styles.drawerHeader}>
+                <View style={styles.hamburgerGhost}>
+                  <View style={styles.menuLine} />
+                  <View style={[styles.menuLine, { width: 22 }]} />
+                  <View style={[styles.menuLine, { width: 18 }]} />
+                </View>
+              </View>
+
+              {/* Itens */}
+              <TouchableOpacity style={styles.item} onPress={goProfile} activeOpacity={0.8}>
+                <Text style={styles.itemIcon}>👤</Text>
+                <Text style={styles.itemText}>Meu Perfil</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
+                <Text style={styles.itemIcon}>📘</Text>
+                <Text style={styles.itemText}>Histórico</Text>
+              </TouchableOpacity>
+
+              <View style={{ flex: 1 }} />
+
+              <TouchableOpacity style={[styles.item, { marginBottom: 18 }]} onPress={doSignOut} activeOpacity={0.8}>
+                <Text style={styles.itemIcon}>🚪</Text>
+                <Text style={styles.itemText}>Sair</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </>
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#B5B7BC' },
-  container: { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#0F1115' },
+  container: { flex: 1, backgroundColor: '#B5B7BC' },
 
   headerWrapper: {
     height: COVER_H,
@@ -227,7 +318,8 @@ const styles = StyleSheet.create({
   },
   header: { flex: 1, justifyContent: 'center' },
   headerImg: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
-  menuBtn: { position: 'absolute', left: 18, top: 18, gap: 6, padding: 4 },
+
+  menuBtn: { position: 'absolute', left: 18, top: 18, gap: 6, padding: 6, borderRadius: 8 },
   menuLine: { height: 3, width: 26, backgroundColor: '#000', borderRadius: 2 },
 
   coverBtn: {
@@ -255,12 +347,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
-    backgroundColor: '#000',
-  },
+  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: '#000' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
   avatarLoading: {
@@ -276,4 +363,33 @@ const styles = StyleSheet.create({
   sectionTitle: { textAlign: 'center', fontSize: 18, fontWeight: '700', marginBottom: 20 },
   serviceCard: { backgroundColor: '#000', borderRadius: 12, paddingVertical: 20, paddingHorizontal: 12 },
   serviceText: { color: '#fff', textAlign: 'center', fontSize: 15 },
+
+  // overlay + drawer
+  overlay: {
+    backgroundColor: '#000',
+  },
+  drawer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: MENU_W,
+    backgroundColor: '#5F646B', // tom parecido da referência
+    paddingTop: 12,
+    paddingHorizontal: 16,
+  },
+  drawerHeader: {
+    height: 56,
+    justifyContent: 'center',
+  },
+  hamburgerGhost: { width: 32, gap: 6 },
+
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+  },
+  itemIcon: { fontSize: 18, color: '#1F2C3A' },
+  itemText: { fontSize: 16, color: '#FFFFFF' },
 });

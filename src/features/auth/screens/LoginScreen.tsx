@@ -1,4 +1,3 @@
-// @features/auth/screens/LoginScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,8 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@app/types';
-
-import { getAuth, signInWithEmailAndPassword } from '@react-native-firebase/auth';
+import { useAuth } from '@features/auth/context/AuthContext';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -23,9 +21,11 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavProp>();
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const emailValid = useMemo(() => emailRegex.test(email.trim()), [email]);
@@ -35,25 +35,15 @@ export default function LoginScreen() {
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    try {
-      const auth = getAuth();
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      // login ok -> navegue para a tela principal (adicione sua lógica)
-      // por enquanto vai para uma tela fictícia "Home" ou apenas mostra uma mensagem
-      navigation.replace('Dashboard');
-      // navigation.navigate('Home'); // descomente se tiver rota Home
-    } catch (err: any) {
-      const code = err?.code ?? '';
-      let message = 'Erro ao autenticar.';
-      if (code === 'auth/invalid-email') message = 'E-mail inválido.';
-      else if (code === 'auth/wrong-password') message = 'E-mail ou senha inválidos.';
-      else if (code === 'auth/user-not-found') message = 'Usuário não encontrado.';
-      Alert.alert('Erro', message);
-      console.warn('Login error:', err);
-    } finally {
-      setSubmitting(false);
-    
+    const res = await signIn(email, password);
+    setSubmitting(false);
+
+    if (!res.ok) {
+      Alert.alert('Erro', res.message ?? 'Falha ao autenticar');
+      return;
     }
+    // RootNavigator já troca para a pilha privada quando houver user.
+    // Se quiser forçar: navigation.replace('Dashboard');
   };
 
   return (
@@ -79,16 +69,31 @@ export default function LoginScreen() {
           {!!email && !emailValid && <Text style={styles.helperError}>E-mail inválido.</Text>}
 
           <Text style={[styles.label, { marginTop: 16 }]}>Senha</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="mínimo 6 caracteres"
-            secureTextEntry
-            style={[styles.input, !!password && !passwordValid && styles.inputError]}
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-          />
-          {!!password && !passwordValid && <Text style={styles.helperError}>A senha deve ter pelo menos 6 caracteres.</Text>}
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="mínimo 6 caracteres"
+              secureTextEntry={!showPassword}
+              style={[
+                styles.input,
+                !!password && !passwordValid && styles.inputError,
+                styles.inputWithIcon,
+              ]}
+              returnKeyType="go"
+              onSubmitEditing={handleSubmit}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(v => !v)}
+              style={styles.eyeBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
+            </TouchableOpacity>
+          </View>
+          {!!password && !passwordValid && (
+            <Text style={styles.helperError}>A senha deve ter pelo menos 6 caracteres.</Text>
+          )}
 
           <TouchableOpacity
             style={[styles.button, !canSubmit && styles.buttonDisabled]}
@@ -99,7 +104,6 @@ export default function LoginScreen() {
             {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
           </TouchableOpacity>
 
-          {/* Link para cadastro */}
           <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkWrapper}>
             <Text style={styles.linkText}>Não tem conta? Criar conta</Text>
           </TouchableOpacity>
@@ -135,8 +139,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontSize: 16,
   },
+  inputWithIcon: { paddingRight: 40 },
   inputError: { borderColor: '#EF4444' },
   helperError: { color: '#EF4444', fontSize: 12, marginTop: 6 },
+  passwordWrapper: { position: 'relative' },
+  eyeBtn: { position: 'absolute', right: 10, top: 12, height: 24, justifyContent: 'center' },
+  eyeText: { fontSize: 18 },
   button: {
     height: 50,
     borderRadius: 12,
