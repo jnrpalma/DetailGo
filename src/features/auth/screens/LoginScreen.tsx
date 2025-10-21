@@ -40,7 +40,7 @@ export default function LoginScreen() {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       // login ok -> navegue para a tela principal (adicione sua lógica)
       // por enquanto vai para uma tela fictícia "Home" ou apenas mostra uma mensagem
-      Alert.alert('Login', 'Autenticado com sucesso!');
+      navigation.replace('Dashboard');
       // navigation.navigate('Home'); // descomente se tiver rota Home
     } catch (err: any) {
       const code = err?.code ?? '';
