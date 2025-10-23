@@ -2,29 +2,25 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   FlatList,
   Image,
   ImageBackground,
-  Platform,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   Alert,
   LogBox,
-  Pressable,
-  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary, ImageLibraryOptions, Asset } from 'react-native-image-picker';
-
 import { getAuth } from '@react-native-firebase/auth';
-
-// Firestore API modular
 import { getFirestore, doc, onSnapshot, setDoc } from '@react-native-firebase/firestore';
-
-// se você já tem o AuthContext:
 import { useAuth } from '@features/auth/context/AuthContext';
+import { Menu, User as UserIcon, History, LogOut } from 'lucide-react-native';
+import { colors, surfaces, radii, spacing, typography } from '@shared/theme';
 
 type UserProfile = {
   firstName?: string;
@@ -35,9 +31,9 @@ type UserProfile = {
   photoB64?: string;
 };
 
-const COVER_H = 240;
-const AVATAR = 160;
-const MENU_W = 260; // largura do drawer
+const COVER_H = 285;
+const AVATAR = 130;
+const MENU_W = 220;
 
 LogBox.ignoreLogs([
   'SafeAreaView has been deprecated',
@@ -49,71 +45,45 @@ export default function DashboardScreen() {
   const user = auth.currentUser!;
   const uid = user.uid;
 
-  const { signOut } = useAuth(); // para botão "Sair"
+  const { signOut } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile>({ photoURL: user.photoURL ?? undefined });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
 
-  // ---- MENU STATE / ANIMAÇÃO ----
   const [menuOpen, setMenuOpen] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current; // 0 fechado, 1 aberto
+  const anim = useRef(new Animated.Value(0)).current;
 
   const openMenu = () => {
     setMenuOpen(true);
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(anim, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   };
-
   const closeMenu = () => {
-    Animated.timing(anim, {
-      toValue: 0,
-      duration: 200,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) setMenuOpen(false);
-    });
+    Animated.timing(anim, { toValue: 0, duration: 200, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(
+      ({ finished }) => finished && setMenuOpen(false)
+    );
   };
 
-  const drawerTx = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-MENU_W, 0],
-  });
+  const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
+  const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  const overlayOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.5],
-  });
-
-  // ---- MOCK ----
   const mockServices = [
     { id: '1', title: 'Higienização Completa' },
     { id: '2', title: 'Polimento Técnico' },
     { id: '3', title: 'Vitrificação de Pintura' },
   ];
 
-  // ---- CARREGAR PERFIL ----
   useEffect(() => {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
     const unsub = onSnapshot(userRef, (snap) => {
       const data = snap.data() as UserProfile | undefined;
       if (data) {
-        setProfile((p) => ({
-          ...p,
-          ...data,
-          photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined,
-        }));
+        setProfile((p) => ({ ...p, ...data, photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined }));
       }
     });
     return unsub;
   }, [uid, user.photoURL]);
 
-  // ---- IMAGE PICK (base64) ----
   const pickAsBase64 = async () => {
     const opts: ImageLibraryOptions = {
       mediaType: 'photo',
@@ -128,8 +98,7 @@ export default function DashboardScreen() {
     const a: Asset | undefined = res.assets?.[0];
     if (!a?.base64) return null;
     const mime = a.type && a.type.startsWith('image/') ? a.type : 'image/jpeg';
-    const dataUri = `data:${mime};base64,${a.base64}`;
-    return dataUri;
+    return `data:${mime};base64,${a.base64}`;
   };
 
   const saveCover = async () => {
@@ -140,7 +109,6 @@ export default function DashboardScreen() {
       await setDoc(doc(getFirestore(), 'users', uid), { coverB64: b64 }, { merge: true });
       setProfile((p) => ({ ...p, coverB64: b64 }));
     } catch (e: any) {
-      console.warn('saveCover error:', e?.code, e?.message, e);
       Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
     } finally {
       setSaving(null);
@@ -155,7 +123,6 @@ export default function DashboardScreen() {
       await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
       setProfile((p) => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
-      console.warn('saveAvatar error:', e?.code, e?.message, e);
       Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
     } finally {
       setSaving(null);
@@ -163,36 +130,22 @@ export default function DashboardScreen() {
   };
 
   const coverSource =
-    profile.coverB64
-      ? { uri: profile.coverB64 }
-      : profile.coverUrl
-      ? { uri: profile.coverUrl }
-      : { uri: 'https://singlecolorimage.com/get/1f46d3/1200x600' };
+    profile.coverB64 ? { uri: profile.coverB64 } : profile.coverUrl ? { uri: profile.coverUrl } : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
+  const avatarSource = profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
 
-  const avatarSource =
-    profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
+  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Usuário';
 
-  // ---- AÇÕES DO MENU ----
   const goProfile = () => {
     closeMenu();
-    Alert.alert('Meu Perfil', 'Aqui você navega para a tela de Perfil. (TODO)');
-    // navigation.navigate('Perfil') // quando criar a rota
+    Alert.alert('Meu Perfil', 'Navegar para Perfil (TODO)');
   };
-
   const goHistory = () => {
     closeMenu();
-    Alert.alert('Histórico', 'Aqui você navega para a tela de Histórico. (TODO)');
-    // navigation.navigate('Historico') // quando criar a rota
+    Alert.alert('Histórico', 'Navegar para Histórico (TODO)');
   };
-
   const doSignOut = async () => {
     closeMenu();
-    try {
-      await signOut();
-      // RootNavigator vai redirecionar para Login automaticamente
-    } catch (e) {
-      Alert.alert('Erro', 'Falha ao sair. Tente novamente.');
-    }
+    try { await signOut(); } catch { Alert.alert('Erro', 'Falha ao sair. Tente novamente.'); }
   };
 
   return (
@@ -201,16 +154,12 @@ export default function DashboardScreen() {
         {/* HEADER */}
         <View style={styles.headerWrapper}>
           <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
-            {/* Botão menu (hambúrguer) */}
             <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
-              <View style={styles.menuLine} />
-              <View style={[styles.menuLine, { width: 22 }]} />
-              <View style={[styles.menuLine, { width: 18 }]} />
+              <Menu size={26} color={colors.white} />
             </TouchableOpacity>
 
-            {/* Trocar capa */}
             <TouchableOpacity onPress={saveCover} style={styles.coverBtn} activeOpacity={0.9}>
-              {saving === 'cover' ? <ActivityIndicator color="#fff" /> : <Text style={styles.coverBtnTxt}>Trocar capa</Text>}
+              {saving === 'cover' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.coverBtnTxt}>Trocar capa</Text>}
             </TouchableOpacity>
           </ImageBackground>
         </View>
@@ -229,7 +178,7 @@ export default function DashboardScreen() {
 
           {saving === 'avatar' && (
             <View style={styles.avatarLoading}>
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.white} />
             </View>
           )}
         </View>
@@ -251,10 +200,9 @@ export default function DashboardScreen() {
           />
         </View>
 
-        {/* -------- OVERLAY + DRAWER ------- */}
-        {(menuOpen || /* render durante animação */ true) && (
+        {/* OVERLAY + DRAWER */}
+        {(menuOpen || true) && (
           <>
-            {/* Overlay clicável para fechar */}
             <Animated.View
               pointerEvents={menuOpen ? 'auto' : 'none'}
               style={[StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }]}
@@ -262,39 +210,26 @@ export default function DashboardScreen() {
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
-            {/* Gaveta */}
-            <Animated.View
-              style={[
-                styles.drawer,
-                {
-                  transform: [{ translateX: drawerTx }],
-                },
-              ]}
-            >
-              {/* Cabeçalho do menu */}
+            <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}>
               <View style={styles.drawerHeader}>
-                <View style={styles.hamburgerGhost}>
-                  <View style={styles.menuLine} />
-                  <View style={[styles.menuLine, { width: 22 }]} />
-                  <View style={[styles.menuLine, { width: 18 }]} />
-                </View>
+                <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
+                <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
-              {/* Itens */}
               <TouchableOpacity style={styles.item} onPress={goProfile} activeOpacity={0.8}>
-                <Text style={styles.itemIcon}>👤</Text>
+                <UserIcon size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
-                <Text style={styles.itemIcon}>📘</Text>
+                <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
 
-              <TouchableOpacity style={[styles.item, { marginBottom: 18 }]} onPress={doSignOut} activeOpacity={0.8}>
-                <Text style={styles.itemIcon}>🚪</Text>
+              <TouchableOpacity style={[styles.item, { marginBottom: 50 }]} onPress={doSignOut} activeOpacity={0.8}>
+                <LogOut size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Sair</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -306,21 +241,20 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0F1115' },
-  container: { flex: 1, backgroundColor: '#B5B7BC' },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
 
   headerWrapper: {
     height: COVER_H,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
     overflow: 'hidden',
-    backgroundColor: '#1F46D3',
+    backgroundColor: colors.primary,
   },
   header: { flex: 1, justifyContent: 'center' },
-  headerImg: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  headerImg: { borderBottomLeftRadius: radii.lg, borderBottomRightRadius: radii.lg },
 
-  menuBtn: { position: 'absolute', left: 18, top: 18, gap: 6, padding: 6, borderRadius: 8 },
-  menuLine: { height: 3, width: 26, backgroundColor: '#000', borderRadius: 2 },
+  menuBtn: { position: 'absolute', left: 18, top: 18, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.15)' },
 
   coverBtn: {
     position: 'absolute',
@@ -328,10 +262,10 @@ const styles = StyleSheet.create({
     top: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
     borderRadius: 10,
   },
-  coverBtnTxt: { color: '#fff', fontWeight: '700' },
+  coverBtnTxt: { color: colors.white, fontWeight: '700' },
 
   avatarContainer: {
     alignSelf: 'center',
@@ -339,7 +273,7 @@ const styles = StyleSheet.create({
     width: AVATAR + 12,
     height: AVATAR + 12,
     borderRadius: (AVATAR + 12) / 2,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     padding: 6,
     elevation: 6,
     shadowColor: '#000',
@@ -347,49 +281,45 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: '#000' },
+  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colors.black },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
-  avatarLoading: {
-    position: 'absolute',
-    inset: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: AVATAR / 2,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
+  avatarLoading: { position: 'absolute', inset: 6, alignItems: 'center', justifyContent: 'center', borderRadius: AVATAR / 2, backgroundColor: 'rgba(0,0,0,0.35)' },
 
-  body: { flex: 1, paddingHorizontal: 24, paddingTop: 24, backgroundColor: '#B5B7BC' },
-  sectionTitle: { textAlign: 'center', fontSize: 18, fontWeight: '700', marginBottom: 20 },
-  serviceCard: { backgroundColor: '#000', borderRadius: 12, paddingVertical: 20, paddingHorizontal: 12 },
-  serviceText: { color: '#fff', textAlign: 'center', fontSize: 15 },
+  body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
+  sectionTitle: { textAlign: 'center', fontSize: 18, fontWeight: '800', marginBottom: 20, color: colors.text },
 
-  // overlay + drawer
-  overlay: {
-    backgroundColor: '#000',
+  serviceCard: {
+    backgroundColor: surfaces.card,
+    borderRadius: radii.md,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
+  serviceText: { color: colors.text, textAlign: 'center', fontSize: typography.text },
+
+  overlay: { backgroundColor: surfaces.overlay },
   drawer: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
     width: MENU_W,
-    backgroundColor: '#5F646B', // tom parecido da referência
-    paddingTop: 12,
-    paddingHorizontal: 16,
+    backgroundColor: surfaces.drawer,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   drawerHeader: {
-    height: 56,
-    justifyContent: 'center',
+    minHeight: 56,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+    marginBottom: 8,
   },
-  hamburgerGhost: { width: 32, gap: 6 },
+  drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
+  drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
 
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-  },
-  itemIcon: { fontSize: 18, color: '#1F2C3A' },
-  itemText: { fontSize: 16, color: '#FFFFFF' },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  itemText: { fontSize: 20, color: colors.bg, fontWeight: '600' },
 });
