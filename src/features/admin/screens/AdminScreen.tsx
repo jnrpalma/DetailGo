@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -12,30 +12,29 @@ import {
   TouchableOpacity,
   View,
   Alert,
-  LogBox,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { launchImageLibrary, ImageLibraryOptions, Asset } from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   getFirestore,
-  doc,
+  collectionGroup,
   onSnapshot,
-  setDoc,
-  collection,
-  query,
   orderBy,
+  query,
+  where,
+  doc,
+  onSnapshot as onDocSnap,
+  type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
-import { useAuth } from '@features/auth/context/AuthContext';
-import { isAdminEmail } from '@features/auth/utils/roles'; // <- NOVO
 import { Menu, User as UserIcon, History, LogOut, Calendar } from 'lucide-react-native';
-import { colors, surfaces, radii, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
+import { colors, surfaces, radii, spacing } from '@shared/theme';
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type UserProfile = {
   firstName?: string;
@@ -48,44 +47,30 @@ type UserProfile = {
 
 type Appointment = {
   id: string;
+  uid: string; // dono do agendamento
+  serviceLabel: string | null;
   vehicleType: 'Carro' | 'Moto';
   carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
-  serviceLabel: string | null;
   price: number | null;
-  whenMs: number; // epoch ms
+  whenMs: number;
 };
 
 const COVER_H = 285;
 const AVATAR = 130;
 const MENU_W = 220;
 
-LogBox.ignoreLogs([
-  'SafeAreaView has been deprecated',
-  'This method is deprecated (as well as all React Native Firebase namespaced API)',
-]);
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-export default function DashboardScreen() {
+export default function AdminDashboardScreen() {
   const navigation = useNavigation<Nav>();
 
   const auth = getAuth();
   const user = auth.currentUser!;
   const uid = user.uid;
 
-  const { signOut } = useAuth();
-
   const [profile, setProfile] = useState<UserProfile>({ photoURL: user.photoURL ?? undefined });
-  const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
-
-  // lista de agendamentos
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
 
   // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-
   const openMenu = () => {
     setMenuOpen(true);
     Animated.timing(anim, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -95,20 +80,26 @@ export default function DashboardScreen() {
       ({ finished }) => finished && setMenuOpen(false)
     );
   };
-
   const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
   const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  // é admin?
-  const isAdmin = isAdminEmail(user.email); // <- NOVO
+  // HOJE (range)
+  const todayRange = useMemo(() => {
+    const s = new Date(); s.setHours(0,0,0,0);
+    const e = new Date(); e.setHours(23,59,59,999);
+    return { start: s.getTime(), end: e.getTime() };
+  }, []);
 
-  // carregar perfil e agendamentos
+  // lista de “agendamentos hoje” (TODOS os users)
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+
+  // carregar perfil do próprio admin e agendamentos de hoje
   useEffect(() => {
     const db = getFirestore();
 
     // perfil
-    const userRef = doc(db, 'users', uid);
-    const unsubProfile = onSnapshot(userRef, (snap) => {
+    const unsubProfile = onDocSnap(doc(db, 'users', uid), (snap) => {
       const data = snap.data() as UserProfile | undefined;
       if (data) {
         setProfile((p) => ({
@@ -119,27 +110,31 @@ export default function DashboardScreen() {
       }
     });
 
-    // agendamentos
-    const q = query(collection(db, 'users', uid, 'appointments'), orderBy('whenMs', 'desc'));
+    // agendamentos de HOJE (collectionGroup across users)
+    const qy = query(
+      collectionGroup(db, 'appointments'),
+      where('whenMs', '>=', todayRange.start),
+      where('whenMs', '<=', todayRange.end),
+      orderBy('whenMs', 'asc')
+    );
 
     const unsubList = onSnapshot(
-      q,
+      qy,
       (snap) => {
-        const arr: Appointment[] = snap.docs
-          .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
-            const v = d.data() as any;
-            if (typeof v?.whenMs !== 'number') return null;
-            return {
-              id: d.id,
-              vehicleType: v.vehicleType ?? 'Carro',
-              carCategory: v.carCategory ?? null,
-              serviceLabel: v.serviceLabel ?? null,
-              price: typeof v.price === 'number' ? v.price : null,
-              whenMs: v.whenMs,
-            } as Appointment;
-          })
-          .filter(Boolean) as Appointment[];
-
+        const arr: Appointment[] = snap.docs.map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
+          const v = d.data() as any;
+          const pathParts = d.ref.path.split('/'); // users/{uid}/appointments/{id}
+          const parentUid = pathParts[1] ?? '';
+          return {
+            id: d.id,
+            uid: parentUid,
+            serviceLabel: v.serviceLabel ?? null,
+            vehicleType: (v.vehicleType as 'Carro' | 'Moto') ?? 'Carro',
+            carCategory: v.carCategory ?? null,
+            price: typeof v.price === 'number' ? v.price : null,
+            whenMs: v.whenMs as number,
+          };
+        });
         setAppointments(arr);
         setLoadingList(false);
       },
@@ -150,54 +145,9 @@ export default function DashboardScreen() {
       unsubProfile();
       unsubList();
     };
-  }, [uid, user.photoURL]);
+  }, [uid, user.photoURL, todayRange.end, todayRange.start]);
 
-  // picker base64
-  const pickAsBase64 = async () => {
-    const opts: ImageLibraryOptions = {
-      mediaType: 'photo',
-      selectionLimit: 1,
-      includeBase64: true,
-      quality: 0.6,
-      maxWidth: 640,
-      maxHeight: 640,
-    };
-    const res = await launchImageLibrary(opts);
-    if (res.didCancel) return null;
-    const a: Asset | undefined = res.assets?.[0];
-    if (!a?.base64) return null;
-    const mime = a.type && a.type.startsWith('image/') ? a.type : 'image/jpeg';
-    return `data:${mime};base64,${a.base64}`;
-  };
-
-  const saveCover = async () => {
-    try {
-      const b64 = await pickAsBase64();
-      if (!b64) return;
-      setSaving('cover');
-      await setDoc(doc(getFirestore(), 'users', uid), { coverB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, coverB64: b64 }));
-    } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const saveAvatar = async () => {
-    try {
-      const b64 = await pickAsBase64();
-      if (!b64) return;
-      setSaving('avatar');
-      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, photoB64: b64 }));
-    } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
-    } finally {
-      setSaving(null);
-    }
-  };
-
+  // helpers UI
   const coverSource =
     profile.coverB64
       ? { uri: profile.coverB64 }
@@ -205,32 +155,8 @@ export default function DashboardScreen() {
       ? { uri: profile.coverUrl }
       : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
   const avatarSource = profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
+  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Administrador';
 
-  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Usuário';
-
-  // ações drawer
-  const goProfile = () => {
-    closeMenu();
-    Alert.alert('Meu Perfil', 'Navegar para Perfil (TODO)');
-  };
-  const goHistory = () => {
-    closeMenu();
-    Alert.alert('Histórico', 'Navegar para Histórico (TODO)');
-  };
-  const goAdmin = () => { // <- NOVO
-    closeMenu();
-    navigation.navigate('Admin');
-  };
-  const doSignOut = async () => {
-    closeMenu();
-    try {
-      await signOut();
-    } catch {
-      Alert.alert('Erro', 'Falha ao sair. Tente novamente.');
-    }
-  };
-
-  // helpers UI
   const formatCurrency = (v: number | null) => (typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--');
   const formatDate = (ms: number) => {
     const d = new Date(ms);
@@ -259,19 +185,30 @@ export default function DashboardScreen() {
     );
   };
 
-  const EmptyList = () => (
-    <View style={styles.emptyWrap}>
-      <Text style={styles.emptyText}>Você ainda não possui serviços.</Text>
-      <TouchableOpacity
-        style={styles.primaryBtn}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('Appointment')}
-      >
-        <Calendar size={18} color={colors.bg} />
-        <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // ações drawer
+  const goProfile = () => {
+    closeMenu();
+    Alert.alert('Meu Perfil', 'Navegar para Perfil (TODO)');
+  };
+  const goHistory = () => {
+    closeMenu();
+    Alert.alert('Histórico', 'Navegar para Histórico (TODO)');
+  };
+  const goManage = () => {
+    closeMenu();
+    navigation.navigate('Admin'); // vai para a tela de GERENCIAR (serviços/horários)
+  };
+  const doSignOut = async () => {
+    closeMenu();
+    try {
+      await auth.signOut();
+    } catch {
+      Alert.alert('Erro', 'Falha ao sair. Tente novamente.');
+    }
+  };
+
+  // animações
+  const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -283,34 +220,24 @@ export default function DashboardScreen() {
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={saveCover} style={styles.coverBtn} activeOpacity={0.9}>
-              {saving === 'cover' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.coverBtnTxt}>Trocar capa</Text>}
-            </TouchableOpacity>
+            {/* no admin não tem botão “Trocar capa” aqui; pode adicionar depois se quiser */}
           </ImageBackground>
         </View>
 
         {/* AVATAR */}
         <View style={styles.avatarContainer}>
-          <TouchableOpacity onPress={saveAvatar} activeOpacity={0.9}>
-            {avatarSource ? (
-              <Image source={avatarSource} style={styles.avatarImg} />
-            ) : (
-              <View style={[styles.avatarImg, styles.avatarFallback]}>
-                <Text style={styles.avatarPlaceholder}>Insira sua foto</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {saving === 'avatar' && (
-            <View style={styles.avatarLoading}>
-              <ActivityIndicator color={colors.white} />
+          {avatarSource ? (
+            <Image source={avatarSource} style={styles.avatarImg} />
+          ) : (
+            <View style={[styles.avatarImg, styles.avatarFallback]}>
+              <Text style={styles.avatarPlaceholder}>Foto</Text>
             </View>
           )}
         </View>
 
         {/* BODY */}
         <View style={styles.body}>
-          <Text style={styles.sectionTitle}>Últimos serviços</Text>
+          <Text style={styles.sectionTitle}>Agendamentos hoje</Text>
 
           {loadingList ? (
             <View style={{ paddingTop: 24 }}>
@@ -324,7 +251,7 @@ export default function DashboardScreen() {
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<EmptyList />}
+              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado para hoje.</Text>}
             />
           )}
         </View>
@@ -332,10 +259,7 @@ export default function DashboardScreen() {
         {/* OVERLAY + DRAWER */}
         {menuOpen && (
           <>
-            <Animated.View
-              pointerEvents={menuOpen ? 'auto' : 'none'}
-              style={[StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }]}
-            >
+            <Animated.View pointerEvents="auto" style={overlayStyle}>
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
@@ -345,13 +269,6 @@ export default function DashboardScreen() {
                 <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
-              {/* Admin só aparece se o e-mail for de admin */}
-              {isAdmin && (
-                <TouchableOpacity style={styles.item} onPress={goAdmin} activeOpacity={0.8}>
-                  <Text style={styles.itemText}>Admin</Text>
-                </TouchableOpacity>
-              )}
-
               <TouchableOpacity style={styles.item} onPress={goProfile} activeOpacity={0.8}>
                 <UserIcon size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
@@ -360,6 +277,12 @@ export default function DashboardScreen() {
               <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
+              </TouchableOpacity>
+
+              {/* OPÇÃO EXTRA DO ADMIN */}
+              <TouchableOpacity style={styles.item} onPress={goManage} activeOpacity={0.8}>
+                <Calendar size={30} color={colors.sand} />
+                <Text style={styles.itemText}>Gerenciar</Text>
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
@@ -377,7 +300,7 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  // base
+  // base (mesmos do cliente)
   safe: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1 },
 
@@ -392,21 +315,11 @@ const styles = StyleSheet.create({
   header: { flex: 1, justifyContent: 'center' },
   headerImg: { borderBottomLeftRadius: radii.lg, borderBottomRightRadius: radii.lg },
   menuBtn: { position: 'absolute', left: 18, top: 18, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.15)' },
-  coverBtn: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderRadius: 10,
-  },
-  coverBtnTxt: { color: colors.white, fontWeight: '700' },
 
   // avatar
   avatarContainer: {
     alignSelf: 'center',
-    marginTop: -AVATAR / 2,
+    marginTop: -(AVATAR / 2),
     width: AVATAR + 12,
     height: AVATAR + 12,
     borderRadius: (AVATAR + 12) / 2,
@@ -421,14 +334,6 @@ const styles = StyleSheet.create({
   avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colors.black },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
-  avatarLoading: {
-    position: 'absolute',
-    inset: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: AVATAR / 2,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
 
   // body
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
@@ -452,27 +357,11 @@ const styles = StyleSheet.create({
   cardPrice: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 6 },
   cardDate: { color: '#616E7C', fontSize: 15 },
 
-  // empty state
-  emptyWrap: { paddingTop: 16, alignItems: 'center', gap: 16 },
-  emptyText: { color: '#707A86', fontSize: 14 },
-  primaryBtn: {
-    height: 48,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '800' },
-
   // overlay + drawer
-  overlay: { backgroundColor: surfaces.overlay },
+  overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
   drawer: {
     position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
+    left: 0, top: 0, bottom: 0,
     width: MENU_W,
     backgroundColor: surfaces.drawer,
     paddingTop: spacing.md,
