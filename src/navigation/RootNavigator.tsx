@@ -61,9 +61,7 @@ export default function RootNavigator() {
 
   useEffect(() => {
     if (!user) return;
-    ensureShopSettings().catch((err) =>
-      console.error('Erro ao garantir settings/shop:', err)
-    );
+    ensureShopSettings().catch((err) => console.error('Erro ao garantir settings/shop:', err));
   }, [user?.uid]);
 
   if (initializing || (user && loadingRole)) {
@@ -83,8 +81,6 @@ export default function RootNavigator() {
           <Stack.Group>
             <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
             <Stack.Screen name="AdminManage" component={AdminManageScreen} />
-
-            {/* ✅ AQUI é o fix */}
             <Stack.Screen name="AdminHistory" component={AdminHistoryScreen} />
           </Stack.Group>
         ) : (

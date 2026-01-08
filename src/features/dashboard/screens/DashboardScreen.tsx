@@ -97,7 +97,6 @@ export default function DashboardScreen() {
   const noShowMarkedRef = useRef<Set<string>>(new Set());
   const backfillDoneRef = useRef(false);
 
-  // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -163,7 +162,6 @@ export default function DashboardScreen() {
           })
           .filter(Boolean) as Appointment[];
 
-        // fallback no global + backfill
         if (arr.length === 0) {
           try {
             const globalQy = query(
