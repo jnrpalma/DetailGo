@@ -526,6 +526,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 12,
+
   },
   cardLeft: { flex: 1 },
   cardTitle: { color: colors.text, fontSize: 16, fontWeight: '800', marginBottom: 4 },
