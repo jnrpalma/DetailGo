@@ -30,7 +30,6 @@ export async function ensureShopSettings() {
     return { created: true, settings: DEFAULT_SETTINGS };
   }
 
-  // Se existe, opcionalmente garante campos (merge)
   const data = snap.data() as Partial<ShopSettings> | undefined;
 
   const merged: ShopSettings = {
@@ -40,7 +39,6 @@ export async function ensureShopSettings() {
     parallelCapacity: data?.parallelCapacity ?? DEFAULT_SETTINGS.parallelCapacity,
   };
 
-  // Se algum campo estiver faltando, completa sem sobrescrever o que já existe
   await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
 
   return { created: false, settings: merged };

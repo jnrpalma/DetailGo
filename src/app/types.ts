@@ -1,4 +1,3 @@
-// @app/types.ts
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -6,7 +5,6 @@ export type RootStackParamList = {
   Dashboard: undefined;
   Appointment: undefined;
 
-  // Admin
   AdminDashboard: undefined;
   AdminManage: undefined;
 };
