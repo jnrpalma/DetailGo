@@ -1,3 +1,4 @@
+// @features/scheduling/services/availability.service.ts
 import {
   collection,
   doc,
@@ -34,7 +35,8 @@ export type AppointmentCreateInput = {
   endAtMs: number;
 };
 
-export type AppointmentStatus = 'scheduled' | 'canceled' | 'done';
+// ✅ sem canceled por enquanto
+export type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
 
 type AppointmentDoc = {
   dayKey?: string;
@@ -159,11 +161,10 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
   const cfg = await getShopSettings();
   const dayKey = toDayKey(input.startAtMs);
 
-  // ✅ pega nome do cliente 1x (fora da transaction)
+  // pega nome do cliente 1x (fora da transaction)
   const userSnap = await getDoc(doc(db, 'users', input.customerUid));
   const userData = (userSnap.data() ?? {}) as { firstName?: string; lastName?: string };
-  const customerName =
-    `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim() || 'Cliente';
+  const customerName = `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim() || 'Cliente';
 
   return runTransaction(db, async (tx) => {
     // checa capacity
@@ -189,12 +190,11 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
       throw err;
     }
 
-    // cria global
     const apptRef = doc(collection(db, 'appointments'));
     tx.set(apptRef, {
       dayKey,
       customerUid: input.customerUid,
-      customerName, // ✅ NOVO
+      customerName,
       vehicleType: input.vehicleType,
       carCategory: input.carCategory,
       serviceLabel: input.serviceLabel,
@@ -202,22 +202,22 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
       price: input.price,
       startAtMs: input.startAtMs,
       endAtMs: input.endAtMs,
-      status: 'scheduled',
+      status: 'scheduled' as AppointmentStatus,
       createdAt: serverTimestamp(),
     });
 
-    // espelho no usuário (mesmo id do global) + appointmentId
+    // ✅ espelho sempre no usuário (id = appointmentId)
     const userRef = doc(db, 'users', input.customerUid, 'appointments', apptRef.id);
     tx.set(userRef, {
       dayKey,
       appointmentId: apptRef.id,
-      customerName, // ✅ opcional, mas útil
+      customerName,
       vehicleType: input.vehicleType,
       carCategory: input.carCategory,
       serviceLabel: input.serviceLabel,
       price: input.price,
       whenMs: input.startAtMs,
-      status: 'scheduled',
+      status: 'scheduled' as AppointmentStatus,
       createdAt: serverTimestamp(),
     });
 

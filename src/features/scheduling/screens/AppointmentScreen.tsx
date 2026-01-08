@@ -1,3 +1,4 @@
+// AppointmentScreen.tsx (o seu arquivo de agendamento - sem mudanças de regra, só mantive igual ao que você mandou)
 import React, { useMemo, useState } from 'react';
 import {
   View,

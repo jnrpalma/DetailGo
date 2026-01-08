@@ -1,3 +1,4 @@
+// AdminDashboardScreen.tsx (ADMIN) - Query robusta por range + filtro local (sem "in" / sem index composto)
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -22,7 +23,6 @@ import {
   getFirestore,
   collection,
   onSnapshot,
-  getDocs,
   orderBy,
   query,
   where,
@@ -33,7 +33,7 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import { Menu, User as UserIcon, History, LogOut, Calendar, CheckCircle2, XCircle } from 'lucide-react-native';
+import { Menu, User as UserIcon, History, LogOut, Calendar, PlayCircle, CheckCircle2 } from 'lucide-react-native';
 import type { RootStackParamList } from '@app/types';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 
@@ -51,6 +51,8 @@ type UserProfile = {
   role?: 'admin' | 'user';
 };
 
+type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
+
 type Appointment = {
   id: string;
   customerUid: string;
@@ -60,13 +62,15 @@ type Appointment = {
   carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
   price: number | null;
   startAtMs: number;
-  status: 'scheduled' | 'canceled' | 'done';
+  status: AppointmentStatus;
   dayKey?: string;
 };
 
 const COVER_H = 285;
 const AVATAR = 130;
 const MENU_W = 220;
+
+const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
 
 function toDayKey(date: Date) {
   const yyyy = date.getFullYear();
@@ -104,8 +108,7 @@ function normalizeAppointmentFromDoc(d: FirebaseFirestoreTypes.QueryDocumentSnap
   const startAtMs = Number(v.startAtMs ?? 0);
   if (!startAtMs) return null;
 
-  const status = (v.status as Appointment['status']) ?? 'scheduled';
-  if (status !== 'scheduled') return null;
+  const status = (v.status ?? 'scheduled') as AppointmentStatus;
 
   const customerUid = String(v.customerUid ?? '');
   if (!customerUid) return null;
@@ -125,20 +128,24 @@ function normalizeAppointmentFromDoc(d: FirebaseFirestoreTypes.QueryDocumentSnap
 }
 
 export default function AdminDashboardScreen() {
-  // ✅ Hooks SEMPRE no topo, SEM return antes disso
   const navigation = useNavigation<Nav>();
 
   const auth = getAuth();
-  const user = auth.currentUser; // ✅ pode ser null sem quebrar
+  const user = auth.currentUser;
 
   const [profile, setProfile] = useState<UserProfile>({});
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingList, setLoadingList] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // evita loop marcando no_show toda hora
+  const noShowMarkedRef = useRef<Set<string>>(new Set());
 
   // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
+  // ⚠️ hoje atual (se quiser “virar o dia” sem reiniciar a tela, dá pra trocar por state + setInterval)
   const today = useMemo(() => new Date(), []);
   const todayKey = useMemo(() => toDayKey(today), [today]);
 
@@ -173,32 +180,25 @@ export default function AdminDashboardScreen() {
   };
 
   const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
-    const updated: Appointment[] = [];
-
-    await Promise.all(
+    // mantém ordem original
+    const updated = await Promise.all(
       list.map(async (it) => {
-        if (it.customerName && it.customerName !== 'Cliente') {
-          updated.push(it);
-          return;
-        }
+        if (it.customerName && it.customerName !== 'Cliente') return it;
 
         const name = await resolveCustomerName(it.customerUid);
 
+        // tenta corrigir nome no global
         try {
           await updateDoc(doc(getFirestore(), 'appointments', it.id), { customerName: name });
-        } catch {
-          // ignora
-        }
+        } catch {}
 
-        updated.push({ ...it, customerName: name });
+        return { ...it, customerName: name };
       })
     );
 
-    updated.sort((a, b) => a.startAtMs - b.startAtMs);
     setAppointments(updated);
   };
 
-  // ✅ Se não tiver user ainda, só fica em loading (sem quebrar hooks)
   useEffect(() => {
     if (!user?.uid) return;
     const db = getFirestore();
@@ -221,55 +221,64 @@ export default function AdminDashboardScreen() {
     const db = getFirestore();
     setLoadingList(true);
 
-    const qyDayKey = query(
+    const dayStart = startOfDayMs(today);
+    const dayEnd = endOfDayMs(today);
+
+    // ✅ Query ÚNICA e robusta: range por startAtMs (sem "in", sem dayKey)
+    const qyRange = query(
       collection(db, 'appointments'),
-      where('dayKey', '==', todayKey),
-      where('status', '==', 'scheduled'),
+      where('startAtMs', '>=', dayStart),
+      where('startAtMs', '<=', dayEnd),
       orderBy('startAtMs', 'asc')
     );
 
     const unsub = onSnapshot(
-      qyDayKey,
+      qyRange,
       async (snap) => {
-        const byDayKey = snap.docs
+        const now = Date.now();
+
+        const raw = snap.docs
           .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => normalizeAppointmentFromDoc(d))
           .filter(Boolean) as Appointment[];
 
-        const dayStart = startOfDayMs(today);
-        const dayEnd = endOfDayMs(today);
+        // ✅ filtra status localmente (o Admin quer ver só scheduled e in_progress na lista principal)
+        const merged = raw.filter((it) => it.status === 'scheduled' || it.status === 'in_progress');
 
-        let byRange: Appointment[] = [];
-        try {
-          const qyRange = query(
-            collection(db, 'appointments'),
-            where('status', '==', 'scheduled'),
-            where('startAtMs', '>=', dayStart),
-            where('startAtMs', '<=', dayEnd),
-            orderBy('startAtMs', 'asc')
+        // ✅ auto no_show (se passou 15 min e ainda estava scheduled)
+        const expiredScheduled = merged.filter(
+          (it) => it.status === 'scheduled' && now > it.startAtMs + NO_SHOW_GRACE_MS && !noShowMarkedRef.current.has(it.id)
+        );
+
+        if (expiredScheduled.length > 0) {
+          await Promise.all(
+            expiredScheduled.map(async (it) => {
+              noShowMarkedRef.current.add(it.id);
+              try {
+                await updateAppointmentStatus({
+                  appointmentId: it.id,
+                  customerUid: it.customerUid,
+                  status: 'no_show',
+                });
+              } catch {
+                noShowMarkedRef.current.delete(it.id);
+              }
+            })
           );
-          const rangeSnap = await getDocs(qyRange);
-          byRange = rangeSnap.docs
-            .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => normalizeAppointmentFromDoc(d))
-            .filter(Boolean) as Appointment[];
-        } catch {
-          byRange = [];
         }
-
-        const map = new Map<string, Appointment>();
-        [...byRange, ...byDayKey].forEach((it) => map.set(it.id, it));
-
-        const merged = Array.from(map.values()).sort((a, b) => a.startAtMs - b.startAtMs);
 
         setLoadingList(false);
         await fillMissingNamesAndUpdate(merged);
       },
-      () => setLoadingList(false)
+      (err) => {
+        console.log('ADMIN onSnapshot error:', err);
+        setLoadingList(false);
+        Alert.alert('Erro', 'Falha ao carregar agendamentos do dia (ver console).');
+      }
     );
 
     return () => unsub();
-  }, [user?.uid, todayKey, today]);
+  }, [user?.uid, today]);
 
-  // ✅ Bloqueio admin (sem return antes dos hooks)
   useEffect(() => {
     if (!user?.uid) return;
     if (profile.role && profile.role !== 'admin') {
@@ -278,7 +287,6 @@ export default function AdminDashboardScreen() {
     }
   }, [profile.role, navigation, user?.uid]);
 
-  // Render fallback se user ainda não carregou
   if (!user?.uid) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -297,65 +305,73 @@ export default function AdminDashboardScreen() {
       : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
 
   const avatarSource =
-    profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : user.photoURL ? { uri: user.photoURL } : undefined;
+    profile.photoB64
+      ? { uri: profile.photoB64 }
+      : profile.photoURL
+      ? { uri: profile.photoURL }
+      : user.photoURL
+      ? { uri: user.photoURL }
+      : undefined;
 
-  const fullName =
-    profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Administrador';
+  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Administrador';
 
-  const confirmDone = (item: Appointment) => {
+  const alertCannotWork = () => {
     Alert.alert(
-      'Concluir serviço',
-      `Concluir ${item.serviceLabel ?? 'Serviço'} de ${item.customerName} às ${formatHour(item.startAtMs)}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Concluir',
-          onPress: async () => {
-            try {
-              await updateAppointmentStatus({
-                appointmentId: item.id,
-                customerUid: item.customerUid,
-                status: 'done',
-              });
-            } catch (e) {
-              console.error(e);
-              Alert.alert('Erro', 'Não foi possível concluir.');
-            }
-          },
-        },
-      ]
+      'Serviço não realizado',
+      'Já passaram 15 minutos do horário marcado.\nEsse agendamento é considerado NÃO REALIZADO e não pode mais ser iniciado/concluído.'
     );
   };
 
-  const confirmCancel = (item: Appointment) => {
-    Alert.alert(
-      'Cancelar agendamento',
-      `Cancelar ${item.serviceLabel ?? 'Serviço'} de ${item.customerName} às ${formatHour(item.startAtMs)}?`,
-      [
-        { text: 'Voltar', style: 'cancel' },
-        {
-          text: 'Cancelar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await updateAppointmentStatus({
-                appointmentId: item.id,
-                customerUid: item.customerUid,
-                status: 'canceled',
-              });
-            } catch (e) {
-              console.error(e);
-              Alert.alert('Erro', 'Não foi possível cancelar.');
-            }
-          },
-        },
-      ]
-    );
+  const doUpdate = async (item: Appointment, next: AppointmentStatus) => {
+    if (updatingId) return;
+    setUpdatingId(item.id);
+    try {
+      await updateAppointmentStatus({
+        appointmentId: item.id,
+        customerUid: item.customerUid,
+        status: next,
+      });
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Erro', e?.code === 'APPOINTMENT_EXPIRED' ? 'Agendamento expirado.' : 'Não foi possível atualizar.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const renderAppointment = ({ item }: { item: Appointment }) => {
-    const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+
+    const expired = Date.now() > item.startAtMs + NO_SHOW_GRACE_MS;
+    const isNoShow = item.status === 'scheduled' && expired;
+
+    const displayStatus: AppointmentStatus = isNoShow ? 'no_show' : item.status;
+
+    const statusLabel =
+      displayStatus === 'in_progress'
+        ? 'Em andamento'
+        : displayStatus === 'done'
+        ? 'Concluído'
+        : displayStatus === 'no_show'
+        ? 'Não realizado'
+        : 'Agendado';
+
+    const statusColor =
+      displayStatus === 'done'
+        ? '#16A34A'
+        : displayStatus === 'in_progress'
+        ? '#2563EB'
+        : displayStatus === 'no_show'
+        ? '#DC2626'
+        : '#6B7280';
+
+    const canPress = !isNoShow && updatingId !== item.id;
+    const action =
+      displayStatus === 'scheduled'
+        ? { label: 'Começar', icon: <PlayCircle size={18} color={colors.bg} />, next: 'in_progress' as AppointmentStatus }
+        : displayStatus === 'in_progress'
+        ? { label: 'Concluir', icon: <CheckCircle2 size={18} color={colors.bg} />, next: 'done' as AppointmentStatus }
+        : null;
 
     return (
       <View style={styles.card}>
@@ -367,19 +383,37 @@ export default function AdminDashboardScreen() {
             {subtitle} • {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
           </Text>
 
+          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+
           <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.doneBtn} onPress={() => confirmDone(item)} activeOpacity={0.85}>
-            <CheckCircle2 size={18} color={colors.bg} />
-            <Text style={styles.doneText}>Done</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => confirmCancel(item)} activeOpacity={0.85}>
-            <XCircle size={18} color={colors.bg} />
-            <Text style={styles.cancelText}>Cancelar</Text>
-          </TouchableOpacity>
+          {action ? (
+            <TouchableOpacity
+              style={[
+                styles.primaryActionBtn,
+                displayStatus === 'in_progress' && styles.primaryActionBtnAlt,
+                (!canPress || isNoShow) && styles.disabledBtn,
+              ]}
+              onPress={() => (isNoShow ? alertCannotWork() : doUpdate(item, action.next))}
+              activeOpacity={0.85}
+              disabled={!canPress || isNoShow}
+            >
+              {updatingId === item.id ? (
+                <ActivityIndicator color={colors.bg} />
+              ) : (
+                <>
+                  {action.icon}
+                  <Text style={styles.primaryActionText}>{action.label}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.primaryActionBtn, styles.disabledBtn]}>
+              <Text style={styles.primaryActionText}>Sem ação</Text>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -526,40 +560,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 12,
-
   },
   cardLeft: { flex: 1 },
   cardTitle: { color: colors.text, fontSize: 16, fontWeight: '800', marginBottom: 4 },
   cardClient: { fontSize: 14, fontWeight: '900', color: '#111827', marginBottom: 6 },
-  cardSubtitle: { color: '#616E7C', fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  cardSubtitle: { color: '#616E7C', fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  statusText: { fontSize: 13, fontWeight: '900', marginBottom: 8 },
   cardPrice: { color: colors.primary, fontSize: 14, fontWeight: '900' },
 
   actions: { gap: 10 },
-  doneBtn: {
+  primaryActionBtn: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: '#2563EB',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    minWidth: 130,
+    justifyContent: 'center',
   },
-  doneText: { color: colors.bg, fontWeight: '900' },
-  cancelBtn: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  cancelText: { color: colors.bg, fontWeight: '900' },
+  primaryActionBtnAlt: { backgroundColor: colors.primary },
+  primaryActionText: { color: colors.bg, fontWeight: '900' },
+  disabledBtn: { opacity: 0.45 },
 
   overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
   drawer: {
     position: 'absolute',
-    left: 0, top: 0, bottom: 0,
+    left: 0,
+    top: 0,
+    bottom: 0,
     width: MENU_W,
     backgroundColor: surfaces.drawer,
     paddingTop: spacing.md,

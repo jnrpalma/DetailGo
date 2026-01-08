@@ -1,3 +1,6 @@
+// DashboardScreen.tsx (USER) - Botão "Agendar Serviço" sempre visível (topo)
+// + mantém fallback no global + backfill do espelho
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { launchImageLibrary, ImageLibraryOptions, Asset } from 'react-native-image-picker';
+import { launchImageLibrary, type ImageLibraryOptions, type Asset } from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   getFirestore,
@@ -28,14 +31,21 @@ import {
   collection,
   query,
   orderBy,
+  where,
+  getDocs,
+  limit,
+  type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
 import { useAuth } from '@features/auth/context/AuthContext';
 import { isAdminEmail } from '@features/auth/utils/roles';
 import { Menu, User as UserIcon, History, LogOut, Calendar } from 'lucide-react-native';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
+import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
+import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type UserProfile = {
   firstName?: string;
@@ -53,19 +63,20 @@ type Appointment = {
   serviceLabel: string | null;
   price: number | null;
   whenMs: number;
-  status: 'scheduled' | 'canceled' | 'done';
+  status: AppointmentStatus;
 };
 
 const COVER_H = 285;
 const AVATAR = 130;
 const MENU_W = 220;
 
+const NO_SHOW_GRACE_MIN = 15;
+const NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN * 60 * 1000;
+
 LogBox.ignoreLogs([
   'SafeAreaView has been deprecated',
   'This method is deprecated (as well as all React Native Firebase namespaced API)',
 ]);
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function DashboardScreen() {
   const navigation = useNavigation<Nav>();
@@ -76,11 +87,16 @@ export default function DashboardScreen() {
 
   const { signOut } = useAuth();
 
-  const [profile, setProfile] = useState<UserProfile>({ photoURL: user.photoURL ?? undefined });
+  const [profile, setProfile] = useState<UserProfile>({
+    photoURL: user.photoURL ?? undefined,
+  });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingList, setLoadingList] = useState(true);
+
+  const noShowMarkedRef = useRef<Set<string>>(new Set());
+  const backfillDoneRef = useRef(false);
 
   // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
@@ -88,16 +104,30 @@ export default function DashboardScreen() {
 
   const openMenu = () => {
     setMenuOpen(true);
-    Animated.timing(anim, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   };
   const closeMenu = () => {
-    Animated.timing(anim, { toValue: 0, duration: 200, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(
-      ({ finished }) => finished && setMenuOpen(false)
-    );
+    Animated.timing(anim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => finished && setMenuOpen(false));
   };
 
-  const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
-  const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const drawerTx = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-MENU_W, 0],
+  });
+  const overlayOpacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   const isAdmin = isAdminEmail(user.email);
 
@@ -120,7 +150,9 @@ export default function DashboardScreen() {
 
     const unsubList = onSnapshot(
       qy,
-      (snap) => {
+      async (snap) => {
+        const now = Date.now();
+
         const arr: Appointment[] = snap.docs
           .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
             const v = d.data() as any;
@@ -133,10 +165,129 @@ export default function DashboardScreen() {
               serviceLabel: v.serviceLabel ?? null,
               price: typeof v.price === 'number' ? v.price : null,
               whenMs: v.whenMs,
-              status: (v.status ?? 'scheduled') as Appointment['status'],
+              status: (v.status ?? 'scheduled') as AppointmentStatus,
             } as Appointment;
           })
           .filter(Boolean) as Appointment[];
+
+        // ✅ fallback no global + backfill do espelho (caso espelho vazio)
+        if (arr.length === 0) {
+          try {
+            const globalQy = query(
+              collection(db, 'appointments'),
+              where('customerUid', '==', uid),
+              orderBy('startAtMs', 'desc'),
+              limit(30)
+            );
+            const globalSnap = await getDocs(globalQy);
+
+            const fromGlobal: Appointment[] = globalSnap.docs
+              .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
+                const v = d.data() as any;
+                const startAtMs = Number(v?.startAtMs ?? 0);
+                if (!startAtMs) return null;
+                return {
+                  id: d.id,
+                  vehicleType: v.vehicleType ?? 'Carro',
+                  carCategory: v.carCategory ?? null,
+                  serviceLabel: v.serviceLabel ?? null,
+                  price: typeof v.price === 'number' ? v.price : null,
+                  whenMs: startAtMs,
+                  status: (v.status ?? 'scheduled') as AppointmentStatus,
+                } as Appointment;
+              })
+              .filter(Boolean) as Appointment[];
+
+            // backfill 1x
+            if (!backfillDoneRef.current && fromGlobal.length > 0) {
+              backfillDoneRef.current = true;
+
+              await Promise.all(
+                fromGlobal.map(async (it) => {
+                  const g = globalSnap.docs.find(
+                    (x: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>) => x.id === it.id
+                  );
+                  const gv = (g?.data() ?? {}) as any;
+
+                  const mirrorRef = doc(db, 'users', uid, 'appointments', it.id);
+                  await setDoc(
+                    mirrorRef,
+                    {
+                      appointmentId: it.id,
+                      dayKey: gv.dayKey,
+                      customerName: gv.customerName ?? 'Cliente',
+                      vehicleType: it.vehicleType,
+                      carCategory: it.carCategory,
+                      serviceLabel: it.serviceLabel,
+                      price: it.price,
+                      whenMs: it.whenMs,
+                      status: it.status,
+                      createdAt: gv.createdAt ?? undefined,
+                      updatedAt: gv.updatedAt ?? undefined,
+                    },
+                    { merge: true }
+                  );
+                })
+              );
+            }
+
+            // auto no_show (global enquanto espelho não existe)
+            const shouldMarkGlobal = fromGlobal.filter(
+              (it) =>
+                it.status === 'scheduled' &&
+                now > it.whenMs + NO_SHOW_GRACE_MS &&
+                !noShowMarkedRef.current.has(it.id)
+            );
+
+            if (shouldMarkGlobal.length > 0) {
+              await Promise.all(
+                shouldMarkGlobal.map(async (it) => {
+                  noShowMarkedRef.current.add(it.id);
+                  try {
+                    await updateAppointmentStatus({
+                      appointmentId: it.id,
+                      customerUid: uid,
+                      status: 'no_show',
+                    });
+                  } catch {
+                    noShowMarkedRef.current.delete(it.id);
+                  }
+                })
+              );
+            }
+
+            setAppointments(fromGlobal);
+            setLoadingList(false);
+            return;
+          } catch (e) {
+            console.log('Fallback global appointments failed:', e);
+          }
+        }
+
+        // auto no_show: espelho
+        const shouldMark = arr.filter(
+          (it) =>
+            it.status === 'scheduled' &&
+            now > it.whenMs + NO_SHOW_GRACE_MS &&
+            !noShowMarkedRef.current.has(it.id)
+        );
+
+        if (shouldMark.length > 0) {
+          await Promise.all(
+            shouldMark.map(async (it) => {
+              noShowMarkedRef.current.add(it.id);
+              try {
+                await updateAppointmentStatus({
+                  appointmentId: it.id,
+                  customerUid: uid,
+                  status: 'no_show',
+                });
+              } catch {
+                noShowMarkedRef.current.delete(it.id);
+              }
+            })
+          );
+        }
 
         setAppointments(arr);
         setLoadingList(false);
@@ -195,12 +346,11 @@ export default function DashboardScreen() {
     }
   };
 
-  const coverSource =
-    profile.coverB64
-      ? { uri: profile.coverB64 }
-      : profile.coverUrl
-      ? { uri: profile.coverUrl }
-      : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
+  const coverSource = profile.coverB64
+    ? { uri: profile.coverB64 }
+    : profile.coverUrl
+    ? { uri: profile.coverUrl }
+    : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
 
   const avatarSource = profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
 
@@ -215,7 +365,6 @@ export default function DashboardScreen() {
     Alert.alert('Histórico', 'Navegar para Histórico (TODO)');
   };
 
-  // ✅ Admin vai pro painel (AdminDashboard)
   const goAdmin = () => {
     closeMenu();
     navigation.navigate('AdminDashboard');
@@ -238,38 +387,51 @@ export default function DashboardScreen() {
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
   };
+  const formatHour = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const renderAppointment = ({ item }: { item: Appointment }) => {
-    const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
 
     const statusLabel =
-      item.status === 'scheduled' ? 'Agendado' : item.status === 'done' ? 'Concluído' : 'Cancelado';
+      item.status === 'scheduled'
+        ? 'Agendado'
+        : item.status === 'in_progress'
+        ? 'Em andamento'
+        : item.status === 'done'
+        ? 'Concluído'
+        : 'Não realizado';
+
+    const statusColor =
+      item.status === 'done'
+        ? '#16A34A'
+        : item.status === 'in_progress'
+        ? '#2563EB'
+        : item.status === 'no_show'
+        ? '#DC2626'
+        : '#6B7280';
 
     return (
       <View style={styles.card}>
         <View style={styles.cardLeft}>
           <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
           <Text style={styles.cardSubtitle}>{subtitle}</Text>
-          <Text style={{ color: '#6B7280', fontWeight: '800', marginTop: 6 }}>{statusLabel}</Text>
+          <Text style={{ color: statusColor, fontWeight: '900', marginTop: 6 }}>{statusLabel}</Text>
         </View>
 
         <View style={styles.cardRight}>
           <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
-          <Text style={styles.cardDate}>{formatDate(item.whenMs)}</Text>
+          <Text style={styles.cardDate}>
+            {formatDate(item.whenMs)} • {formatHour(item.whenMs)}
+          </Text>
         </View>
       </View>
     );
   };
 
-  const EmptyList = () => (
-    <View style={styles.emptyWrap}>
-      <Text style={styles.emptyText}>Você ainda não possui serviços.</Text>
-      <TouchableOpacity
-        style={styles.primaryBtn}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('Appointment')}
-      >
+  // ✅ botão sempre visível, independente de ter serviços ou não
+  const HeaderCTA = () => (
+    <View style={styles.ctaWrap}>
+      <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => navigation.navigate('Appointment')}>
         <Calendar size={18} color={colors.bg} />
         <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
       </TouchableOpacity>
@@ -312,6 +474,9 @@ export default function DashboardScreen() {
         <View style={styles.body}>
           <Text style={styles.sectionTitle}>Últimos serviços</Text>
 
+          {/* ✅ CTA fixo no topo */}
+          <HeaderCTA />
+
           {loadingList ? (
             <View style={{ paddingTop: 24 }}>
               <ActivityIndicator />
@@ -324,7 +489,7 @@ export default function DashboardScreen() {
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<EmptyList />}
+              ListEmptyComponent={<Text style={styles.emptyText}>Você ainda não possui serviços.</Text>}
             />
           )}
         </View>
@@ -379,15 +544,25 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   headerWrapper: {
-    height: 285,
+    height: COVER_H,
     borderBottomLeftRadius: radii.lg,
     borderBottomRightRadius: radii.lg,
     overflow: 'hidden',
     backgroundColor: colors.primary,
   },
   header: { flex: 1, justifyContent: 'center' },
-  headerImg: { borderBottomLeftRadius: radii.lg, borderBottomRightRadius: radii.lg },
-  menuBtn: { position: 'absolute', left: 18, top: 18, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.15)' },
+  headerImg: {
+    borderBottomLeftRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
+  },
+  menuBtn: {
+    position: 'absolute',
+    left: 18,
+    top: 18,
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
   coverBtn: {
     position: 'absolute',
     right: 12,
@@ -401,10 +576,10 @@ const styles = StyleSheet.create({
 
   avatarContainer: {
     alignSelf: 'center',
-    marginTop: -130 / 2,
-    width: 130 + 12,
-    height: 130 + 12,
-    borderRadius: (130 + 12) / 2,
+    marginTop: -AVATAR / 2,
+    width: AVATAR + 12,
+    height: AVATAR + 12,
+    borderRadius: (AVATAR + 12) / 2,
     backgroundColor: colors.white,
     padding: 6,
     elevation: 6,
@@ -413,7 +588,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: { width: 130, height: 130, borderRadius: 130 / 2, backgroundColor: colors.black },
+  avatarImg: {
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    backgroundColor: colors.black,
+  },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
   avatarLoading: {
@@ -421,12 +601,39 @@ const styles = StyleSheet.create({
     inset: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 130 / 2,
+    borderRadius: AVATAR / 2,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
 
-  body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
-  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 20, color: colors.text },
+  body: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    backgroundColor: colors.bg,
+  },
+  sectionTitle: {
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 12,
+    color: colors.text,
+  },
+
+  // ✅ CTA fixo
+  ctaWrap: {
+    marginBottom: 14,
+    alignItems: 'center',
+  },
+  primaryBtn: {
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '800' },
 
   card: {
     flexDirection: 'row',
@@ -440,23 +647,22 @@ const styles = StyleSheet.create({
   },
   cardLeft: { flex: 1 },
   cardRight: { alignItems: 'flex-end' },
-  cardTitle: { color: colors.text, fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  cardTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   cardSubtitle: { color: '#616E7C', fontSize: 15 },
-  cardPrice: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 6 },
+  cardPrice: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
   cardDate: { color: '#616E7C', fontSize: 15 },
 
-  emptyWrap: { paddingTop: 16, alignItems: 'center', gap: 16 },
-  emptyText: { color: '#707A86', fontSize: 14 },
-  primaryBtn: {
-    height: 48,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '800' },
+  emptyText: { color: '#707A86', fontSize: 14, textAlign: 'center', marginTop: 8 },
 
   overlay: { backgroundColor: surfaces.overlay },
   drawer: {
@@ -464,7 +670,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 220,
+    width: MENU_W,
     backgroundColor: surfaces.drawer,
     paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
@@ -478,6 +684,11 @@ const styles = StyleSheet.create({
   },
   drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
   drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+  },
   itemText: { fontSize: 20, color: colors.bg, fontWeight: '600' },
 });
