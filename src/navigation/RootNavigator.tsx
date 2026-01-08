@@ -15,7 +15,11 @@ import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth/context/AuthContext';
 
 import { ensureShopSettings } from '@app/bootstrap/ensureShopSettings';
-import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
+import {
+  doc,
+  getFirestore,
+  onSnapshot,
+} from '@react-native-firebase/firestore';
 import { isAdminEmail } from '@features/auth/utils/roles';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -31,7 +35,6 @@ export default function RootNavigator() {
   const [role, setRole] = useState<UserProfile['role']>(undefined);
   const [loadingRole, setLoadingRole] = useState(false);
 
-  // 🔥 pega role do Firestore (users/{uid}.role)
   useEffect(() => {
     if (!user) {
       setRole(undefined);
@@ -45,24 +48,25 @@ export default function RootNavigator() {
 
     const unsub = onSnapshot(
       ref,
-      (snap) => {
+      snap => {
         const data = (snap.data() ?? {}) as UserProfile;
         setRole(data.role);
         setLoadingRole(false);
       },
-      (err) => {
+      err => {
         console.error('Erro ao carregar role:', err);
         setLoadingRole(false);
-      }
+      },
     );
 
     return unsub;
   }, [user?.uid]);
 
-  // 🔥 seed settings/shop
   useEffect(() => {
     if (!user) return;
-    ensureShopSettings().catch((err) => console.error('Erro ao garantir settings/shop:', err));
+    ensureShopSettings().catch(err =>
+      console.error('Erro ao garantir settings/shop:', err),
+    );
   }, [user?.uid]);
 
   if (initializing || (user && loadingRole)) {
@@ -73,27 +77,26 @@ export default function RootNavigator() {
     );
   }
 
-  // ✅ admin por role, fallback por email
   const isAdmin = role === 'admin' || isAdminEmail(user?.email);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
         isAdmin ? (
-          // ======= FLUXO ADMIN =======
           <Stack.Group>
-            <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+            <Stack.Screen
+              name="AdminDashboard"
+              component={AdminDashboardScreen}
+            />
             <Stack.Screen name="AdminManage" component={AdminManageScreen} />
           </Stack.Group>
         ) : (
-          // ======= FLUXO CLIENTE =======
           <Stack.Group>
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
             <Stack.Screen name="Appointment" component={AppointmentScreen} />
           </Stack.Group>
         )
       ) : (
-        // ======= NÃO LOGADO =======
         <Stack.Group>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />

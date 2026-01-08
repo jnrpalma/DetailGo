@@ -1,4 +1,3 @@
-// AdminDashboardScreen.tsx (ADMIN) - Query robusta por range + filtro local (sem "in" / sem index composto)
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -138,14 +137,11 @@ export default function AdminDashboardScreen() {
   const [loadingList, setLoadingList] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // evita loop marcando no_show toda hora
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
-  // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
-  // ⚠️ hoje atual (se quiser “virar o dia” sem reiniciar a tela, dá pra trocar por state + setInterval)
   const today = useMemo(() => new Date(), []);
   const todayKey = useMemo(() => toDayKey(today), [today]);
 
@@ -180,14 +176,12 @@ export default function AdminDashboardScreen() {
   };
 
   const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
-    // mantém ordem original
     const updated = await Promise.all(
       list.map(async (it) => {
         if (it.customerName && it.customerName !== 'Cliente') return it;
 
         const name = await resolveCustomerName(it.customerUid);
 
-        // tenta corrigir nome no global
         try {
           await updateDoc(doc(getFirestore(), 'appointments', it.id), { customerName: name });
         } catch {}
@@ -224,7 +218,6 @@ export default function AdminDashboardScreen() {
     const dayStart = startOfDayMs(today);
     const dayEnd = endOfDayMs(today);
 
-    // ✅ Query ÚNICA e robusta: range por startAtMs (sem "in", sem dayKey)
     const qyRange = query(
       collection(db, 'appointments'),
       where('startAtMs', '>=', dayStart),
@@ -241,10 +234,8 @@ export default function AdminDashboardScreen() {
           .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => normalizeAppointmentFromDoc(d))
           .filter(Boolean) as Appointment[];
 
-        // ✅ filtra status localmente (o Admin quer ver só scheduled e in_progress na lista principal)
         const merged = raw.filter((it) => it.status === 'scheduled' || it.status === 'in_progress');
 
-        // ✅ auto no_show (se passou 15 min e ainda estava scheduled)
         const expiredScheduled = merged.filter(
           (it) => it.status === 'scheduled' && now > it.startAtMs + NO_SHOW_GRACE_MS && !noShowMarkedRef.current.has(it.id)
         );

@@ -1,6 +1,3 @@
-// DashboardScreen.tsx (USER) - Botão "Agendar Serviço" sempre visível (topo)
-// + mantém fallback no global + backfill do espelho
-
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,7 +18,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { launchImageLibrary, type ImageLibraryOptions, type Asset } from 'react-native-image-picker';
+import {
+  launchImageLibrary,
+  type ImageLibraryOptions,
+  type Asset,
+} from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   getFirestore,
@@ -39,7 +40,13 @@ import {
 
 import { useAuth } from '@features/auth/context/AuthContext';
 import { isAdminEmail } from '@features/auth/utils/roles';
-import { Menu, User as UserIcon, History, LogOut, Calendar } from 'lucide-react-native';
+import {
+  Menu,
+  User as UserIcon,
+  History,
+  LogOut,
+  Calendar,
+} from 'lucide-react-native';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
@@ -98,7 +105,6 @@ export default function DashboardScreen() {
   const noShowMarkedRef = useRef<Set<string>>(new Set());
   const backfillDoneRef = useRef(false);
 
-  // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -135,10 +141,10 @@ export default function DashboardScreen() {
     const db = getFirestore();
 
     const userRef = doc(db, 'users', uid);
-    const unsubProfile = onSnapshot(userRef, (snap) => {
+    const unsubProfile = onSnapshot(userRef, snap => {
       const data = snap.data() as UserProfile | undefined;
       if (data) {
-        setProfile((p) => ({
+        setProfile(p => ({
           ...p,
           ...data,
           photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined,
@@ -146,11 +152,14 @@ export default function DashboardScreen() {
       }
     });
 
-    const qy = query(collection(db, 'users', uid, 'appointments'), orderBy('whenMs', 'desc'));
+    const qy = query(
+      collection(db, 'users', uid, 'appointments'),
+      orderBy('whenMs', 'desc'),
+    );
 
     const unsubList = onSnapshot(
       qy,
-      async (snap) => {
+      async snap => {
         const now = Date.now();
 
         const arr: Appointment[] = snap.docs
@@ -170,14 +179,13 @@ export default function DashboardScreen() {
           })
           .filter(Boolean) as Appointment[];
 
-        // ✅ fallback no global + backfill do espelho (caso espelho vazio)
         if (arr.length === 0) {
           try {
             const globalQy = query(
               collection(db, 'appointments'),
               where('customerUid', '==', uid),
               orderBy('startAtMs', 'desc'),
-              limit(30)
+              limit(30),
             );
             const globalSnap = await getDocs(globalQy);
 
@@ -198,18 +206,25 @@ export default function DashboardScreen() {
               })
               .filter(Boolean) as Appointment[];
 
-            // backfill 1x
             if (!backfillDoneRef.current && fromGlobal.length > 0) {
               backfillDoneRef.current = true;
 
               await Promise.all(
-                fromGlobal.map(async (it) => {
+                fromGlobal.map(async it => {
                   const g = globalSnap.docs.find(
-                    (x: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>) => x.id === it.id
+                    (
+                      x: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
+                    ) => x.id === it.id,
                   );
                   const gv = (g?.data() ?? {}) as any;
 
-                  const mirrorRef = doc(db, 'users', uid, 'appointments', it.id);
+                  const mirrorRef = doc(
+                    db,
+                    'users',
+                    uid,
+                    'appointments',
+                    it.id,
+                  );
                   await setDoc(
                     mirrorRef,
                     {
@@ -225,23 +240,22 @@ export default function DashboardScreen() {
                       createdAt: gv.createdAt ?? undefined,
                       updatedAt: gv.updatedAt ?? undefined,
                     },
-                    { merge: true }
+                    { merge: true },
                   );
-                })
+                }),
               );
             }
 
-            // auto no_show (global enquanto espelho não existe)
             const shouldMarkGlobal = fromGlobal.filter(
-              (it) =>
+              it =>
                 it.status === 'scheduled' &&
                 now > it.whenMs + NO_SHOW_GRACE_MS &&
-                !noShowMarkedRef.current.has(it.id)
+                !noShowMarkedRef.current.has(it.id),
             );
 
             if (shouldMarkGlobal.length > 0) {
               await Promise.all(
-                shouldMarkGlobal.map(async (it) => {
+                shouldMarkGlobal.map(async it => {
                   noShowMarkedRef.current.add(it.id);
                   try {
                     await updateAppointmentStatus({
@@ -252,7 +266,7 @@ export default function DashboardScreen() {
                   } catch {
                     noShowMarkedRef.current.delete(it.id);
                   }
-                })
+                }),
               );
             }
 
@@ -264,17 +278,16 @@ export default function DashboardScreen() {
           }
         }
 
-        // auto no_show: espelho
         const shouldMark = arr.filter(
-          (it) =>
+          it =>
             it.status === 'scheduled' &&
             now > it.whenMs + NO_SHOW_GRACE_MS &&
-            !noShowMarkedRef.current.has(it.id)
+            !noShowMarkedRef.current.has(it.id),
         );
 
         if (shouldMark.length > 0) {
           await Promise.all(
-            shouldMark.map(async (it) => {
+            shouldMark.map(async it => {
               noShowMarkedRef.current.add(it.id);
               try {
                 await updateAppointmentStatus({
@@ -285,14 +298,14 @@ export default function DashboardScreen() {
               } catch {
                 noShowMarkedRef.current.delete(it.id);
               }
-            })
+            }),
           );
         }
 
         setAppointments(arr);
         setLoadingList(false);
       },
-      () => setLoadingList(false)
+      () => setLoadingList(false),
     );
 
     return () => {
@@ -323,8 +336,12 @@ export default function DashboardScreen() {
       const b64 = await pickAsBase64();
       if (!b64) return;
       setSaving('cover');
-      await setDoc(doc(getFirestore(), 'users', uid), { coverB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, coverB64: b64 }));
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { coverB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, coverB64: b64 }));
     } catch (e: any) {
       Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
     } finally {
@@ -337,10 +354,17 @@ export default function DashboardScreen() {
       const b64 = await pickAsBase64();
       if (!b64) return;
       setSaving('avatar');
-      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, photoB64: b64 }));
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { photoB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
+      Alert.alert(
+        'Erro',
+        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
+      );
     } finally {
       setSaving(null);
     }
@@ -352,9 +376,15 @@ export default function DashboardScreen() {
     ? { uri: profile.coverUrl }
     : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
 
-  const avatarSource = profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
+  const avatarSource = profile.photoB64
+    ? { uri: profile.photoB64 }
+    : profile.photoURL
+    ? { uri: profile.photoURL }
+    : undefined;
 
-  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Usuário';
+  const fullName = profile.firstName
+    ? `${profile.firstName} ${profile.lastName ?? ''}`
+    : user.displayName ?? 'Usuário';
 
   const goProfile = () => {
     closeMenu();
@@ -379,7 +409,8 @@ export default function DashboardScreen() {
     }
   };
 
-  const formatCurrency = (v: number | null) => (typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--');
+  const formatCurrency = (v: number | null) =>
+    typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
   const formatDate = (ms: number) => {
     const d = new Date(ms);
     const dd = String(d.getDate()).padStart(2, '0');
@@ -387,10 +418,14 @@ export default function DashboardScreen() {
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
   };
-  const formatHour = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatHour = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const renderAppointment = ({ item }: { item: Appointment }) => {
-    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+    const subtitle =
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `Carro • ${item.carCategory}`
+        : item.vehicleType;
 
     const statusLabel =
       item.status === 'scheduled'
@@ -415,7 +450,9 @@ export default function DashboardScreen() {
         <View style={styles.cardLeft}>
           <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
           <Text style={styles.cardSubtitle}>{subtitle}</Text>
-          <Text style={{ color: statusColor, fontWeight: '900', marginTop: 6 }}>{statusLabel}</Text>
+          <Text style={{ color: statusColor, fontWeight: '900', marginTop: 6 }}>
+            {statusLabel}
+          </Text>
         </View>
 
         <View style={styles.cardRight}>
@@ -428,10 +465,13 @@ export default function DashboardScreen() {
     );
   };
 
-  // ✅ botão sempre visível, independente de ter serviços ou não
   const HeaderCTA = () => (
     <View style={styles.ctaWrap}>
-      <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => navigation.navigate('Appointment')}>
+      <TouchableOpacity
+        style={styles.primaryBtn}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('Appointment')}
+      >
         <Calendar size={18} color={colors.bg} />
         <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
       </TouchableOpacity>
@@ -442,13 +482,29 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <View style={styles.headerWrapper}>
-          <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
-            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
+          <ImageBackground
+            style={styles.header}
+            imageStyle={styles.headerImg}
+            source={coverSource}
+          >
+            <TouchableOpacity
+              style={styles.menuBtn}
+              activeOpacity={0.8}
+              onPress={openMenu}
+            >
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={saveCover} style={styles.coverBtn} activeOpacity={0.9}>
-              {saving === 'cover' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.coverBtnTxt}>Trocar capa</Text>}
+            <TouchableOpacity
+              onPress={saveCover}
+              style={styles.coverBtn}
+              activeOpacity={0.9}
+            >
+              {saving === 'cover' ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.coverBtnTxt}>Trocar capa</Text>
+              )}
             </TouchableOpacity>
           </ImageBackground>
         </View>
@@ -484,12 +540,16 @@ export default function DashboardScreen() {
           ) : (
             <FlatList
               data={appointments}
-              keyExtractor={(it) => it.id}
+              keyExtractor={it => it.id}
               renderItem={renderAppointment}
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={styles.emptyText}>Você ainda não possui serviços.</Text>}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  Você ainda não possui serviços.
+                </Text>
+              }
             />
           )}
         </View>
@@ -498,36 +558,58 @@ export default function DashboardScreen() {
           <>
             <Animated.View
               pointerEvents={menuOpen ? 'auto' : 'none'}
-              style={[StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }]}
+              style={[
+                StyleSheet.absoluteFill,
+                styles.overlay,
+                { opacity: overlayOpacity },
+              ]}
             >
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}>
+            <Animated.View
+              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
+            >
               <View style={styles.drawerHeader}>
                 <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
                 <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
               {isAdmin && (
-                <TouchableOpacity style={styles.item} onPress={goAdmin} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.item}
+                  onPress={goAdmin}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.itemText}>Admin</Text>
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.item} onPress={goProfile} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goProfile}
+                activeOpacity={0.8}
+              >
                 <UserIcon size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goHistory}
+                activeOpacity={0.8}
+              >
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
 
-              <TouchableOpacity style={[styles.item, { marginBottom: 50 }]} onPress={doSignOut} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={[styles.item, { marginBottom: 50 }]}
+                onPress={doSignOut}
+                activeOpacity={0.8}
+              >
                 <LogOut size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Sair</Text>
               </TouchableOpacity>
@@ -618,8 +700,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: colors.text,
   },
-
-  // ✅ CTA fixo
   ctaWrap: {
     marginBottom: 14,
     alignItems: 'center',
@@ -662,7 +742,12 @@ const styles = StyleSheet.create({
   },
   cardDate: { color: '#616E7C', fontSize: 15 },
 
-  emptyText: { color: '#707A86', fontSize: 14, textAlign: 'center', marginTop: 8 },
+  emptyText: {
+    color: '#707A86',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+  },
 
   overlay: { backgroundColor: surfaces.overlay },
   drawer: {
