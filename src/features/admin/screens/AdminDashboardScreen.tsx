@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+// AdminDashboardScreen.tsx (ADMIN) - Semana (hoje + próximos 7 dias) + UX melhor + auto no_show
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   FlatList,
@@ -11,7 +13,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,26 +20,27 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getAuth } from '@react-native-firebase/auth';
 import {
-  getFirestore,
   collection,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
   doc,
   getDoc,
-  updateDoc,
+  getDocs,
+  getFirestore,
+  onSnapshot,
   onSnapshot as onDocSnap,
+  orderBy,
+  query,
+  updateDoc,
+  where,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
 import { Menu, User as UserIcon, History, LogOut, Calendar, PlayCircle, CheckCircle2 } from 'lucide-react-native';
 import type { RootStackParamList } from '@app/types';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
-
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type UserProfile = {
   firstName?: string;
@@ -70,12 +72,12 @@ const AVATAR = 130;
 const MENU_W = 220;
 
 const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
+const UPCOMING_DAYS = 7;
 
-function toDayKey(date: Date) {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 function startOfDayMs(date: Date) {
   const d = new Date(date);
@@ -101,13 +103,13 @@ function formatCurrency(v: number | null) {
   return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
 }
 
-function normalizeAppointmentFromDoc(d: FirebaseFirestoreTypes.QueryDocumentSnapshot): Appointment | null {
+function normalizeAppointmentFromDoc(d: QDoc): Appointment | null {
   const v = d.data() as any;
 
   const startAtMs = Number(v.startAtMs ?? 0);
   if (!startAtMs) return null;
 
-  const status = (v.status ?? 'scheduled') as AppointmentStatus;
+  const status = (v.status as AppointmentStatus) ?? 'scheduled';
 
   const customerUid = String(v.customerUid ?? '');
   if (!customerUid) return null;
@@ -137,13 +139,21 @@ export default function AdminDashboardScreen() {
   const [loadingList, setLoadingList] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // evita loop marcando no_show toda hora
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
+  // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
   const today = useMemo(() => new Date(), []);
-  const todayKey = useMemo(() => toDayKey(today), [today]);
+  const rangeStartMs = useMemo(() => startOfDayMs(today), [today]);
+  const rangeEndMs = useMemo(() => endOfDayMs(addDays(today, UPCOMING_DAYS)), [today]);
+
+  const weekLabel = useMemo(() => {
+    const end = addDays(today, UPCOMING_DAYS);
+    return `${formatDate(today.getTime())} - ${formatDate(end.getTime())}`;
+  }, [today]);
 
   const nameCacheRef = useRef<Map<string, string>>(new Map());
 
@@ -176,9 +186,14 @@ export default function AdminDashboardScreen() {
   };
 
   const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
-    const updated = await Promise.all(
+    const updated: Appointment[] = [];
+
+    await Promise.all(
       list.map(async (it) => {
-        if (it.customerName && it.customerName !== 'Cliente') return it;
+        if (it.customerName && it.customerName !== 'Cliente') {
+          updated.push(it);
+          return;
+        }
 
         const name = await resolveCustomerName(it.customerUid);
 
@@ -186,10 +201,11 @@ export default function AdminDashboardScreen() {
           await updateDoc(doc(getFirestore(), 'appointments', it.id), { customerName: name });
         } catch {}
 
-        return { ...it, customerName: name };
+        updated.push({ ...it, customerName: name });
       })
     );
 
+    updated.sort((a, b) => a.startAtMs - b.startAtMs);
     setAppointments(updated);
   };
 
@@ -215,28 +231,26 @@ export default function AdminDashboardScreen() {
     const db = getFirestore();
     setLoadingList(true);
 
-    const dayStart = startOfDayMs(today);
-    const dayEnd = endOfDayMs(today);
-
-    const qyRange = query(
+    // ✅ Semana: pega scheduled + in_progress no range
+    const qyWeek = query(
       collection(db, 'appointments'),
-      where('startAtMs', '>=', dayStart),
-      where('startAtMs', '<=', dayEnd),
+      where('status', 'in', ['scheduled', 'in_progress']),
+      where('startAtMs', '>=', rangeStartMs),
+      where('startAtMs', '<=', rangeEndMs),
       orderBy('startAtMs', 'asc')
     );
 
     const unsub = onSnapshot(
-      qyRange,
+      qyWeek,
       async (snap) => {
         const now = Date.now();
 
-        const raw = snap.docs
-          .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => normalizeAppointmentFromDoc(d))
+        const list = snap.docs
+          .map((d: QDoc) => normalizeAppointmentFromDoc(d))
           .filter(Boolean) as Appointment[];
 
-        const merged = raw.filter((it) => it.status === 'scheduled' || it.status === 'in_progress');
-
-        const expiredScheduled = merged.filter(
+        // ✅ auto no_show (se passou 15 min e estava scheduled)
+        const expiredScheduled = list.filter(
           (it) => it.status === 'scheduled' && now > it.startAtMs + NO_SHOW_GRACE_MS && !noShowMarkedRef.current.has(it.id)
         );
 
@@ -258,17 +272,13 @@ export default function AdminDashboardScreen() {
         }
 
         setLoadingList(false);
-        await fillMissingNamesAndUpdate(merged);
+        await fillMissingNamesAndUpdate(list);
       },
-      (err) => {
-        console.log('ADMIN onSnapshot error:', err);
-        setLoadingList(false);
-        Alert.alert('Erro', 'Falha ao carregar agendamentos do dia (ver console).');
-      }
+      () => setLoadingList(false)
     );
 
     return () => unsub();
-  }, [user?.uid, today]);
+  }, [user?.uid, rangeStartMs, rangeEndMs]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -357,6 +367,7 @@ export default function AdminDashboardScreen() {
         : '#6B7280';
 
     const canPress = !isNoShow && updatingId !== item.id;
+
     const action =
       displayStatus === 'scheduled'
         ? { label: 'Começar', icon: <PlayCircle size={18} color={colors.bg} />, next: 'in_progress' as AppointmentStatus }
@@ -375,7 +386,6 @@ export default function AdminDashboardScreen() {
           </Text>
 
           <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
-
           <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
         </View>
 
@@ -443,8 +453,8 @@ export default function AdminDashboardScreen() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.sectionTitle}>Agendamentos hoje</Text>
-          <Text style={styles.sectionSub}>{todayKey}</Text>
+          <Text style={styles.sectionTitle}>Agendamentos (semana)</Text>
+          <Text style={styles.sectionSub}>{weekLabel}</Text>
 
           {loadingList ? (
             <View style={{ paddingTop: 24 }}>
@@ -458,7 +468,7 @@ export default function AdminDashboardScreen() {
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado para hoje.</Text>}
+              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado para a semana.</Text>}
             />
           )}
         </View>
@@ -480,7 +490,7 @@ export default function AdminDashboardScreen() {
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Histórico', 'TODO')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminHistory' as any)} activeOpacity={0.8}>
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
@@ -560,6 +570,7 @@ const styles = StyleSheet.create({
   cardPrice: { color: colors.primary, fontSize: 14, fontWeight: '900' },
 
   actions: { gap: 10 },
+
   primaryActionBtn: {
     flexDirection: 'row',
     gap: 8,
@@ -573,6 +584,7 @@ const styles = StyleSheet.create({
   },
   primaryActionBtnAlt: { backgroundColor: colors.primary },
   primaryActionText: { color: colors.bg, fontWeight: '900' },
+
   disabledBtn: { opacity: 0.45 },
 
   overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },

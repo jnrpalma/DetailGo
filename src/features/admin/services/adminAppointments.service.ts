@@ -1,3 +1,4 @@
+// @features/admin/services/adminAppointments.service.ts
 import {
   doc,
   getDoc,
@@ -19,7 +20,7 @@ const NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN * 60 * 1000;
 export async function updateAppointmentStatus(params: {
   appointmentId: string;
   customerUid: string;
-  status: AppointmentStatus;
+  status: AppointmentStatus; // scheduled | in_progress | done | no_show
 }) {
   const db = getFirestore();
   const globalRef = doc(db, 'appointments', params.appointmentId);
@@ -33,19 +34,15 @@ export async function updateAppointmentStatus(params: {
   if (startAtMs) {
     const expired = Date.now() > startAtMs + NO_SHOW_GRACE_MS;
 
-    if (
-      expired &&
-      currentStatus === 'scheduled' &&
-      (params.status === 'in_progress' || params.status === 'done')
-    ) {
-      const err: any = new Error(
-        'Agendamento expirado. Deve ser marcado como não realizado.',
-      );
+    // depois de 15min, não pode virar in_progress/done se ainda estava scheduled
+    if (expired && currentStatus === 'scheduled' && (params.status === 'in_progress' || params.status === 'done')) {
+      const err: any = new Error('Agendamento expirado. Deve ser marcado como não realizado.');
       err.code = 'APPOINTMENT_EXPIRED';
       throw err;
     }
   }
 
+  // encontra o doc espelhado do usuário pelo campo appointmentId
   const userCol = collection(db, 'users', params.customerUid, 'appointments');
   const qy = query(userCol, where('appointmentId', '==', params.appointmentId));
   const snap = await getDocs(qy);
@@ -55,15 +52,13 @@ export async function updateAppointmentStatus(params: {
     updatedAt: serverTimestamp(),
   };
 
-  if (params.status === 'in_progress')
-    (payload as any).startedAt = serverTimestamp();
+  if (params.status === 'in_progress') (payload as any).startedAt = serverTimestamp();
   if (params.status === 'done') (payload as any).doneAt = serverTimestamp();
-  if (params.status === 'no_show')
-    (payload as any).noShowAt = serverTimestamp();
+  if (params.status === 'no_show') (payload as any).noShowAt = serverTimestamp();
 
   const updates: Promise<void>[] = [updateDoc(globalRef, payload)];
 
-  snap.docs.forEach((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
+  snap.docs.forEach((d: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>) => {
     updates.push(updateDoc(d.ref, payload));
   });
 
