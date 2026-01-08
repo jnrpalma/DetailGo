@@ -1,8 +1,7 @@
-// AdminDashboardScreen.tsx (ADMIN) - Semana (hoje + próximos 7 dias) + UX melhor + auto no_show
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// AdminDashboardScreen.tsx (ADMIN) - Semana navegável + agendamentos do range
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   FlatList,
@@ -13,6 +12,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -20,27 +20,27 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getAuth } from '@react-native-firebase/auth';
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
   getFirestore,
+  collection,
   onSnapshot,
-  onSnapshot as onDocSnap,
+  getDocs,
   orderBy,
   query,
-  updateDoc,
   where,
+  doc,
+  getDoc,
+  updateDoc,
+  onSnapshot as onDocSnap,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import { Menu, User as UserIcon, History, LogOut, Calendar, PlayCircle, CheckCircle2 } from 'lucide-react-native';
+import { Menu, User as UserIcon, History, LogOut, Calendar, PlayCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import type { RootStackParamList } from '@app/types';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
+
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type UserProfile = {
   firstName?: string;
@@ -72,13 +72,7 @@ const AVATAR = 130;
 const MENU_W = 220;
 
 const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
-const UPCOMING_DAYS = 7;
 
-function addDays(date: Date, days: number) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
 function startOfDayMs(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -89,6 +83,29 @@ function endOfDayMs(date: Date) {
   d.setHours(23, 59, 59, 999);
   return d.getTime();
 }
+
+function startOfWeekMs(anchor: Date) {
+  // Semana começando na segunda-feira
+  const d = new Date(anchor);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Dom 1=Seg ...
+  const diffToMonday = (day + 6) % 7; // Dom(0)->6, Seg(1)->0 ...
+  d.setDate(d.getDate() - diffToMonday);
+  return d.getTime();
+}
+function endOfWeekMs(anchor: Date) {
+  const start = startOfWeekMs(anchor);
+  const d = new Date(start);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 function formatHour(ms: number) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -103,13 +120,15 @@ function formatCurrency(v: number | null) {
   return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
 }
 
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+
 function normalizeAppointmentFromDoc(d: QDoc): Appointment | null {
   const v = d.data() as any;
 
   const startAtMs = Number(v.startAtMs ?? 0);
   if (!startAtMs) return null;
 
-  const status = (v.status as AppointmentStatus) ?? 'scheduled';
+  const status = (v.status as Appointment['status']) ?? 'scheduled';
 
   const customerUid = String(v.customerUid ?? '');
   if (!customerUid) return null;
@@ -139,21 +158,18 @@ export default function AdminDashboardScreen() {
   const [loadingList, setLoadingList] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // Semana selecionada (âncora)
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
+
+  const weekStartMs = useMemo(() => startOfWeekMs(weekAnchor), [weekAnchor]);
+  const weekEndMs = useMemo(() => endOfWeekMs(weekAnchor), [weekAnchor]);
+
   // evita loop marcando no_show toda hora
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
   // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-
-  const today = useMemo(() => new Date(), []);
-  const rangeStartMs = useMemo(() => startOfDayMs(today), [today]);
-  const rangeEndMs = useMemo(() => endOfDayMs(addDays(today, UPCOMING_DAYS)), [today]);
-
-  const weekLabel = useMemo(() => {
-    const end = addDays(today, UPCOMING_DAYS);
-    return `${formatDate(today.getTime())} - ${formatDate(end.getTime())}`;
-  }, [today]);
 
   const nameCacheRef = useRef<Map<string, string>>(new Map());
 
@@ -185,7 +201,7 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
+  const fillMissingNamesAndUpdate = useCallback(async (list: Appointment[]) => {
     const updated: Appointment[] = [];
 
     await Promise.all(
@@ -207,7 +223,7 @@ export default function AdminDashboardScreen() {
 
     updated.sort((a, b) => a.startAtMs - b.startAtMs);
     setAppointments(updated);
-  };
+  }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -231,12 +247,12 @@ export default function AdminDashboardScreen() {
     const db = getFirestore();
     setLoadingList(true);
 
-    // ✅ Semana: pega scheduled + in_progress no range
+    // ✅ Query principal: range da semana por startAtMs
     const qyWeek = query(
       collection(db, 'appointments'),
       where('status', 'in', ['scheduled', 'in_progress']),
-      where('startAtMs', '>=', rangeStartMs),
-      where('startAtMs', '<=', rangeEndMs),
+      where('startAtMs', '>=', weekStartMs),
+      where('startAtMs', '<=', weekEndMs),
       orderBy('startAtMs', 'asc')
     );
 
@@ -245,12 +261,12 @@ export default function AdminDashboardScreen() {
       async (snap) => {
         const now = Date.now();
 
-        const list = snap.docs
+        const merged = snap.docs
           .map((d: QDoc) => normalizeAppointmentFromDoc(d))
           .filter(Boolean) as Appointment[];
 
-        // ✅ auto no_show (se passou 15 min e estava scheduled)
-        const expiredScheduled = list.filter(
+        // ✅ auto no_show no ADMIN também (se passou 15min e estava scheduled)
+        const expiredScheduled = merged.filter(
           (it) => it.status === 'scheduled' && now > it.startAtMs + NO_SHOW_GRACE_MS && !noShowMarkedRef.current.has(it.id)
         );
 
@@ -272,13 +288,13 @@ export default function AdminDashboardScreen() {
         }
 
         setLoadingList(false);
-        await fillMissingNamesAndUpdate(list);
+        await fillMissingNamesAndUpdate(merged);
       },
       () => setLoadingList(false)
     );
 
     return () => unsub();
-  }, [user?.uid, rangeStartMs, rangeEndMs]);
+  }, [user?.uid, weekStartMs, weekEndMs, fillMissingNamesAndUpdate]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -367,7 +383,6 @@ export default function AdminDashboardScreen() {
         : '#6B7280';
 
     const canPress = !isNoShow && updatingId !== item.id;
-
     const action =
       displayStatus === 'scheduled'
         ? { label: 'Começar', icon: <PlayCircle size={18} color={colors.bg} />, next: 'in_progress' as AppointmentStatus }
@@ -386,6 +401,7 @@ export default function AdminDashboardScreen() {
           </Text>
 
           <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+
           <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
         </View>
 
@@ -431,6 +447,8 @@ export default function AdminDashboardScreen() {
 
   const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
 
+  const weekLabel = `${formatDate(weekStartMs)} – ${formatDate(weekEndMs)}`;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
@@ -453,8 +471,35 @@ export default function AdminDashboardScreen() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.sectionTitle}>Agendamentos (semana)</Text>
-          <Text style={styles.sectionSub}>{weekLabel}</Text>
+          <Text style={styles.sectionTitle}>Agendamentos da semana</Text>
+
+          {/* ✅ Navegação de semanas */}
+          <View style={styles.weekRow}>
+            <TouchableOpacity
+              style={styles.weekBtn}
+              onPress={() => setWeekAnchor((prev) => addDays(prev, -7))}
+              activeOpacity={0.85}
+            >
+              <ChevronLeft size={18} color={colors.bg} />
+              <Text style={styles.weekBtnTxt}>Anterior</Text>
+            </TouchableOpacity>
+
+            <View style={styles.weekCenter}>
+              <Text style={styles.weekRange}>{weekLabel}</Text>
+              <TouchableOpacity onPress={() => setWeekAnchor(new Date())} activeOpacity={0.85}>
+                <Text style={styles.weekToday}>Hoje</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.weekBtn}
+              onPress={() => setWeekAnchor((prev) => addDays(prev, 7))}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.weekBtnTxt}>Próxima</Text>
+              <ChevronRight size={18} color={colors.bg} />
+            </TouchableOpacity>
+          </View>
 
           {loadingList ? (
             <View style={{ paddingTop: 24 }}>
@@ -468,7 +513,7 @@ export default function AdminDashboardScreen() {
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado para a semana.</Text>}
+              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Sem agendamentos nessa semana.</Text>}
             />
           )}
         </View>
@@ -490,7 +535,7 @@ export default function AdminDashboardScreen() {
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminHistory' as any)} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminHistory')} activeOpacity={0.8}>
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
@@ -548,8 +593,29 @@ const styles = StyleSheet.create({
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
 
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
-  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 6, color: colors.text },
-  sectionSub: { textAlign: 'center', color: '#6B7280', fontWeight: '700', marginBottom: 18 },
+
+  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 10, color: colors.text },
+
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  weekBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  weekBtnTxt: { color: colors.bg, fontWeight: '900' },
+  weekCenter: { alignItems: 'center', gap: 2, flex: 1 },
+  weekRange: { color: '#111827', fontWeight: '900' },
+  weekToday: { color: colors.primary, fontWeight: '900', textDecorationLine: 'underline' },
 
   card: {
     flexDirection: 'row',
