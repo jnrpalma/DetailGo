@@ -1,8 +1,12 @@
+// @app/types.ts
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+
   Dashboard: undefined;
   Appointment: undefined;
-  AdminDashboard: undefined; // novo
-  Admin: undefined;          // tela "Gerenciar"
+
+  // Admin
+  AdminDashboard: undefined;
+  AdminManage: undefined;
 };

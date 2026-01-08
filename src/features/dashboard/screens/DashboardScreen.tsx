@@ -32,7 +32,7 @@ import {
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
 import { useAuth } from '@features/auth/context/AuthContext';
-import { isAdminEmail } from '@features/auth/utils/roles'; // <- NOVO
+import { isAdminEmail } from '@features/auth/utils/roles';
 import { Menu, User as UserIcon, History, LogOut, Calendar } from 'lucide-react-native';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
@@ -52,7 +52,8 @@ type Appointment = {
   carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
   serviceLabel: string | null;
   price: number | null;
-  whenMs: number; // epoch ms
+  whenMs: number;
+  status: 'scheduled' | 'canceled' | 'done';
 };
 
 const COVER_H = 285;
@@ -78,7 +79,6 @@ export default function DashboardScreen() {
   const [profile, setProfile] = useState<UserProfile>({ photoURL: user.photoURL ?? undefined });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
 
-  // lista de agendamentos
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingList, setLoadingList] = useState(true);
 
@@ -99,14 +99,11 @@ export default function DashboardScreen() {
   const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
   const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  // é admin?
-  const isAdmin = isAdminEmail(user.email); // <- NOVO
+  const isAdmin = isAdminEmail(user.email);
 
-  // carregar perfil e agendamentos
   useEffect(() => {
     const db = getFirestore();
 
-    // perfil
     const userRef = doc(db, 'users', uid);
     const unsubProfile = onSnapshot(userRef, (snap) => {
       const data = snap.data() as UserProfile | undefined;
@@ -119,16 +116,16 @@ export default function DashboardScreen() {
       }
     });
 
-    // agendamentos
-    const q = query(collection(db, 'users', uid, 'appointments'), orderBy('whenMs', 'desc'));
+    const qy = query(collection(db, 'users', uid, 'appointments'), orderBy('whenMs', 'desc'));
 
     const unsubList = onSnapshot(
-      q,
+      qy,
       (snap) => {
         const arr: Appointment[] = snap.docs
           .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
             const v = d.data() as any;
             if (typeof v?.whenMs !== 'number') return null;
+
             return {
               id: d.id,
               vehicleType: v.vehicleType ?? 'Carro',
@@ -136,6 +133,7 @@ export default function DashboardScreen() {
               serviceLabel: v.serviceLabel ?? null,
               price: typeof v.price === 'number' ? v.price : null,
               whenMs: v.whenMs,
+              status: (v.status ?? 'scheduled') as Appointment['status'],
             } as Appointment;
           })
           .filter(Boolean) as Appointment[];
@@ -152,7 +150,6 @@ export default function DashboardScreen() {
     };
   }, [uid, user.photoURL]);
 
-  // picker base64
   const pickAsBase64 = async () => {
     const opts: ImageLibraryOptions = {
       mediaType: 'photo',
@@ -204,11 +201,11 @@ export default function DashboardScreen() {
       : profile.coverUrl
       ? { uri: profile.coverUrl }
       : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
+
   const avatarSource = profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
 
   const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Usuário';
 
-  // ações drawer
   const goProfile = () => {
     closeMenu();
     Alert.alert('Meu Perfil', 'Navegar para Perfil (TODO)');
@@ -217,10 +214,13 @@ export default function DashboardScreen() {
     closeMenu();
     Alert.alert('Histórico', 'Navegar para Histórico (TODO)');
   };
-  const goAdmin = () => { // <- NOVO
+
+  // ✅ Admin vai pro painel (AdminDashboard)
+  const goAdmin = () => {
     closeMenu();
-    navigation.navigate('Admin');
+    navigation.navigate('AdminDashboard');
   };
+
   const doSignOut = async () => {
     closeMenu();
     try {
@@ -230,7 +230,6 @@ export default function DashboardScreen() {
     }
   };
 
-  // helpers UI
   const formatCurrency = (v: number | null) => (typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--');
   const formatDate = (ms: number) => {
     const d = new Date(ms);
@@ -244,11 +243,15 @@ export default function DashboardScreen() {
     const subtitle =
       item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
 
+    const statusLabel =
+      item.status === 'scheduled' ? 'Agendado' : item.status === 'done' ? 'Concluído' : 'Cancelado';
+
     return (
       <View style={styles.card}>
         <View style={styles.cardLeft}>
           <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
           <Text style={styles.cardSubtitle}>{subtitle}</Text>
+          <Text style={{ color: '#6B7280', fontWeight: '800', marginTop: 6 }}>{statusLabel}</Text>
         </View>
 
         <View style={styles.cardRight}>
@@ -276,7 +279,6 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
-        {/* HEADER */}
         <View style={styles.headerWrapper}>
           <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
             <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
@@ -289,7 +291,6 @@ export default function DashboardScreen() {
           </ImageBackground>
         </View>
 
-        {/* AVATAR */}
         <View style={styles.avatarContainer}>
           <TouchableOpacity onPress={saveAvatar} activeOpacity={0.9}>
             {avatarSource ? (
@@ -308,7 +309,6 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {/* BODY */}
         <View style={styles.body}>
           <Text style={styles.sectionTitle}>Últimos serviços</Text>
 
@@ -329,7 +329,6 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {/* OVERLAY + DRAWER */}
         {menuOpen && (
           <>
             <Animated.View
@@ -345,7 +344,6 @@ export default function DashboardScreen() {
                 <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
-              {/* Admin só aparece se o e-mail for de admin */}
               {isAdmin && (
                 <TouchableOpacity style={styles.item} onPress={goAdmin} activeOpacity={0.8}>
                   <Text style={styles.itemText}>Admin</Text>
@@ -377,13 +375,11 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  // base
   safe: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1 },
 
-  // header
   headerWrapper: {
-    height: COVER_H,
+    height: 285,
     borderBottomLeftRadius: radii.lg,
     borderBottomRightRadius: radii.lg,
     overflow: 'hidden',
@@ -403,13 +399,12 @@ const styles = StyleSheet.create({
   },
   coverBtnTxt: { color: colors.white, fontWeight: '700' },
 
-  // avatar
   avatarContainer: {
     alignSelf: 'center',
-    marginTop: -AVATAR / 2,
-    width: AVATAR + 12,
-    height: AVATAR + 12,
-    borderRadius: (AVATAR + 12) / 2,
+    marginTop: -130 / 2,
+    width: 130 + 12,
+    height: 130 + 12,
+    borderRadius: (130 + 12) / 2,
     backgroundColor: colors.white,
     padding: 6,
     elevation: 6,
@@ -418,7 +413,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colors.black },
+  avatarImg: { width: 130, height: 130, borderRadius: 130 / 2, backgroundColor: colors.black },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
   avatarLoading: {
@@ -426,15 +421,13 @@ const styles = StyleSheet.create({
     inset: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: AVATAR / 2,
+    borderRadius: 130 / 2,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
 
-  // body
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
   sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 20, color: colors.text },
 
-  // card
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,7 +445,6 @@ const styles = StyleSheet.create({
   cardPrice: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 6 },
   cardDate: { color: '#616E7C', fontSize: 15 },
 
-  // empty state
   emptyWrap: { paddingTop: 16, alignItems: 'center', gap: 16 },
   emptyText: { color: '#707A86', fontSize: 14 },
   primaryBtn: {
@@ -466,14 +458,13 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '800' },
 
-  // overlay + drawer
   overlay: { backgroundColor: surfaces.overlay },
   drawer: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: MENU_W,
+    width: 220,
     backgroundColor: surfaces.drawer,
     paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
