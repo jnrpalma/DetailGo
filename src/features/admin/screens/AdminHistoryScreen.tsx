@@ -1,4 +1,3 @@
-// AdminHistoryScreen.tsx (ADMIN) - Histórico: done + no_show (com filtro)
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

@@ -7,6 +7,5 @@ export type RootStackParamList = {
 
   AdminDashboard: undefined;
   AdminManage: undefined;
-
   AdminHistory: undefined;
 };

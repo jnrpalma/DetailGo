@@ -1,5 +1,4 @@
-// AdminDashboardScreen.tsx (ADMIN) - Semana navegável + agendamentos do range
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -35,12 +34,14 @@ import {
 } from '@react-native-firebase/firestore';
 
 import { Menu, User as UserIcon, History, LogOut, Calendar, PlayCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+
 import type { RootStackParamList } from '@app/types';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type UserProfile = {
   firstName?: string;
@@ -73,39 +74,26 @@ const MENU_W = 220;
 
 const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
 
-function startOfDayMs(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-function endOfDayMs(date: Date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d.getTime();
-}
-
 function startOfWeekMs(anchor: Date) {
-  // Semana começando na segunda-feira
   const d = new Date(anchor);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0=Dom 1=Seg ...
-  const diffToMonday = (day + 6) % 7; // Dom(0)->6, Seg(1)->0 ...
+  const day = d.getDay(); // 0 dom ... 6 sab
+  const diffToMonday = (day + 6) % 7; // monday=0
   d.setDate(d.getDate() - diffToMonday);
+  d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
 function endOfWeekMs(anchor: Date) {
-  const start = startOfWeekMs(anchor);
-  const d = new Date(start);
-  d.setDate(d.getDate() + 6);
-  d.setHours(23, 59, 59, 999);
-  return d.getTime();
+  const s = new Date(startOfWeekMs(anchor));
+  const e = new Date(s);
+  e.setDate(e.getDate() + 6);
+  e.setHours(23, 59, 59, 999);
+  return e.getTime();
 }
-function addDays(date: Date, days: number) {
-  const d = new Date(date);
+function addDays(base: Date, days: number) {
+  const d = new Date(base);
   d.setDate(d.getDate() + days);
   return d;
 }
-
 function formatHour(ms: number) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -119,10 +107,32 @@ function formatDate(ms: number) {
 function formatCurrency(v: number | null) {
   return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
 }
+function formatWeekLabel(startMs: number, endMs: number) {
+  const s = new Date(startMs);
+  const e = new Date(endMs);
 
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+  const ddS = String(s.getDate()).padStart(2, '0');
+  const ddE = String(e.getDate()).padStart(2, '0');
 
-function normalizeAppointmentFromDoc(d: QDoc): Appointment | null {
+  const monthS = s.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+  const monthE = e.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+
+  const yyyyS = s.getFullYear();
+  const yyyyE = e.getFullYear();
+
+  if (yyyyS === yyyyE && s.getMonth() === e.getMonth()) {
+    return `${ddS}–${ddE} ${monthS} ${yyyyS}`;
+  }
+  if (yyyyS === yyyyE) {
+    return `${ddS} ${monthS} – ${ddE} ${monthE} ${yyyyS}`;
+  }
+  return `${ddS} ${monthS} ${yyyyS} – ${ddE} ${monthE} ${yyyyE}`;
+}
+function isCurrentWeek(anchor: Date) {
+  return startOfWeekMs(anchor) === startOfWeekMs(new Date());
+}
+
+function normalizeAppointmentFromDoc(d: FirebaseFirestoreTypes.QueryDocumentSnapshot): Appointment | null {
   const v = d.data() as any;
 
   const startAtMs = Number(v.startAtMs ?? 0);
@@ -154,22 +164,22 @@ export default function AdminDashboardScreen() {
   const user = auth.currentUser;
 
   const [profile, setProfile] = useState<UserProfile>({});
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
+
+  const [appointmentsWeek, setAppointmentsWeek] = useState<Appointment[]>([]);
+  const [loadingWeek, setLoadingWeek] = useState(true);
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Semana selecionada (âncora)
-  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
-
-  const weekStartMs = useMemo(() => startOfWeekMs(weekAnchor), [weekAnchor]);
-  const weekEndMs = useMemo(() => endOfWeekMs(weekAnchor), [weekAnchor]);
-
-  // evita loop marcando no_show toda hora
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
-  // Drawer
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
+
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
+  const weekStartMs = useMemo(() => startOfWeekMs(weekAnchor), [weekAnchor]);
+  const weekEndMs = useMemo(() => endOfWeekMs(weekAnchor), [weekAnchor]);
+  const weekLabel = useMemo(() => formatWeekLabel(weekStartMs, weekEndMs), [weekStartMs, weekEndMs]);
+  const onCurrentWeek = useMemo(() => isCurrentWeek(weekAnchor), [weekAnchor]);
 
   const nameCacheRef = useRef<Map<string, string>>(new Map());
 
@@ -201,9 +211,8 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const fillMissingNamesAndUpdate = useCallback(async (list: Appointment[]) => {
+  const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
     const updated: Appointment[] = [];
-
     await Promise.all(
       list.map(async (it) => {
         if (it.customerName && it.customerName !== 'Cliente') {
@@ -212,18 +221,16 @@ export default function AdminDashboardScreen() {
         }
 
         const name = await resolveCustomerName(it.customerUid);
-
         try {
           await updateDoc(doc(getFirestore(), 'appointments', it.id), { customerName: name });
         } catch {}
-
         updated.push({ ...it, customerName: name });
       })
     );
 
     updated.sort((a, b) => a.startAtMs - b.startAtMs);
-    setAppointments(updated);
-  }, []);
+    return updated;
+  };
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -243,11 +250,18 @@ export default function AdminDashboardScreen() {
 
   useEffect(() => {
     if (!user?.uid) return;
+    if (profile.role && profile.role !== 'admin') {
+      Alert.alert('Acesso negado', 'Sua conta não é admin.');
+      navigation.replace('Dashboard' as any);
+    }
+  }, [profile.role, navigation, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
 
     const db = getFirestore();
-    setLoadingList(true);
+    setLoadingWeek(true);
 
-    // ✅ Query principal: range da semana por startAtMs
     const qyWeek = query(
       collection(db, 'appointments'),
       where('status', 'in', ['scheduled', 'in_progress']),
@@ -259,14 +273,13 @@ export default function AdminDashboardScreen() {
     const unsub = onSnapshot(
       qyWeek,
       async (snap) => {
-        const now = Date.now();
-
-        const merged = snap.docs
-          .map((d: QDoc) => normalizeAppointmentFromDoc(d))
+        const base = snap.docs
+          .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => normalizeAppointmentFromDoc(d))
           .filter(Boolean) as Appointment[];
 
-        // ✅ auto no_show no ADMIN também (se passou 15min e estava scheduled)
-        const expiredScheduled = merged.filter(
+        // auto no_show se passou 15min e ainda estava scheduled (opcional, mas mantém coerência)
+        const now = Date.now();
+        const expiredScheduled = base.filter(
           (it) => it.status === 'scheduled' && now > it.startAtMs + NO_SHOW_GRACE_MS && !noShowMarkedRef.current.has(it.id)
         );
 
@@ -287,22 +300,15 @@ export default function AdminDashboardScreen() {
           );
         }
 
-        setLoadingList(false);
-        await fillMissingNamesAndUpdate(merged);
+        const finalList = await fillMissingNamesAndUpdate(base);
+        setAppointmentsWeek(finalList);
+        setLoadingWeek(false);
       },
-      () => setLoadingList(false)
+      () => setLoadingWeek(false)
     );
 
     return () => unsub();
-  }, [user?.uid, weekStartMs, weekEndMs, fillMissingNamesAndUpdate]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (profile.role && profile.role !== 'admin') {
-      Alert.alert('Acesso negado', 'Sua conta não é admin.');
-      navigation.replace('Dashboard' as any);
-    }
-  }, [profile.role, navigation, user?.uid]);
+  }, [user?.uid, weekStartMs, weekEndMs]);
 
   if (!user?.uid) {
     return (
@@ -436,6 +442,8 @@ export default function AdminDashboardScreen() {
     );
   };
 
+  const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
+
   const doSignOut = async () => {
     closeMenu();
     try {
@@ -445,9 +453,33 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
+  const HeaderWeek = () => (
+    <View style={styles.weekHeader}>
+      <Text style={styles.sectionTitle}>Agendamentos da semana</Text>
+      <Text style={styles.weekRangeTitle}>{weekLabel}</Text>
 
-  const weekLabel = `${formatDate(weekStartMs)} – ${formatDate(weekEndMs)}`;
+      <View style={styles.weekNavRow}>
+        <TouchableOpacity style={styles.weekNavBtn} onPress={() => setWeekAnchor((prev) => addDays(prev, -7))} activeOpacity={0.85}>
+          <ChevronLeft size={18} color={colors.bg} />
+          <Text style={styles.weekNavTxt}>Anterior</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.weekChip, onCurrentWeek && styles.weekChipDisabled]}
+          onPress={() => setWeekAnchor(new Date())}
+          activeOpacity={0.85}
+          disabled={onCurrentWeek}
+        >
+          <Text style={[styles.weekChipTxt, onCurrentWeek && styles.weekChipTxtDisabled]}>Semana atual</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.weekNavBtn} onPress={() => setWeekAnchor((prev) => addDays(prev, 7))} activeOpacity={0.85}>
+          <Text style={styles.weekNavTxt}>Próxima</Text>
+          <ChevronRight size={18} color={colors.bg} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -471,49 +503,20 @@ export default function AdminDashboardScreen() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.sectionTitle}>Agendamentos da semana</Text>
-
-          {/* ✅ Navegação de semanas */}
-          <View style={styles.weekRow}>
-            <TouchableOpacity
-              style={styles.weekBtn}
-              onPress={() => setWeekAnchor((prev) => addDays(prev, -7))}
-              activeOpacity={0.85}
-            >
-              <ChevronLeft size={18} color={colors.bg} />
-              <Text style={styles.weekBtnTxt}>Anterior</Text>
-            </TouchableOpacity>
-
-            <View style={styles.weekCenter}>
-              <Text style={styles.weekRange}>{weekLabel}</Text>
-              <TouchableOpacity onPress={() => setWeekAnchor(new Date())} activeOpacity={0.85}>
-                <Text style={styles.weekToday}>Hoje</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.weekBtn}
-              onPress={() => setWeekAnchor((prev) => addDays(prev, 7))}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.weekBtnTxt}>Próxima</Text>
-              <ChevronRight size={18} color={colors.bg} />
-            </TouchableOpacity>
-          </View>
-
-          {loadingList ? (
-            <View style={{ paddingTop: 24 }}>
+          {loadingWeek ? (
+            <View style={{ paddingTop: 18 }}>
               <ActivityIndicator />
             </View>
           ) : (
             <FlatList
-              data={appointments}
-              keyExtractor={(it) => it.id}
+              data={appointmentsWeek}
+              keyExtractor={(it) => `week-${it.id}`}
               renderItem={renderAppointment}
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Sem agendamentos nessa semana.</Text>}
+              ListHeaderComponent={<HeaderWeek />}
+              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado nessa semana.</Text>}
             />
           )}
         </View>
@@ -540,7 +543,7 @@ export default function AdminDashboardScreen() {
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminManage' as any)} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminManage')} activeOpacity={0.8}>
                 <Calendar size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Gerenciar</Text>
               </TouchableOpacity>
@@ -594,16 +597,13 @@ const styles = StyleSheet.create({
 
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
 
-  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 10, color: colors.text },
+  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 6, color: colors.text },
 
-  weekRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  weekBtn: {
+  weekHeader: { marginBottom: 12, gap: 10, alignItems: 'center' },
+  weekRangeTitle: { fontSize: 16, fontWeight: '900', color: '#111827' },
+  weekNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' },
+
+  weekNavBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -611,11 +611,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
+    minWidth: 110,
+    justifyContent: 'center',
   },
-  weekBtnTxt: { color: colors.bg, fontWeight: '900' },
-  weekCenter: { alignItems: 'center', gap: 2, flex: 1 },
-  weekRange: { color: '#111827', fontWeight: '900' },
-  weekToday: { color: colors.primary, fontWeight: '900', textDecorationLine: 'underline' },
+  weekNavTxt: { color: colors.bg, fontWeight: '900' },
+
+  weekChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: surfaces.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  weekChipTxt: { fontWeight: '900', color: colors.primary },
+  weekChipDisabled: { opacity: 0.6 },
+  weekChipTxtDisabled: { color: '#64748B' },
 
   card: {
     flexDirection: 'row',
@@ -650,7 +664,6 @@ const styles = StyleSheet.create({
   },
   primaryActionBtnAlt: { backgroundColor: colors.primary },
   primaryActionText: { color: colors.bg, fontWeight: '900' },
-
   disabledBtn: { opacity: 0.45 },
 
   overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
