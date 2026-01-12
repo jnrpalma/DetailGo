@@ -2,15 +2,16 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, surfaces } from '@shared/theme';
-import type { DashboardAppointment } from '@features/appointments/hooks/useDashboardAppointments';
+import type { UserAppointment } from '@features/appointments/domain/appointment.types';
 
 type Props = {
-  item: DashboardAppointment;
+  item: UserAppointment;
 };
 
 function formatCurrency(v: number | null) {
   return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
 }
+
 function formatDate(ms: number) {
   const d = new Date(ms);
   const dd = String(d.getDate()).padStart(2, '0');
@@ -18,8 +19,12 @@ function formatDate(ms: number) {
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
+
 function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function AppointmentCard({ item }: Props) {
@@ -51,13 +56,15 @@ export default function AppointmentCard({ item }: Props) {
       <View style={styles.cardLeft}>
         <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
         <Text style={styles.cardSubtitle}>{subtitle}</Text>
-        <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
+        <Text style={[styles.status, { color: statusColor }]}>
+          {statusLabel}
+        </Text>
       </View>
 
       <View style={styles.cardRight}>
         <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
         <Text style={styles.cardDate}>
-          {formatDate(item.whenMs)} • {formatHour(item.whenMs)}
+          {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
         </Text>
       </View>
     </View>

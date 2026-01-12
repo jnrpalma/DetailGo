@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   FlatList,
@@ -11,7 +12,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,17 +19,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getAuth } from '@react-native-firebase/auth';
 import {
-  getFirestore,
   collection,
-  onSnapshot,
-  getDocs,
-  orderBy,
-  query,
-  where,
   doc,
   getDoc,
+  getFirestore,
+  onSnapshot,
+  orderBy,
+  query,
   updateDoc,
-  onSnapshot as onDocSnap,
+  where,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
@@ -49,10 +47,13 @@ import type { RootStackParamList } from '@app/types';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
+import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
+import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
+
+import type { AdminAppointment } from '../domain/adminAppointment.types';
+import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type UserProfile = {
   firstName?: string;
@@ -64,26 +65,12 @@ type UserProfile = {
   role?: 'admin' | 'user';
 };
 
-type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
-
-type Appointment = {
-  id: string;
-  customerUid: string;
-  customerName: string;
-  serviceLabel: string | null;
-  vehicleType: 'Carro' | 'Moto';
-  carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
-  price: number | null;
-  startAtMs: number;
-  status: AppointmentStatus;
-  dayKey?: string;
-};
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 const COVER_H = 285;
 const AVATAR = 130;
 const MENU_W = 220;
-
-const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
 
 function startOfWeekMs(anchor: Date) {
   const d = new Date(anchor);
@@ -106,10 +93,7 @@ function addDays(base: Date, days: number) {
   return d;
 }
 function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 function formatDate(ms: number) {
   const d = new Date(ms);
@@ -134,43 +118,12 @@ function formatWeekLabel(startMs: number, endMs: number) {
   const yyyyS = s.getFullYear();
   const yyyyE = e.getFullYear();
 
-  if (yyyyS === yyyyE && s.getMonth() === e.getMonth()) {
-    return `${ddS}–${ddE} ${monthS} ${yyyyS}`;
-  }
-  if (yyyyS === yyyyE) {
-    return `${ddS} ${monthS} – ${ddE} ${monthE} ${yyyyS}`;
-  }
+  if (yyyyS === yyyyE && s.getMonth() === e.getMonth()) return `${ddS}–${ddE} ${monthS} ${yyyyS}`;
+  if (yyyyS === yyyyE) return `${ddS} ${monthS} – ${ddE} ${monthE} ${yyyyS}`;
   return `${ddS} ${monthS} ${yyyyS} – ${ddE} ${monthE} ${yyyyE}`;
 }
 function isCurrentWeek(anchor: Date) {
   return startOfWeekMs(anchor) === startOfWeekMs(new Date());
-}
-
-function normalizeAppointmentFromDoc(
-  d: FirebaseFirestoreTypes.QueryDocumentSnapshot,
-): Appointment | null {
-  const v = d.data() as any;
-
-  const startAtMs = Number(v.startAtMs ?? 0);
-  if (!startAtMs) return null;
-
-  const status = (v.status as Appointment['status']) ?? 'scheduled';
-
-  const customerUid = String(v.customerUid ?? '');
-  if (!customerUid) return null;
-
-  return {
-    id: d.id,
-    customerUid,
-    customerName: String(v.customerName ?? 'Cliente'),
-    serviceLabel: v.serviceLabel ?? null,
-    vehicleType: (v.vehicleType as 'Carro' | 'Moto') ?? 'Carro',
-    carCategory: v.carCategory ?? null,
-    price: typeof v.price === 'number' ? v.price : null,
-    startAtMs,
-    status,
-    dayKey: v.dayKey,
-  };
 }
 
 export default function AdminDashboardScreen() {
@@ -178,15 +131,16 @@ export default function AdminDashboardScreen() {
 
   const auth = getAuth();
   const user = auth.currentUser;
+  const db = getFirestore();
 
   const [profile, setProfile] = useState<UserProfile>({});
 
-  const [appointmentsWeek, setAppointmentsWeek] = useState<Appointment[]>([]);
+  const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(true);
 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-
   const noShowMarkedRef = useRef<Set<string>>(new Set());
+  const nameCacheRef = useRef<Map<string, string>>(new Map());
 
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
@@ -194,13 +148,8 @@ export default function AdminDashboardScreen() {
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const weekStartMs = useMemo(() => startOfWeekMs(weekAnchor), [weekAnchor]);
   const weekEndMs = useMemo(() => endOfWeekMs(weekAnchor), [weekAnchor]);
-  const weekLabel = useMemo(
-    () => formatWeekLabel(weekStartMs, weekEndMs),
-    [weekStartMs, weekEndMs],
-  );
+  const weekLabel = useMemo(() => formatWeekLabel(weekStartMs, weekEndMs), [weekStartMs, weekEndMs]);
   const onCurrentWeek = useMemo(() => isCurrentWeek(weekAnchor), [weekAnchor]);
-
-  const nameCacheRef = useRef<Map<string, string>>(new Map());
 
   const openMenu = () => {
     setMenuOpen(true);
@@ -220,27 +169,17 @@ export default function AdminDashboardScreen() {
     }).start(({ finished }) => finished && setMenuOpen(false));
   };
 
-  const drawerTx = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-MENU_W, 0],
-  });
-  const overlayOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
+  const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   const resolveCustomerName = async (customerUid: string): Promise<string> => {
     const cached = nameCacheRef.current.get(customerUid);
     if (cached) return cached;
 
     try {
-      const snap = await getDoc(doc(getFirestore(), 'users', customerUid));
-      const data = (snap.data() ?? {}) as {
-        firstName?: string;
-        lastName?: string;
-      };
-      const name =
-        `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
+      const snap = await getDoc(doc(db, 'users', customerUid));
+      const data = (snap.data() ?? {}) as { firstName?: string; lastName?: string };
+      const name = `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
       nameCacheRef.current.set(customerUid, name);
       return name;
     } catch {
@@ -248,10 +187,10 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
-    const updated: Appointment[] = [];
+  const fillMissingNamesAndUpdate = async (list: AdminAppointment[]) => {
+    const updated: AdminAppointment[] = [];
     await Promise.all(
-      list.map(async it => {
+      list.map(async (it) => {
         if (it.customerName && it.customerName !== 'Cliente') {
           updated.push(it);
           return;
@@ -259,10 +198,9 @@ export default function AdminDashboardScreen() {
 
         const name = await resolveCustomerName(it.customerUid);
         try {
-          await updateDoc(doc(getFirestore(), 'appointments', it.id), {
-            customerName: name,
-          });
+          await updateDoc(doc(db, 'appointments', it.id), { customerName: name });
         } catch {}
+
         updated.push({ ...it, customerName: name });
       }),
     );
@@ -273,11 +211,10 @@ export default function AdminDashboardScreen() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const db = getFirestore();
 
-    const unsubProfile = onDocSnap(
+    const unsubProfile = onSnapshot(
       doc(db, 'users', user.uid),
-      snap => {
+      (snap) => {
         const data = snap.data() as UserProfile | undefined;
         if (data) setProfile(data);
       },
@@ -285,7 +222,7 @@ export default function AdminDashboardScreen() {
     );
 
     return () => unsubProfile();
-  }, [user?.uid]);
+  }, [db, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -298,7 +235,6 @@ export default function AdminDashboardScreen() {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const db = getFirestore();
     setLoadingWeek(true);
 
     const qyWeek = query(
@@ -311,17 +247,15 @@ export default function AdminDashboardScreen() {
 
     const unsub = onSnapshot(
       qyWeek,
-      async snap => {
+      async (snap) => {
         const base = snap.docs
-          .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) =>
-            normalizeAppointmentFromDoc(d),
-          )
-          .filter(Boolean) as Appointment[];
+          .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
+          .filter(Boolean) as AdminAppointment[];
 
-        // auto no_show se passou 15min e ainda estava scheduled (opcional, mas mantém coerência)
+        // auto no_show se passou 15min e ainda estava scheduled
         const now = Date.now();
         const expiredScheduled = base.filter(
-          it =>
+          (it) =>
             it.status === 'scheduled' &&
             now > it.startAtMs + NO_SHOW_GRACE_MS &&
             !noShowMarkedRef.current.has(it.id),
@@ -329,7 +263,7 @@ export default function AdminDashboardScreen() {
 
         if (expiredScheduled.length > 0) {
           await Promise.all(
-            expiredScheduled.map(async it => {
+            expiredScheduled.map(async (it) => {
               noShowMarkedRef.current.add(it.id);
               try {
                 await updateAppointmentStatus({
@@ -352,14 +286,12 @@ export default function AdminDashboardScreen() {
     );
 
     return () => unsub();
-  }, [user?.uid, weekStartMs, weekEndMs]);
+  }, [db, user?.uid, weekStartMs, weekEndMs]);
 
   if (!user?.uid) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-        >
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator />
         </View>
       </SafeAreaView>
@@ -391,8 +323,9 @@ export default function AdminDashboardScreen() {
     );
   };
 
-  const doUpdate = async (item: Appointment, next: AppointmentStatus) => {
+  const doUpdate = async (item: AdminAppointment, next: AppointmentStatus) => {
     if (updatingId) return;
+
     setUpdatingId(item.id);
     try {
       await updateAppointmentStatus({
@@ -404,20 +337,16 @@ export default function AdminDashboardScreen() {
       console.error(e);
       Alert.alert(
         'Erro',
-        e?.code === 'APPOINTMENT_EXPIRED'
-          ? 'Agendamento expirado.'
-          : 'Não foi possível atualizar.',
+        e?.code === 'APPOINTMENT_EXPIRED' ? 'Agendamento expirado.' : 'Não foi possível atualizar.',
       );
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const renderAppointment = ({ item }: { item: Appointment }) => {
+  const renderAppointment = ({ item }: { item: AdminAppointment }) => {
     const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory
-        ? `Carro • ${item.carCategory}`
-        : item.vehicleType;
+      item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
 
     const expired = Date.now() > item.startAtMs + NO_SHOW_GRACE_MS;
     const isNoShow = item.status === 'scheduled' && expired;
@@ -443,19 +372,12 @@ export default function AdminDashboardScreen() {
         : '#6B7280';
 
     const canPress = !isNoShow && updatingId !== item.id;
+
     const action =
       displayStatus === 'scheduled'
-        ? {
-            label: 'Começar',
-            icon: <PlayCircle size={18} color={colors.bg} />,
-            next: 'in_progress' as AppointmentStatus,
-          }
+        ? { label: 'Começar', icon: <PlayCircle size={18} color={colors.bg} />, next: 'in_progress' as AppointmentStatus }
         : displayStatus === 'in_progress'
-        ? {
-            label: 'Concluir',
-            icon: <CheckCircle2 size={18} color={colors.bg} />,
-            next: 'done' as AppointmentStatus,
-          }
+        ? { label: 'Concluir', icon: <CheckCircle2 size={18} color={colors.bg} />, next: 'done' as AppointmentStatus }
         : null;
 
     return (
@@ -465,14 +387,10 @@ export default function AdminDashboardScreen() {
           <Text style={styles.cardClient}>👤 {item.customerName}</Text>
 
           <Text style={styles.cardSubtitle}>
-            {subtitle} • {formatDate(item.startAtMs)} •{' '}
-            {formatHour(item.startAtMs)}
+            {subtitle} • {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
           </Text>
 
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {statusLabel}
-          </Text>
-
+          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
           <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
         </View>
 
@@ -484,9 +402,7 @@ export default function AdminDashboardScreen() {
                 displayStatus === 'in_progress' && styles.primaryActionBtnAlt,
                 (!canPress || isNoShow) && styles.disabledBtn,
               ]}
-              onPress={() =>
-                isNoShow ? alertCannotWork() : doUpdate(item, action.next)
-              }
+              onPress={() => (isNoShow ? alertCannotWork() : doUpdate(item, action.next))}
               activeOpacity={0.85}
               disabled={!canPress || isNoShow}
             >
@@ -509,11 +425,7 @@ export default function AdminDashboardScreen() {
     );
   };
 
-  const overlayStyle = [
-    StyleSheet.absoluteFill,
-    styles.overlay,
-    { opacity: overlayOpacity },
-  ];
+  const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
 
   const doSignOut = async () => {
     closeMenu();
@@ -532,7 +444,7 @@ export default function AdminDashboardScreen() {
       <View style={styles.weekNavRow}>
         <TouchableOpacity
           style={styles.weekNavBtn}
-          onPress={() => setWeekAnchor(prev => addDays(prev, -7))}
+          onPress={() => setWeekAnchor((prev) => addDays(prev, -7))}
           activeOpacity={0.85}
         >
           <ChevronLeft size={18} color={colors.bg} />
@@ -545,19 +457,14 @@ export default function AdminDashboardScreen() {
           activeOpacity={0.85}
           disabled={onCurrentWeek}
         >
-          <Text
-            style={[
-              styles.weekChipTxt,
-              onCurrentWeek && styles.weekChipTxtDisabled,
-            ]}
-          >
+          <Text style={[styles.weekChipTxt, onCurrentWeek && styles.weekChipTxtDisabled]}>
             Semana atual
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.weekNavBtn}
-          onPress={() => setWeekAnchor(prev => addDays(prev, 7))}
+          onPress={() => setWeekAnchor((prev) => addDays(prev, 7))}
           activeOpacity={0.85}
         >
           <Text style={styles.weekNavTxt}>Próxima</Text>
@@ -571,16 +478,8 @@ export default function AdminDashboardScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <View style={styles.headerWrapper}>
-          <ImageBackground
-            style={styles.header}
-            imageStyle={styles.headerImg}
-            source={coverSource}
-          >
-            <TouchableOpacity
-              style={styles.menuBtn}
-              activeOpacity={0.8}
-              onPress={openMenu}
-            >
+          <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
+            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
           </ImageBackground>
@@ -604,16 +503,14 @@ export default function AdminDashboardScreen() {
           ) : (
             <FlatList
               data={appointmentsWeek}
-              keyExtractor={it => `week-${it.id}`}
+              keyExtractor={(it) => `week-${it.id}`}
               renderItem={renderAppointment}
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={<HeaderWeek />}
               ListEmptyComponent={
-                <Text style={{ textAlign: 'center', color: '#6B7280' }}>
-                  Nada marcado nessa semana.
-                </Text>
+                <Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado nessa semana.</Text>
               }
             />
           )}
@@ -625,9 +522,7 @@ export default function AdminDashboardScreen() {
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
-            <Animated.View
-              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
-            >
+            <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}>
               <View style={styles.drawerHeader}>
                 <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
                 <Text style={styles.drawerTitle}>Menu</Text>

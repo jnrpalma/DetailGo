@@ -8,9 +8,11 @@ import LoginScreen from '@features/auth/screens/LoginScreen';
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
 import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
 
-import MyAppointmentsScreen from '@features/scheduling/screens/MyAppointmentsScreen';
-import HistoryScreen from '@features/scheduling/screens/HistoryScreen';
+// ✅ AGORA VEM DE APPOINTMENTS (não scheduling)
+import MyAppointmentsScreen from '@features/appointments/screens/MyAppointmentsScreen';
+import HistoryScreen from '@features/appointments/screens/HistoryScreen';
 
+// ADMIN
 import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';

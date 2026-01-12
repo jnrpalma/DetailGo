@@ -16,14 +16,12 @@ import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth/context/AuthContext';
 
 import { ensureShopSettings } from '@app/bootstrap/ensureShopSettings';
-import {
-  doc,
-  getFirestore,
-  onSnapshot,
-} from '@react-native-firebase/firestore';
+import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
 import { isAdminEmail } from '@features/auth/utils/roles';
-import MyAppointmentsScreen from '@features/scheduling/screens/MyAppointmentsScreen';
-import HistoryScreen from '@features/scheduling/screens/HistoryScreen';
+
+// ✅ AGORA VEM DE APPOINTMENTS (não scheduling)
+import MyAppointmentsScreen from '@features/appointments/screens/MyAppointmentsScreen';
+import HistoryScreen from '@features/appointments/screens/HistoryScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -46,6 +44,7 @@ export default function RootNavigator() {
     }
 
     setLoadingRole(true);
+
     const db = getFirestore();
     const ref = doc(db, 'users', user.uid);
 
@@ -87,10 +86,7 @@ export default function RootNavigator() {
       {user ? (
         isAdmin ? (
           <Stack.Group>
-            <Stack.Screen
-              name="AdminDashboard"
-              component={AdminDashboardScreen}
-            />
+            <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
             <Stack.Screen name="AdminManage" component={AdminManageScreen} />
             <Stack.Screen name="AdminHistory" component={AdminHistoryScreen} />
           </Stack.Group>
@@ -99,10 +95,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
             <Stack.Screen name="Appointment" component={AppointmentScreen} />
 
-            <Stack.Screen
-              name="MyAppointments"
-              component={MyAppointmentsScreen}
-            />
+            <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} />
             <Stack.Screen name="History" component={HistoryScreen} />
           </Stack.Group>
         )
