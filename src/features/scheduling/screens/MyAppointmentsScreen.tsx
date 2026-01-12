@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getAuth } from '@react-native-firebase/auth';
@@ -18,7 +24,8 @@ import {
 import { colors, spacing, surfaces } from '@shared/theme';
 import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
 
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type Appointment = {
   id: string;
@@ -31,7 +38,10 @@ type Appointment = {
 };
 
 function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 function formatDate(ms: number) {
   const d = new Date(ms);
@@ -67,12 +77,12 @@ export default function MyAppointmentsScreen() {
     const qy = query(
       collection(db, 'users', uid, 'appointments'),
       orderBy('whenMs', 'desc'),
-      limit(50)
+      limit(50),
     );
 
     const unsub = onSnapshot(
       qy,
-      async (snap) => {
+      async snap => {
         const arr: Appointment[] = snap.docs
           .map((d: QDoc) => {
             const v = d.data() as any;
@@ -90,7 +100,7 @@ export default function MyAppointmentsScreen() {
           })
           .filter(Boolean) as Appointment[];
 
-        const active = arr.filter((it) => ACTIVE_SET.includes(it.status));
+        const active = arr.filter(it => ACTIVE_SET.includes(it.status));
 
         if (snap.docs.length > 0) {
           setItems(active);
@@ -107,7 +117,7 @@ export default function MyAppointmentsScreen() {
               where('customerUid', '==', uid),
               where('status', 'in', ACTIVE_SET),
               orderBy('startAtMs', 'desc'),
-              limit(50)
+              limit(50),
             );
 
             const globalSnap = await getDocs(globalQy);
@@ -142,7 +152,7 @@ export default function MyAppointmentsScreen() {
         setItems([]);
         setLoading(false);
       },
-      () => setLoading(false)
+      () => setLoading(false),
     );
 
     return () => unsub();
@@ -150,9 +160,12 @@ export default function MyAppointmentsScreen() {
 
   const renderItem = ({ item }: { item: Appointment }) => {
     const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `Carro • ${item.carCategory}`
+        : item.vehicleType;
 
-    const statusLabel = item.status === 'in_progress' ? 'Em andamento' : 'Agendado';
+    const statusLabel =
+      item.status === 'in_progress' ? 'Em andamento' : 'Agendado';
     const statusColor = item.status === 'in_progress' ? '#2563EB' : '#6B7280';
 
     return (
@@ -162,7 +175,9 @@ export default function MyAppointmentsScreen() {
           <Text style={styles.sub}>
             {subtitle} • {formatDate(item.whenMs)} • {formatHour(item.whenMs)}
           </Text>
-          <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
+          <Text style={[styles.status, { color: statusColor }]}>
+            {statusLabel}
+          </Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
@@ -175,7 +190,9 @@ export default function MyAppointmentsScreen() {
   if (!uid) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        >
           <ActivityIndicator />
         </View>
       </SafeAreaView>
@@ -183,7 +200,10 @@ export default function MyAppointmentsScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      edges={['top', 'left', 'right']}
+    >
       <View style={{ flex: 1, padding: spacing.lg }}>
         <Text style={styles.screenTitle}>Meus agendamentos</Text>
 
@@ -194,7 +214,7 @@ export default function MyAppointmentsScreen() {
         ) : (
           <FlatList
             data={items}
-            keyExtractor={(it) => it.id}
+            keyExtractor={it => it.id}
             renderItem={renderItem}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             contentContainerStyle={{ paddingBottom: 40 }}
@@ -211,7 +231,13 @@ export default function MyAppointmentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenTitle: { fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center', marginBottom: 12 },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
 
   card: {
     flexDirection: 'row',
@@ -224,7 +250,12 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     gap: 12,
   },
-  title: { color: colors.text, fontSize: 16, fontWeight: '900', marginBottom: 6 },
+  title: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
   sub: { color: '#616E7C', fontSize: 13, fontWeight: '700', marginBottom: 6 },
   status: { fontWeight: '900' },
   price: { color: colors.primary, fontWeight: '900' },
