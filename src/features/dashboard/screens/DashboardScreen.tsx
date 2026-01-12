@@ -19,7 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { launchImageLibrary, type ImageLibraryOptions, type Asset } from 'react-native-image-picker';
+import {
+  launchImageLibrary,
+  type ImageLibraryOptions,
+  type Asset,
+} from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   collection,
@@ -37,14 +41,22 @@ import {
 
 import { useAuth } from '@features/auth/context/AuthContext';
 import { isAdminEmail } from '@features/auth/utils/roles';
-import { Menu, User as UserIcon, History, LogOut, Calendar, ClipboardList } from 'lucide-react-native';
+import {
+  Menu,
+  User as UserIcon,
+  History,
+  LogOut,
+  Calendar,
+  ClipboardList,
+} from 'lucide-react-native';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type UserProfile = {
   firstName?: string;
@@ -118,8 +130,14 @@ export default function DashboardScreen() {
     }).start(({ finished }) => finished && setMenuOpen(false));
   };
 
-  const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
-  const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const drawerTx = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-MENU_W, 0],
+  });
+  const overlayOpacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   const isAdmin = isAdminEmail(user.email);
 
@@ -127,10 +145,10 @@ export default function DashboardScreen() {
     const db = getFirestore();
 
     const userRef = doc(db, 'users', uid);
-    const unsubProfile = onSnapshot(userRef, (snap) => {
+    const unsubProfile = onSnapshot(userRef, snap => {
       const data = snap.data() as UserProfile | undefined;
       if (data) {
-        setProfile((p) => ({
+        setProfile(p => ({
           ...p,
           ...data,
           photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined,
@@ -138,11 +156,14 @@ export default function DashboardScreen() {
       }
     });
 
-    const qy = query(collection(db, 'users', uid, 'appointments'), orderBy('whenMs', 'desc'));
+    const qy = query(
+      collection(db, 'users', uid, 'appointments'),
+      orderBy('whenMs', 'desc'),
+    );
 
     const unsubList = onSnapshot(
       qy,
-      async (snap) => {
+      async snap => {
         const now = Date.now();
 
         const arr: Appointment[] = snap.docs
@@ -169,7 +190,7 @@ export default function DashboardScreen() {
               collection(db, 'appointments'),
               where('customerUid', '==', uid),
               orderBy('startAtMs', 'desc'),
-              limit(30)
+              limit(30),
             );
             const globalSnap = await getDocs(globalQy);
 
@@ -194,11 +215,17 @@ export default function DashboardScreen() {
               backfillDoneRef.current = true;
 
               await Promise.all(
-                fromGlobal.map(async (it) => {
+                fromGlobal.map(async it => {
                   const g = globalSnap.docs.find((x: QDoc) => x.id === it.id);
                   const gv = (g?.data() ?? {}) as any;
 
-                  const mirrorRef = doc(db, 'users', uid, 'appointments', it.id);
+                  const mirrorRef = doc(
+                    db,
+                    'users',
+                    uid,
+                    'appointments',
+                    it.id,
+                  );
                   await setDoc(
                     mirrorRef,
                     {
@@ -214,22 +241,22 @@ export default function DashboardScreen() {
                       createdAt: gv.createdAt ?? undefined,
                       updatedAt: gv.updatedAt ?? undefined,
                     },
-                    { merge: true }
+                    { merge: true },
                   );
-                })
+                }),
               );
             }
 
             const shouldMarkGlobal = fromGlobal.filter(
-              (it) =>
+              it =>
                 it.status === 'scheduled' &&
                 now > it.whenMs + NO_SHOW_GRACE_MS &&
-                !noShowMarkedRef.current.has(it.id)
+                !noShowMarkedRef.current.has(it.id),
             );
 
             if (shouldMarkGlobal.length > 0) {
               await Promise.all(
-                shouldMarkGlobal.map(async (it) => {
+                shouldMarkGlobal.map(async it => {
                   noShowMarkedRef.current.add(it.id);
                   try {
                     await updateAppointmentStatus({
@@ -240,7 +267,7 @@ export default function DashboardScreen() {
                   } catch {
                     noShowMarkedRef.current.delete(it.id);
                   }
-                })
+                }),
               );
             }
 
@@ -254,15 +281,15 @@ export default function DashboardScreen() {
 
         // auto no_show para subcollection
         const shouldMark = arr.filter(
-          (it) =>
+          it =>
             it.status === 'scheduled' &&
             now > it.whenMs + NO_SHOW_GRACE_MS &&
-            !noShowMarkedRef.current.has(it.id)
+            !noShowMarkedRef.current.has(it.id),
         );
 
         if (shouldMark.length > 0) {
           await Promise.all(
-            shouldMark.map(async (it) => {
+            shouldMark.map(async it => {
               noShowMarkedRef.current.add(it.id);
               try {
                 await updateAppointmentStatus({
@@ -273,14 +300,14 @@ export default function DashboardScreen() {
               } catch {
                 noShowMarkedRef.current.delete(it.id);
               }
-            })
+            }),
           );
         }
 
         setAppointments(arr);
         setLoadingList(false);
       },
-      () => setLoadingList(false)
+      () => setLoadingList(false),
     );
 
     return () => {
@@ -311,8 +338,12 @@ export default function DashboardScreen() {
       const b64 = await pickAsBase64();
       if (!b64) return;
       setSaving('cover');
-      await setDoc(doc(getFirestore(), 'users', uid), { coverB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, coverB64: b64 }));
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { coverB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, coverB64: b64 }));
     } catch (e: any) {
       Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
     } finally {
@@ -325,10 +356,17 @@ export default function DashboardScreen() {
       const b64 = await pickAsBase64();
       if (!b64) return;
       setSaving('avatar');
-      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, photoB64: b64 }));
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { photoB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
+      Alert.alert(
+        'Erro',
+        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
+      );
     } finally {
       setSaving(null);
     }
@@ -346,7 +384,9 @@ export default function DashboardScreen() {
     ? { uri: profile.photoURL }
     : undefined;
 
-  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Usuário';
+  const fullName = profile.firstName
+    ? `${profile.firstName} ${profile.lastName ?? ''}`
+    : user.displayName ?? 'Usuário';
 
   const goProfile = () => {
     closeMenu();
@@ -379,7 +419,8 @@ export default function DashboardScreen() {
     }
   };
 
-  const formatCurrency = (v: number | null) => (typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--');
+  const formatCurrency = (v: number | null) =>
+    typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
   const formatDate = (ms: number) => {
     const d = new Date(ms);
     const dd = String(d.getDate()).padStart(2, '0');
@@ -387,10 +428,14 @@ export default function DashboardScreen() {
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
   };
-  const formatHour = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatHour = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const renderAppointment = ({ item }: { item: Appointment }) => {
-    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+    const subtitle =
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `Carro • ${item.carCategory}`
+        : item.vehicleType;
 
     const statusLabel =
       item.status === 'scheduled'
@@ -415,7 +460,9 @@ export default function DashboardScreen() {
         <View style={styles.cardLeft}>
           <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
           <Text style={styles.cardSubtitle}>{subtitle}</Text>
-          <Text style={{ color: statusColor, fontWeight: '900', marginTop: 6 }}>{statusLabel}</Text>
+          <Text style={{ color: statusColor, fontWeight: '900', marginTop: 6 }}>
+            {statusLabel}
+          </Text>
         </View>
 
         <View style={styles.cardRight}>
@@ -428,19 +475,39 @@ export default function DashboardScreen() {
     );
   };
 
-  const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
+  const overlayStyle = [
+    StyleSheet.absoluteFill,
+    styles.overlay,
+    { opacity: overlayOpacity },
+  ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <View style={styles.headerWrapper}>
-          <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
-            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
+          <ImageBackground
+            style={styles.header}
+            imageStyle={styles.headerImg}
+            source={coverSource}
+          >
+            <TouchableOpacity
+              style={styles.menuBtn}
+              activeOpacity={0.8}
+              onPress={openMenu}
+            >
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={saveCover} style={styles.coverBtn} activeOpacity={0.9}>
-              {saving === 'cover' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.coverBtnTxt}>Trocar capa</Text>}
+            <TouchableOpacity
+              onPress={saveCover}
+              style={styles.coverBtn}
+              activeOpacity={0.9}
+            >
+              {saving === 'cover' ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.coverBtnTxt}>Trocar capa</Text>
+              )}
             </TouchableOpacity>
           </ImageBackground>
         </View>
@@ -466,7 +533,11 @@ export default function DashboardScreen() {
         <View style={styles.body}>
           {/* ✅ HEADER FIXO (NÃO FAZ PARTE DA LISTA) */}
           <View style={styles.headerFixed}>
-            <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => navigation.navigate('Appointment')}>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Appointment')}
+            >
               <Calendar size={18} color={colors.bg} />
               <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
             </TouchableOpacity>
@@ -483,54 +554,89 @@ export default function DashboardScreen() {
             <FlatList
               style={{ flex: 1 }}
               data={appointments}
-              keyExtractor={(it) => it.id}
+              keyExtractor={it => it.id}
               renderItem={renderAppointment}
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280', marginTop: 12 }}>Você ainda não possui serviços.</Text>}
+              ListEmptyComponent={
+                <Text
+                  style={{
+                    textAlign: 'center',
+                    color: '#6B7280',
+                    marginTop: 12,
+                  }}
+                >
+                  Você ainda não possui serviços.
+                </Text>
+              }
             />
           )}
         </View>
 
         {menuOpen && (
           <>
-            <Animated.View pointerEvents={menuOpen ? 'auto' : 'none'} style={overlayStyle}>
+            <Animated.View
+              pointerEvents={menuOpen ? 'auto' : 'none'}
+              style={overlayStyle}
+            >
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}>
+            <Animated.View
+              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
+            >
               <View style={styles.drawerHeader}>
                 <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
                 <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
               {isAdmin && (
-                <TouchableOpacity style={styles.item} onPress={goAdmin} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.item}
+                  onPress={goAdmin}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.itemText}>Admin</Text>
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.item} onPress={goProfile} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goProfile}
+                activeOpacity={0.8}
+              >
                 <UserIcon size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
               {/* ✅ AGORA FUNCIONA */}
-              <TouchableOpacity style={styles.item} onPress={goMyAppointments} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goMyAppointments}
+                activeOpacity={0.8}
+              >
                 <ClipboardList size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meus agendamentos</Text>
               </TouchableOpacity>
 
               {/* ✅ AGORA FUNCIONA */}
-              <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goHistory}
+                activeOpacity={0.8}
+              >
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
 
-              <TouchableOpacity style={[styles.item, { marginBottom: 50 }]} onPress={doSignOut} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={[styles.item, { marginBottom: 50 }]}
+                onPress={doSignOut}
+                activeOpacity={0.8}
+              >
                 <LogOut size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Sair</Text>
               </TouchableOpacity>
@@ -554,9 +660,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   header: { flex: 1, justifyContent: 'center' },
-  headerImg: { borderBottomLeftRadius: radii.lg, borderBottomRightRadius: radii.lg },
-  menuBtn: { position: 'absolute', left: 18, top: 18, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.15)' },
-  coverBtn: { position: 'absolute', right: 12, top: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10 },
+  headerImg: {
+    borderBottomLeftRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
+  },
+  menuBtn: {
+    position: 'absolute',
+    left: 18,
+    top: 18,
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
+  coverBtn: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 10,
+  },
   coverBtnTxt: { color: colors.white, fontWeight: '700' },
 
   avatarContainer: {
@@ -573,7 +697,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: { width: 130, height: 130, borderRadius: 130 / 2, backgroundColor: colors.black },
+  avatarImg: {
+    width: 130,
+    height: 130,
+    borderRadius: 130 / 2,
+    backgroundColor: colors.black,
+  },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
   avatarLoading: {
@@ -585,7 +714,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
 
-  body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.bg },
+  body: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: colors.bg,
+  },
 
   headerFixed: { gap: 14, paddingBottom: 10 },
 
@@ -601,7 +735,12 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '900' },
 
-  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', color: colors.text },
+  sectionTitle: {
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text,
+  },
 
   card: {
     flexDirection: 'row',
@@ -615,16 +754,40 @@ const styles = StyleSheet.create({
   },
   cardLeft: { flex: 1 },
   cardRight: { alignItems: 'flex-end' },
-  cardTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  cardTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
   cardSubtitle: { color: '#616E7C', fontSize: 15 },
-  cardPrice: { color: colors.primary, fontSize: 16, fontWeight: '900', marginBottom: 6 },
+  cardPrice: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
   cardDate: { color: '#616E7C', fontSize: 15 },
 
   overlay: { backgroundColor: surfaces.overlay },
-  drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 220, backgroundColor: surfaces.drawer, paddingTop: spacing.md, paddingHorizontal: spacing.md },
+  drawer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 220,
+    backgroundColor: surfaces.drawer,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
   drawerHeader: { minHeight: 56, gap: 2, marginBottom: 8 },
   drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
   drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+  },
   itemText: { fontSize: 20, color: colors.bg, fontWeight: '600' },
 });

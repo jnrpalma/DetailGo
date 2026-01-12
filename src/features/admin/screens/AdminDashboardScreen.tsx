@@ -33,7 +33,17 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import { Menu, User as UserIcon, History, LogOut, Calendar, PlayCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import {
+  Menu,
+  User as UserIcon,
+  History,
+  LogOut,
+  Calendar,
+  PlayCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
@@ -41,7 +51,8 @@ import { colors, surfaces, radii, spacing } from '@shared/theme';
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type UserProfile = {
   firstName?: string;
@@ -95,7 +106,10 @@ function addDays(base: Date, days: number) {
   return d;
 }
 function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 function formatDate(ms: number) {
   const d = new Date(ms);
@@ -132,7 +146,9 @@ function isCurrentWeek(anchor: Date) {
   return startOfWeekMs(anchor) === startOfWeekMs(new Date());
 }
 
-function normalizeAppointmentFromDoc(d: FirebaseFirestoreTypes.QueryDocumentSnapshot): Appointment | null {
+function normalizeAppointmentFromDoc(
+  d: FirebaseFirestoreTypes.QueryDocumentSnapshot,
+): Appointment | null {
   const v = d.data() as any;
 
   const startAtMs = Number(v.startAtMs ?? 0);
@@ -178,23 +194,40 @@ export default function AdminDashboardScreen() {
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const weekStartMs = useMemo(() => startOfWeekMs(weekAnchor), [weekAnchor]);
   const weekEndMs = useMemo(() => endOfWeekMs(weekAnchor), [weekAnchor]);
-  const weekLabel = useMemo(() => formatWeekLabel(weekStartMs, weekEndMs), [weekStartMs, weekEndMs]);
+  const weekLabel = useMemo(
+    () => formatWeekLabel(weekStartMs, weekEndMs),
+    [weekStartMs, weekEndMs],
+  );
   const onCurrentWeek = useMemo(() => isCurrentWeek(weekAnchor), [weekAnchor]);
 
   const nameCacheRef = useRef<Map<string, string>>(new Map());
 
   const openMenu = () => {
     setMenuOpen(true);
-    Animated.timing(anim, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   };
   const closeMenu = () => {
-    Animated.timing(anim, { toValue: 0, duration: 200, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(
-      ({ finished }) => finished && setMenuOpen(false)
-    );
+    Animated.timing(anim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => finished && setMenuOpen(false));
   };
 
-  const drawerTx = anim.interpolate({ inputRange: [0, 1], outputRange: [-MENU_W, 0] });
-  const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const drawerTx = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-MENU_W, 0],
+  });
+  const overlayOpacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   const resolveCustomerName = async (customerUid: string): Promise<string> => {
     const cached = nameCacheRef.current.get(customerUid);
@@ -202,8 +235,12 @@ export default function AdminDashboardScreen() {
 
     try {
       const snap = await getDoc(doc(getFirestore(), 'users', customerUid));
-      const data = (snap.data() ?? {}) as { firstName?: string; lastName?: string };
-      const name = `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
+      const data = (snap.data() ?? {}) as {
+        firstName?: string;
+        lastName?: string;
+      };
+      const name =
+        `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
       nameCacheRef.current.set(customerUid, name);
       return name;
     } catch {
@@ -214,7 +251,7 @@ export default function AdminDashboardScreen() {
   const fillMissingNamesAndUpdate = async (list: Appointment[]) => {
     const updated: Appointment[] = [];
     await Promise.all(
-      list.map(async (it) => {
+      list.map(async it => {
         if (it.customerName && it.customerName !== 'Cliente') {
           updated.push(it);
           return;
@@ -222,10 +259,12 @@ export default function AdminDashboardScreen() {
 
         const name = await resolveCustomerName(it.customerUid);
         try {
-          await updateDoc(doc(getFirestore(), 'appointments', it.id), { customerName: name });
+          await updateDoc(doc(getFirestore(), 'appointments', it.id), {
+            customerName: name,
+          });
         } catch {}
         updated.push({ ...it, customerName: name });
-      })
+      }),
     );
 
     updated.sort((a, b) => a.startAtMs - b.startAtMs);
@@ -238,11 +277,11 @@ export default function AdminDashboardScreen() {
 
     const unsubProfile = onDocSnap(
       doc(db, 'users', user.uid),
-      (snap) => {
+      snap => {
         const data = snap.data() as UserProfile | undefined;
         if (data) setProfile(data);
       },
-      () => {}
+      () => {},
     );
 
     return () => unsubProfile();
@@ -267,25 +306,30 @@ export default function AdminDashboardScreen() {
       where('status', 'in', ['scheduled', 'in_progress']),
       where('startAtMs', '>=', weekStartMs),
       where('startAtMs', '<=', weekEndMs),
-      orderBy('startAtMs', 'asc')
+      orderBy('startAtMs', 'asc'),
     );
 
     const unsub = onSnapshot(
       qyWeek,
-      async (snap) => {
+      async snap => {
         const base = snap.docs
-          .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => normalizeAppointmentFromDoc(d))
+          .map((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) =>
+            normalizeAppointmentFromDoc(d),
+          )
           .filter(Boolean) as Appointment[];
 
         // auto no_show se passou 15min e ainda estava scheduled (opcional, mas mantém coerência)
         const now = Date.now();
         const expiredScheduled = base.filter(
-          (it) => it.status === 'scheduled' && now > it.startAtMs + NO_SHOW_GRACE_MS && !noShowMarkedRef.current.has(it.id)
+          it =>
+            it.status === 'scheduled' &&
+            now > it.startAtMs + NO_SHOW_GRACE_MS &&
+            !noShowMarkedRef.current.has(it.id),
         );
 
         if (expiredScheduled.length > 0) {
           await Promise.all(
-            expiredScheduled.map(async (it) => {
+            expiredScheduled.map(async it => {
               noShowMarkedRef.current.add(it.id);
               try {
                 await updateAppointmentStatus({
@@ -296,7 +340,7 @@ export default function AdminDashboardScreen() {
               } catch {
                 noShowMarkedRef.current.delete(it.id);
               }
-            })
+            }),
           );
         }
 
@@ -304,7 +348,7 @@ export default function AdminDashboardScreen() {
         setAppointmentsWeek(finalList);
         setLoadingWeek(false);
       },
-      () => setLoadingWeek(false)
+      () => setLoadingWeek(false),
     );
 
     return () => unsub();
@@ -313,35 +357,37 @@ export default function AdminDashboardScreen() {
   if (!user?.uid) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        >
           <ActivityIndicator />
         </View>
       </SafeAreaView>
     );
   }
 
-  const coverSource =
-    profile.coverB64
-      ? { uri: profile.coverB64 }
-      : profile.coverUrl
-      ? { uri: profile.coverUrl }
-      : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
+  const coverSource = profile.coverB64
+    ? { uri: profile.coverB64 }
+    : profile.coverUrl
+    ? { uri: profile.coverUrl }
+    : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
 
-  const avatarSource =
-    profile.photoB64
-      ? { uri: profile.photoB64 }
-      : profile.photoURL
-      ? { uri: profile.photoURL }
-      : user.photoURL
-      ? { uri: user.photoURL }
-      : undefined;
+  const avatarSource = profile.photoB64
+    ? { uri: profile.photoB64 }
+    : profile.photoURL
+    ? { uri: profile.photoURL }
+    : user.photoURL
+    ? { uri: user.photoURL }
+    : undefined;
 
-  const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Administrador';
+  const fullName = profile.firstName
+    ? `${profile.firstName} ${profile.lastName ?? ''}`
+    : user.displayName ?? 'Administrador';
 
   const alertCannotWork = () => {
     Alert.alert(
       'Serviço não realizado',
-      'Já passaram 15 minutos do horário marcado.\nEsse agendamento é considerado NÃO REALIZADO e não pode mais ser iniciado/concluído.'
+      'Já passaram 15 minutos do horário marcado.\nEsse agendamento é considerado NÃO REALIZADO e não pode mais ser iniciado/concluído.',
     );
   };
 
@@ -356,14 +402,22 @@ export default function AdminDashboardScreen() {
       });
     } catch (e: any) {
       console.error(e);
-      Alert.alert('Erro', e?.code === 'APPOINTMENT_EXPIRED' ? 'Agendamento expirado.' : 'Não foi possível atualizar.');
+      Alert.alert(
+        'Erro',
+        e?.code === 'APPOINTMENT_EXPIRED'
+          ? 'Agendamento expirado.'
+          : 'Não foi possível atualizar.',
+      );
     } finally {
       setUpdatingId(null);
     }
   };
 
   const renderAppointment = ({ item }: { item: Appointment }) => {
-    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+    const subtitle =
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `Carro • ${item.carCategory}`
+        : item.vehicleType;
 
     const expired = Date.now() > item.startAtMs + NO_SHOW_GRACE_MS;
     const isNoShow = item.status === 'scheduled' && expired;
@@ -391,9 +445,17 @@ export default function AdminDashboardScreen() {
     const canPress = !isNoShow && updatingId !== item.id;
     const action =
       displayStatus === 'scheduled'
-        ? { label: 'Começar', icon: <PlayCircle size={18} color={colors.bg} />, next: 'in_progress' as AppointmentStatus }
+        ? {
+            label: 'Começar',
+            icon: <PlayCircle size={18} color={colors.bg} />,
+            next: 'in_progress' as AppointmentStatus,
+          }
         : displayStatus === 'in_progress'
-        ? { label: 'Concluir', icon: <CheckCircle2 size={18} color={colors.bg} />, next: 'done' as AppointmentStatus }
+        ? {
+            label: 'Concluir',
+            icon: <CheckCircle2 size={18} color={colors.bg} />,
+            next: 'done' as AppointmentStatus,
+          }
         : null;
 
     return (
@@ -403,10 +465,13 @@ export default function AdminDashboardScreen() {
           <Text style={styles.cardClient}>👤 {item.customerName}</Text>
 
           <Text style={styles.cardSubtitle}>
-            {subtitle} • {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
+            {subtitle} • {formatDate(item.startAtMs)} •{' '}
+            {formatHour(item.startAtMs)}
           </Text>
 
-          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+          <Text style={[styles.statusText, { color: statusColor }]}>
+            {statusLabel}
+          </Text>
 
           <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
         </View>
@@ -419,7 +484,9 @@ export default function AdminDashboardScreen() {
                 displayStatus === 'in_progress' && styles.primaryActionBtnAlt,
                 (!canPress || isNoShow) && styles.disabledBtn,
               ]}
-              onPress={() => (isNoShow ? alertCannotWork() : doUpdate(item, action.next))}
+              onPress={() =>
+                isNoShow ? alertCannotWork() : doUpdate(item, action.next)
+              }
               activeOpacity={0.85}
               disabled={!canPress || isNoShow}
             >
@@ -442,7 +509,11 @@ export default function AdminDashboardScreen() {
     );
   };
 
-  const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
+  const overlayStyle = [
+    StyleSheet.absoluteFill,
+    styles.overlay,
+    { opacity: overlayOpacity },
+  ];
 
   const doSignOut = async () => {
     closeMenu();
@@ -459,7 +530,11 @@ export default function AdminDashboardScreen() {
       <Text style={styles.weekRangeTitle}>{weekLabel}</Text>
 
       <View style={styles.weekNavRow}>
-        <TouchableOpacity style={styles.weekNavBtn} onPress={() => setWeekAnchor((prev) => addDays(prev, -7))} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.weekNavBtn}
+          onPress={() => setWeekAnchor(prev => addDays(prev, -7))}
+          activeOpacity={0.85}
+        >
           <ChevronLeft size={18} color={colors.bg} />
           <Text style={styles.weekNavTxt}>Anterior</Text>
         </TouchableOpacity>
@@ -470,10 +545,21 @@ export default function AdminDashboardScreen() {
           activeOpacity={0.85}
           disabled={onCurrentWeek}
         >
-          <Text style={[styles.weekChipTxt, onCurrentWeek && styles.weekChipTxtDisabled]}>Semana atual</Text>
+          <Text
+            style={[
+              styles.weekChipTxt,
+              onCurrentWeek && styles.weekChipTxtDisabled,
+            ]}
+          >
+            Semana atual
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.weekNavBtn} onPress={() => setWeekAnchor((prev) => addDays(prev, 7))} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.weekNavBtn}
+          onPress={() => setWeekAnchor(prev => addDays(prev, 7))}
+          activeOpacity={0.85}
+        >
           <Text style={styles.weekNavTxt}>Próxima</Text>
           <ChevronRight size={18} color={colors.bg} />
         </TouchableOpacity>
@@ -485,8 +571,16 @@ export default function AdminDashboardScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <View style={styles.headerWrapper}>
-          <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
-            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
+          <ImageBackground
+            style={styles.header}
+            imageStyle={styles.headerImg}
+            source={coverSource}
+          >
+            <TouchableOpacity
+              style={styles.menuBtn}
+              activeOpacity={0.8}
+              onPress={openMenu}
+            >
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
           </ImageBackground>
@@ -510,13 +604,17 @@ export default function AdminDashboardScreen() {
           ) : (
             <FlatList
               data={appointmentsWeek}
-              keyExtractor={(it) => `week-${it.id}`}
+              keyExtractor={it => `week-${it.id}`}
               renderItem={renderAppointment}
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={<HeaderWeek />}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Nada marcado nessa semana.</Text>}
+              ListEmptyComponent={
+                <Text style={{ textAlign: 'center', color: '#6B7280' }}>
+                  Nada marcado nessa semana.
+                </Text>
+              }
             />
           )}
         </View>
@@ -527,30 +625,48 @@ export default function AdminDashboardScreen() {
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}>
+            <Animated.View
+              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
+            >
               <View style={styles.drawerHeader}>
                 <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
                 <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
-              <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Meu Perfil', 'TODO')} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={() => Alert.alert('Meu Perfil', 'TODO')}
+                activeOpacity={0.8}
+              >
                 <UserIcon size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminHistory')} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={() => navigation.navigate('AdminHistory')}
+                activeOpacity={0.8}
+              >
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminManage')} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={() => navigation.navigate('AdminManage')}
+                activeOpacity={0.8}
+              >
                 <Calendar size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Gerenciar</Text>
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
 
-              <TouchableOpacity style={[styles.item, { marginBottom: 50 }]} onPress={doSignOut} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={[styles.item, { marginBottom: 50 }]}
+                onPress={doSignOut}
+                activeOpacity={0.8}
+              >
                 <LogOut size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Sair</Text>
               </TouchableOpacity>
@@ -574,8 +690,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   header: { flex: 1, justifyContent: 'center' },
-  headerImg: { borderBottomLeftRadius: radii.lg, borderBottomRightRadius: radii.lg },
-  menuBtn: { position: 'absolute', left: 18, top: 18, padding: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.15)' },
+  headerImg: {
+    borderBottomLeftRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
+  },
+  menuBtn: {
+    position: 'absolute',
+    left: 18,
+    top: 18,
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+  },
 
   avatarContainer: {
     alignSelf: 'center',
@@ -591,17 +717,39 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colors.black },
+  avatarImg: {
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    backgroundColor: colors.black,
+  },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
 
-  body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, backgroundColor: colors.bg },
+  body: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    backgroundColor: colors.bg,
+  },
 
-  sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', marginBottom: 6, color: colors.text },
+  sectionTitle: {
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 6,
+    color: colors.text,
+  },
 
   weekHeader: { marginBottom: 12, gap: 10, alignItems: 'center' },
   weekRangeTitle: { fontSize: 16, fontWeight: '900', color: '#111827' },
-  weekNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' },
+  weekNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    width: '100%',
+  },
 
   weekNavBtn: {
     flexDirection: 'row',
@@ -643,9 +791,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardLeft: { flex: 1 },
-  cardTitle: { color: colors.text, fontSize: 16, fontWeight: '800', marginBottom: 4 },
-  cardClient: { fontSize: 14, fontWeight: '900', color: '#111827', marginBottom: 6 },
-  cardSubtitle: { color: '#616E7C', fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  cardTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  cardClient: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  cardSubtitle: {
+    color: '#616E7C',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
   statusText: { fontSize: 13, fontWeight: '900', marginBottom: 8 },
   cardPrice: { color: colors.primary, fontSize: 14, fontWeight: '900' },
 
@@ -680,6 +843,11 @@ const styles = StyleSheet.create({
   drawerHeader: { minHeight: 56, gap: 2, marginBottom: 8 },
   drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
   drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+  },
   itemText: { fontSize: 20, color: colors.bg, fontWeight: '600' },
 });
