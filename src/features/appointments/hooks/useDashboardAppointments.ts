@@ -12,9 +12,7 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import type {
-  UserAppointment,
-} from '../domain/appointment.types';
+import type { UserAppointment } from '../domain/appointment.types';
 
 import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
 
@@ -102,7 +100,6 @@ export function useDashboardAppointments({
           return;
         }
 
-        // fallback global só 1x enquanto subcollection estiver vazia
         if (fallbackOnceRef.current) {
           setItems([]);
           setLoading(false);

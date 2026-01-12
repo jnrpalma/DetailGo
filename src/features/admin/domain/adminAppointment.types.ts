@@ -1,6 +1,8 @@
-// src/features/admin/domain/adminAppointment.types.ts
-
-import type { AppointmentStatus, CarCategory, VehicleType } from '@features/appointments/domain/appointment.types';
+import type {
+  AppointmentStatus,
+  CarCategory,
+  VehicleType,
+} from '@features/appointments/domain/appointment.types';
 
 export type AdminAppointment = {
   id: string;

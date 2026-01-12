@@ -1,7 +1,8 @@
-// src/features/appointments/hooks/useUserAppointments.ts
-
 import { useEffect, useMemo, useState } from 'react';
-import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
+import type {
+  AppointmentStatus,
+  UserAppointment,
+} from '../domain/appointment.types';
 import { watchUserAppointmentsWithFallback } from '../data/appointmentsRepo';
 
 type Params = {
@@ -30,10 +31,10 @@ export function useUserAppointments(params: Params) {
     const unsub = watchUserAppointmentsWithFallback({
       uid,
       limitN,
-      onChange: (list) => {
+      onChange: list => {
         const filtered =
           statusIn && statusIn.length > 0
-            ? list.filter((it) => statusSet.has(it.status))
+            ? list.filter(it => statusSet.has(it.status))
             : list;
 
         setItems(filtered);
@@ -46,7 +47,6 @@ export function useUserAppointments(params: Params) {
     });
 
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, limitN, statusIn?.join('|')]);
 
   return { loading, items };

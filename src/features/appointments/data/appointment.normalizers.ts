@@ -1,14 +1,14 @@
 // src/features/appointments/data/appointment.normalizers.ts
 
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
+import type {
+  AppointmentStatus,
+  UserAppointment,
+} from '../domain/appointment.types';
 
 type QDoc =
   FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
-/**
- * users/{uid}/appointments  -> whenMs
- */
 export function normalizeUserAppointmentFromSubcollection(
   d: QDoc,
 ): UserAppointment | null {
@@ -27,10 +27,6 @@ export function normalizeUserAppointmentFromSubcollection(
   };
 }
 
-/**
- * appointments (global) -> startAtMs
- * Obs: aqui é "visão do usuário", então não inclui customerUid/customerName.
- */
 export function normalizeUserAppointmentFromGlobal(
   d: QDoc,
 ): UserAppointment | null {
