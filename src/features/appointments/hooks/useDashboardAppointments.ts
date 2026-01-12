@@ -12,17 +12,18 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
+import type {
+  UserAppointment,
+} from '../domain/appointment.types';
 
-export type DashboardAppointment = {
-  id: string;
-  vehicleType: 'Carro' | 'Moto';
-  carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
-  serviceLabel: string | null;
-  price: number | null;
-  whenMs: number;
-  status: AppointmentStatus;
-};
+import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
+
+import {
+  normalizeUserAppointmentFromSubcollection,
+  normalizeUserAppointmentFromGlobal,
+} from '../data/appointment.normalizers';
+
+export type DashboardAppointment = UserAppointment;
 
 type QDoc =
   FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
@@ -33,47 +34,17 @@ type Params = {
   markNoShow?: (appointmentId: string, customerUid: string) => Promise<void>;
 };
 
-const NO_SHOW_GRACE_MS = 15 * 60 * 1000;
-
-function normalizeFromUserSubcollectionDoc(d: QDoc): DashboardAppointment | null {
-  const v = d.data() as any;
-  if (typeof v?.whenMs !== 'number') return null;
-
-  return {
-    id: d.id,
-    vehicleType: v.vehicleType ?? 'Carro',
-    carCategory: v.carCategory ?? null,
-    serviceLabel: v.serviceLabel ?? null,
-    price: typeof v.price === 'number' ? v.price : null,
-    whenMs: v.whenMs,
-    status: (v.status ?? 'scheduled') as AppointmentStatus,
-  };
-}
-
-function normalizeFromGlobalDoc(d: QDoc): DashboardAppointment | null {
-  const v = d.data() as any;
-  const startAtMs = Number(v?.startAtMs ?? 0);
-  if (!startAtMs) return null;
-
-  return {
-    id: d.id,
-    vehicleType: v.vehicleType ?? 'Carro',
-    carCategory: v.carCategory ?? null,
-    serviceLabel: v.serviceLabel ?? null,
-    price: typeof v.price === 'number' ? v.price : null,
-    whenMs: startAtMs,
-    status: (v.status ?? 'scheduled') as AppointmentStatus,
-  };
-}
-
-export function useDashboardAppointments({ uid, limitN = 30, markNoShow }: Params) {
+export function useDashboardAppointments({
+  uid,
+  limitN = 30,
+  markNoShow,
+}: Params) {
   const [items, setItems] = useState<DashboardAppointment[]>([]);
   const [loading, setLoading] = useState(true);
 
   const markedRef = useRef<Set<string>>(new Set());
   const fallbackOnceRef = useRef(false);
 
-  // ✅ CRÍTICO: estabiliza a referência da função
   const markNoShowRef = useRef<typeof markNoShow>(markNoShow);
   useEffect(() => {
     markNoShowRef.current = markNoShow;
@@ -83,8 +54,6 @@ export function useDashboardAppointments({ uid, limitN = 30, markNoShow }: Param
     if (!uid) return;
 
     const db = getFirestore();
-
-    // ✅ só entra loading=true quando uid/limit mudam (não a cada render)
     setLoading(true);
     fallbackOnceRef.current = false;
 
@@ -96,36 +65,36 @@ export function useDashboardAppointments({ uid, limitN = 30, markNoShow }: Param
 
     const unsub = onSnapshot(
       qUser,
-      async (snap) => {
+      async snap => {
         const arr = snap.docs
-          .map((d: QDoc) => normalizeFromUserSubcollectionDoc(d))
+          .map((d: QDoc) => normalizeUserAppointmentFromSubcollection(d))
           .filter(Boolean) as DashboardAppointment[];
 
-        // Atualiza UI rápido
+        // se subcollection tem dados: usa ela
         if (snap.docs.length > 0) {
           setItems(arr);
           setLoading(false);
 
-          // no_show em background (sem mexer em loading)
           const fn = markNoShowRef.current;
           if (fn) {
             const now = Date.now();
-            const shouldMark = arr.filter((it) => (
-              it.status === 'scheduled' &&
-              now > it.whenMs + NO_SHOW_GRACE_MS &&
-              !markedRef.current.has(it.id)
-            ));
+            const shouldMark = arr.filter(
+              it =>
+                it.status === 'scheduled' &&
+                now > it.startAtMs + NO_SHOW_GRACE_MS &&
+                !markedRef.current.has(it.id),
+            );
 
             if (shouldMark.length > 0) {
-              shouldMark.forEach((it) => markedRef.current.add(it.id));
+              shouldMark.forEach(it => markedRef.current.add(it.id));
               await Promise.all(
-                shouldMark.map(async (it) => {
+                shouldMark.map(async it => {
                   try {
                     await fn(it.id, uid);
                   } catch {
                     markedRef.current.delete(it.id);
                   }
-                })
+                }),
               );
             }
           }
@@ -133,7 +102,7 @@ export function useDashboardAppointments({ uid, limitN = 30, markNoShow }: Param
           return;
         }
 
-        // fallback global só 1x enquanto a subcollection estiver vazia
+        // fallback global só 1x enquanto subcollection estiver vazia
         if (fallbackOnceRef.current) {
           setItems([]);
           setLoading(false);
@@ -153,36 +122,12 @@ export function useDashboardAppointments({ uid, limitN = 30, markNoShow }: Param
           const globalSnap = await getDocs(qGlobal);
 
           const fromGlobal = globalSnap.docs
-            .map((d: QDoc) => normalizeFromGlobalDoc(d))
+            .map((d: QDoc) => normalizeUserAppointmentFromGlobal(d))
             .filter(Boolean) as DashboardAppointment[];
 
           setItems(fromGlobal);
           setLoading(false);
-
-          const fn = markNoShowRef.current;
-          if (fn) {
-            const now = Date.now();
-            const shouldMark = fromGlobal.filter((it) => (
-              it.status === 'scheduled' &&
-              now > it.whenMs + NO_SHOW_GRACE_MS &&
-              !markedRef.current.has(it.id)
-            ));
-
-            if (shouldMark.length > 0) {
-              shouldMark.forEach((it) => markedRef.current.add(it.id));
-              await Promise.all(
-                shouldMark.map(async (it) => {
-                  try {
-                    await fn(it.id, uid);
-                  } catch {
-                    markedRef.current.delete(it.id);
-                  }
-                })
-              );
-            }
-          }
-        } catch (e) {
-          console.log('Fallback global appointments failed:', e);
+        } catch {
           setItems([]);
           setLoading(false);
         }
@@ -191,7 +136,7 @@ export function useDashboardAppointments({ uid, limitN = 30, markNoShow }: Param
     );
 
     return () => unsub();
-  }, [uid, limitN]); // ✅ markNoShow saiu daqui
+  }, [uid, limitN]);
 
   return { items, loading };
 }

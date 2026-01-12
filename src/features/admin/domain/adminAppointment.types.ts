@@ -1,9 +1,8 @@
-export type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
+// src/features/admin/domain/adminAppointment.types.ts
 
-export type VehicleType = 'Carro' | 'Moto';
-export type CarCategory = 'Hatch' | 'Sedan' | 'Caminhonete';
+import type { AppointmentStatus, CarCategory, VehicleType } from '@features/appointments/domain/appointment.types';
 
-export type Appointment = {
+export type AdminAppointment = {
   id: string;
   customerUid: string;
   customerName: string;

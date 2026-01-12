@@ -5,9 +5,9 @@ import { getAuth } from '@react-native-firebase/auth';
 
 import { colors, spacing, surfaces } from '@shared/theme';
 
-import { useUserAppointments } from '@features/appointments/hooks/useUserAppointments';
-import { HISTORY_SET } from '@features/appointments/model/sets';
-import type { Appointment } from '@features/appointments/model/appointment';
+import { useUserAppointments } from '../hooks/useUserAppointments';
+import type { UserAppointment } from '../domain/appointment.types';
+import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
 
 import { formatDatePtBR, formatHour } from '@shared/utils/date';
 import { formatCurrencyBRL } from '@shared/utils/money';
@@ -18,11 +18,11 @@ export default function HistoryScreen() {
 
   const { loading, items } = useUserAppointments({
     uid,
-    statusIn: HISTORY_SET,
+    statusIn: HISTORY_APPOINTMENT_SET,
     limitN: 50,
   });
 
-  const renderItem = ({ item }: { item: Appointment }) => {
+  const renderItem = ({ item }: { item: UserAppointment }) => {
     const subtitle =
       item.vehicleType === 'Carro' && item.carCategory
         ? `Carro • ${item.carCategory}`
@@ -35,9 +35,11 @@ export default function HistoryScreen() {
       <View style={styles.card}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{item.serviceLabel ?? 'Serviço'}</Text>
+
           <Text style={styles.sub}>
             {subtitle} • {formatDatePtBR(item.startAtMs)} • {formatHour(item.startAtMs)}
           </Text>
+
           <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
         </View>
 
@@ -75,9 +77,7 @@ export default function HistoryScreen() {
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             contentContainerStyle={{ paddingBottom: 40 }}
             ListEmptyComponent={
-              <Text style={{ textAlign: 'center', color: '#6B7280' }}>
-                Sem registros.
-              </Text>
+              <Text style={{ textAlign: 'center', color: '#6B7280' }}>Sem registros.</Text>
             }
           />
         )}

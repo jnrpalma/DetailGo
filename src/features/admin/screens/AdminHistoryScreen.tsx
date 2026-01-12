@@ -18,22 +18,13 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import { colors, radii, spacing, surfaces } from '@shared/theme';
+import { colors, spacing, surfaces } from '@shared/theme';
+
+import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
+import type { AdminAppointment } from '../domain/adminAppointment.types';
+import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
-type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
-
-type Appointment = {
-  id: string;
-  customerUid: string;
-  customerName: string;
-  serviceLabel: string | null;
-  vehicleType: 'Carro' | 'Moto';
-  carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
-  price: number | null;
-  startAtMs: number;
-  status: AppointmentStatus;
-};
 
 function formatHour(ms: number) {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -49,37 +40,13 @@ function formatCurrency(v: number | null) {
   return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
 }
 
-function normalizeAppointmentFromDoc(d: QDoc): Appointment | null {
-  const v = d.data() as any;
-
-  const startAtMs = Number(v.startAtMs ?? 0);
-  if (!startAtMs) return null;
-
-  const customerUid = String(v.customerUid ?? '');
-  if (!customerUid) return null;
-
-  const status = (v.status as AppointmentStatus) ?? 'scheduled';
-
-  return {
-    id: d.id,
-    customerUid,
-    customerName: String(v.customerName ?? 'Cliente'),
-    serviceLabel: v.serviceLabel ?? null,
-    vehicleType: (v.vehicleType as 'Carro' | 'Moto') ?? 'Carro',
-    carCategory: v.carCategory ?? null,
-    price: typeof v.price === 'number' ? v.price : null,
-    startAtMs,
-    status,
-  };
-}
-
 export default function AdminHistoryScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
   const db = getFirestore();
 
   const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<Appointment[]>([]);
+  const [items, setItems] = useState<AdminAppointment[]>([]);
   const [filter, setFilter] = useState<'all' | 'done' | 'no_show'>('all');
 
   const [loadingMore, setLoadingMore] = useState(false);
@@ -120,15 +87,15 @@ export default function AdminHistoryScreen() {
       collection(db, 'appointments'),
       where('status', 'in', statusSet),
       orderBy('startAtMs', 'desc'),
-      limit(30)
+      limit(30),
     );
 
     const unsub = onSnapshot(
       qy,
       async (snap) => {
         const base = snap.docs
-          .map((d: QDoc) => normalizeAppointmentFromDoc(d))
-          .filter(Boolean) as Appointment[];
+          .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
+          .filter(Boolean) as AdminAppointment[];
 
         lastDocRef.current = (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? null;
         canLoadMoreRef.current = snap.docs.length >= 30;
@@ -138,13 +105,13 @@ export default function AdminHistoryScreen() {
             if (it.customerName && it.customerName !== 'Cliente') return it;
             const name = await resolveCustomerNameSafe(it.customerUid);
             return { ...it, customerName: name };
-          })
+          }),
         );
 
         setItems(withNames);
         setLoading(false);
       },
-      () => setLoading(false)
+      () => setLoading(false),
     );
 
     return () => unsub();
@@ -163,16 +130,17 @@ export default function AdminHistoryScreen() {
         where('status', 'in', statusSet),
         orderBy('startAtMs', 'desc'),
         startAfter(lastDocRef.current),
-        limit(30)
+        limit(30),
       );
 
       const snap = await getDocs(qy);
 
       const base = snap.docs
-        .map((d: QDoc) => normalizeAppointmentFromDoc(d))
-        .filter(Boolean) as Appointment[];
+        .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
+        .filter(Boolean) as AdminAppointment[];
 
-      lastDocRef.current = (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? lastDocRef.current;
+      lastDocRef.current =
+        (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? lastDocRef.current;
       canLoadMoreRef.current = snap.docs.length >= 30;
 
       const withNames = await Promise.all(
@@ -180,7 +148,7 @@ export default function AdminHistoryScreen() {
           if (it.customerName && it.customerName !== 'Cliente') return it;
           const name = await resolveCustomerNameSafe(it.customerUid);
           return { ...it, customerName: name };
-        })
+        }),
       );
 
       setItems((prev) => [...prev, ...withNames]);
@@ -192,8 +160,9 @@ export default function AdminHistoryScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: Appointment }) => {
-    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+  const renderItem = ({ item }: { item: AdminAppointment }) => {
+    const subtitle =
+      item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
 
     const statusLabel = item.status === 'done' ? 'Concluído' : 'Não realizado';
     const statusColor = item.status === 'done' ? '#16A34A' : '#DC2626';
@@ -203,9 +172,11 @@ export default function AdminHistoryScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{item.serviceLabel ?? 'Serviço'}</Text>
           <Text style={styles.client}>👤 {item.customerName}</Text>
+
           <Text style={styles.sub}>
             {subtitle} • {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
           </Text>
+
           <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
         </View>
 
