@@ -1,4 +1,4 @@
-// DashboardScreen.tsx (USER) - Botão "Agendar Serviço" sempre visível + fallback/backfill do global
+// DashboardScreen.tsx (USER) - "Agendar Serviço" + "Últimos serviços" FIXOS (não rolam com a lista)
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,7 +37,7 @@ import {
 
 import { useAuth } from '@features/auth/context/AuthContext';
 import { isAdminEmail } from '@features/auth/utils/roles';
-import { Menu, User as UserIcon, History, LogOut, Calendar } from 'lucide-react-native';
+import { Menu, User as UserIcon, History, LogOut, Calendar, ClipboardList } from 'lucide-react-native';
 import { colors, surfaces, radii, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
@@ -162,6 +162,7 @@ export default function DashboardScreen() {
           })
           .filter(Boolean) as Appointment[];
 
+        // fallback/global (se subcollection vazia)
         if (arr.length === 0) {
           try {
             const globalQy = query(
@@ -251,6 +252,7 @@ export default function DashboardScreen() {
           }
         }
 
+        // auto no_show para subcollection
         const shouldMark = arr.filter(
           (it) =>
             it.status === 'scheduled' &&
@@ -338,7 +340,11 @@ export default function DashboardScreen() {
     ? { uri: profile.coverUrl }
     : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
 
-  const avatarSource = profile.photoB64 ? { uri: profile.photoB64 } : profile.photoURL ? { uri: profile.photoURL } : undefined;
+  const avatarSource = profile.photoB64
+    ? { uri: profile.photoB64 }
+    : profile.photoURL
+    ? { uri: profile.photoURL }
+    : undefined;
 
   const fullName = profile.firstName ? `${profile.firstName} ${profile.lastName ?? ''}` : user.displayName ?? 'Usuário';
 
@@ -346,10 +352,19 @@ export default function DashboardScreen() {
     closeMenu();
     Alert.alert('Meu Perfil', 'TODO');
   };
+
+  // ✅ AGORA EXISTE NO STACK
+  const goMyAppointments = () => {
+    closeMenu();
+    navigation.navigate('MyAppointments');
+  };
+
+  // ✅ AGORA EXISTE NO STACK
   const goHistory = () => {
     closeMenu();
-    Alert.alert('Histórico', 'TODO');
+    navigation.navigate('History');
   };
+
   const goAdmin = () => {
     closeMenu();
     navigation.navigate('AdminDashboard');
@@ -413,17 +428,6 @@ export default function DashboardScreen() {
     );
   };
 
-  const ListHeader = () => (
-    <View style={styles.headerListWrap}>
-      <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => navigation.navigate('Appointment')}>
-        <Calendar size={18} color={colors.bg} />
-        <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionTitle}>Últimos serviços</Text>
-    </View>
-  );
-
   const overlayStyle = [StyleSheet.absoluteFill, styles.overlay, { opacity: overlayOpacity }];
 
   return (
@@ -460,20 +464,31 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.body}>
+          {/* ✅ HEADER FIXO (NÃO FAZ PARTE DA LISTA) */}
+          <View style={styles.headerFixed}>
+            <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => navigation.navigate('Appointment')}>
+              <Calendar size={18} color={colors.bg} />
+              <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.sectionTitle}>Últimos serviços</Text>
+          </View>
+
+          {/* ✅ LISTA ROLA SOZINHA */}
           {loadingList ? (
             <View style={{ paddingTop: 24 }}>
               <ActivityIndicator />
             </View>
           ) : (
             <FlatList
+              style={{ flex: 1 }}
               data={appointments}
               keyExtractor={(it) => it.id}
               renderItem={renderAppointment}
-              ListHeaderComponent={<ListHeader />}
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Você ainda não possui serviços.</Text>}
+              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280', marginTop: 12 }}>Você ainda não possui serviços.</Text>}
             />
           )}
         </View>
@@ -501,6 +516,13 @@ export default function DashboardScreen() {
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
+              {/* ✅ AGORA FUNCIONA */}
+              <TouchableOpacity style={styles.item} onPress={goMyAppointments} activeOpacity={0.8}>
+                <ClipboardList size={30} color={colors.sand} />
+                <Text style={styles.itemText}>Meus agendamentos</Text>
+              </TouchableOpacity>
+
+              {/* ✅ AGORA FUNCIONA */}
               <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
@@ -525,7 +547,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   headerWrapper: {
-    height: COVER_H,
+    height: 285,
     borderBottomLeftRadius: radii.lg,
     borderBottomRightRadius: radii.lg,
     overflow: 'hidden',
@@ -539,10 +561,10 @@ const styles = StyleSheet.create({
 
   avatarContainer: {
     alignSelf: 'center',
-    marginTop: -AVATAR / 2,
-    width: AVATAR + 12,
-    height: AVATAR + 12,
-    borderRadius: (AVATAR + 12) / 2,
+    marginTop: -130 / 2,
+    width: 130 + 12,
+    height: 130 + 12,
+    borderRadius: (130 + 12) / 2,
     backgroundColor: colors.white,
     padding: 6,
     elevation: 6,
@@ -551,15 +573,32 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  avatarImg: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colors.black },
+  avatarImg: { width: 130, height: 130, borderRadius: 130 / 2, backgroundColor: colors.black },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
-  avatarLoading: { position: 'absolute', inset: 6, alignItems: 'center', justifyContent: 'center', borderRadius: AVATAR / 2, backgroundColor: 'rgba(0,0,0,0.35)' },
+  avatarLoading: {
+    position: 'absolute',
+    inset: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 130 / 2,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
 
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.bg },
 
-  headerListWrap: { gap: 14, paddingBottom: 8 },
-  primaryBtn: { height: 48, paddingHorizontal: 16, borderRadius: 12, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
+  headerFixed: { gap: 14, paddingBottom: 10 },
+
+  primaryBtn: {
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    justifyContent: 'center',
+  },
   primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '900' },
 
   sectionTitle: { textAlign: 'center', fontSize: 22, fontWeight: '800', color: colors.text },
@@ -582,7 +621,7 @@ const styles = StyleSheet.create({
   cardDate: { color: '#616E7C', fontSize: 15 },
 
   overlay: { backgroundColor: surfaces.overlay },
-  drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, width: MENU_W, backgroundColor: surfaces.drawer, paddingTop: spacing.md, paddingHorizontal: spacing.md },
+  drawer: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 220, backgroundColor: surfaces.drawer, paddingTop: spacing.md, paddingHorizontal: spacing.md },
   drawerHeader: { minHeight: 56, gap: 2, marginBottom: 8 },
   drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
   drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
