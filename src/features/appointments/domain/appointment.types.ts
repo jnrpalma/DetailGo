@@ -1,6 +1,8 @@
-// src/features/appointments/domain/appointment.types.ts
-
-export type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'in_progress'
+  | 'done'
+  | 'no_show';
 
 export type VehicleType = 'Carro' | 'Moto';
 export type CarCategory = 'Hatch' | 'Sedan' | 'Caminhonete';
@@ -16,4 +18,4 @@ export type UserAppointment = {
   dayKey?: string;
 };
 
-// ✅ AdminAppointment fica no admin (não aqui)
+export type Appointment = UserAppointment;

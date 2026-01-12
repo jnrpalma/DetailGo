@@ -28,7 +28,7 @@ import {
 import { getAuth } from '@react-native-firebase/auth';
 import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/firestore';
 
-import { useAuth } from '@features/auth/context/AuthContext';
+import { useAuth } from '@features/auth';
 import { isAdminEmail } from '@features/auth/utils/roles';
 
 import {
