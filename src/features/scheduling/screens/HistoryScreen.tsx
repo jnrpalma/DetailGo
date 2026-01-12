@@ -1,149 +1,32 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { getAuth } from '@react-native-firebase/auth';
-import {
-  collection,
-  getDocs,
-  getFirestore,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-  type FirebaseFirestoreTypes,
-} from '@react-native-firebase/firestore';
 
 import { colors, spacing, surfaces } from '@shared/theme';
-import type { AppointmentStatus } from '@features/scheduling/services/availability.service';
 
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+import { useUserAppointments } from '@features/appointments/hooks/useUserAppointments';
+import { HISTORY_SET } from '@features/appointments/model/sets';
+import type { Appointment } from '@features/appointments/model/appointment';
 
-type Appointment = {
-  id: string;
-  vehicleType: 'Carro' | 'Moto';
-  carCategory: 'Hatch' | 'Sedan' | 'Caminhonete' | null;
-  serviceLabel: string | null;
-  price: number | null;
-  whenMs: number;
-  status: AppointmentStatus;
-};
-
-function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-function formatDate(ms: number) {
-  const d = new Date(ms);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-function formatCurrency(v: number | null) {
-  return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
-}
-
-const HISTORY_SET: AppointmentStatus[] = ['done', 'no_show'];
+import { formatDatePtBR, formatHour } from '@shared/utils/date';
+import { formatCurrencyBRL } from '@shared/utils/money';
 
 export default function HistoryScreen() {
   const auth = getAuth();
-  const user = auth.currentUser;
-  const uid = user?.uid;
-  const db = getFirestore();
+  const uid = auth.currentUser?.uid;
 
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<Appointment[]>([]);
-
-  const fallbackOnceRef = useRef(false);
-
-  useEffect(() => {
-    if (!uid) return;
-
-    setLoading(true);
-    fallbackOnceRef.current = false;
-
-    const qy = query(collection(db, 'users', uid, 'appointments'), orderBy('whenMs', 'desc'));
-
-    const unsub = onSnapshot(
-      qy,
-      async (snap) => {
-        const arr: Appointment[] = snap.docs
-          .map((d: QDoc) => {
-            const v = d.data() as any;
-            if (typeof v?.whenMs !== 'number') return null;
-
-            return {
-              id: d.id,
-              vehicleType: v.vehicleType ?? 'Carro',
-              carCategory: v.carCategory ?? null,
-              serviceLabel: v.serviceLabel ?? null,
-              price: typeof v.price === 'number' ? v.price : null,
-              whenMs: v.whenMs,
-              status: (v.status ?? 'scheduled') as AppointmentStatus,
-            } as Appointment;
-          })
-          .filter(Boolean) as Appointment[];
-
-        const history = arr.filter((it) => HISTORY_SET.includes(it.status));
-
-        if (snap.docs.length > 0) {
-          setItems(history);
-          setLoading(false);
-          return;
-        }
-
-        if (!fallbackOnceRef.current) {
-          fallbackOnceRef.current = true;
-          try {
-            const globalQy = query(
-              collection(db, 'appointments'),
-              where('customerUid', '==', uid),
-              where('status', 'in', HISTORY_SET),
-              orderBy('startAtMs', 'desc'),
-              limit(50)
-            );
-
-            const globalSnap = await getDocs(globalQy);
-
-            const fromGlobal: Appointment[] = globalSnap.docs
-              .map((gd: QDoc) => {
-                const v = gd.data() as any;
-                const startAtMs = Number(v?.startAtMs ?? 0);
-                if (!startAtMs) return null;
-
-                return {
-                  id: gd.id,
-                  vehicleType: v.vehicleType ?? 'Carro',
-                  carCategory: v.carCategory ?? null,
-                  serviceLabel: v.serviceLabel ?? null,
-                  price: typeof v.price === 'number' ? v.price : null,
-                  whenMs: startAtMs,
-                  status: (v.status ?? 'scheduled') as AppointmentStatus,
-                } as Appointment;
-              })
-              .filter(Boolean) as Appointment[];
-
-            setItems(fromGlobal);
-          } catch {
-            setItems([]);
-          } finally {
-            setLoading(false);
-          }
-          return;
-        }
-
-        setItems([]);
-        setLoading(false);
-      },
-      () => setLoading(false)
-    );
-
-    return () => unsub();
-  }, [db, uid]);
+  const { loading, items } = useUserAppointments({
+    uid,
+    statusIn: HISTORY_SET,
+    limitN: 50,
+  });
 
   const renderItem = ({ item }: { item: Appointment }) => {
-    const subtitle = item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+    const subtitle =
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `Carro • ${item.carCategory}`
+        : item.vehicleType;
 
     const statusLabel = item.status === 'done' ? 'Concluído' : 'Não realizado';
     const statusColor = item.status === 'done' ? '#16A34A' : '#DC2626';
@@ -153,13 +36,13 @@ export default function HistoryScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{item.serviceLabel ?? 'Serviço'}</Text>
           <Text style={styles.sub}>
-            {subtitle} • {formatDate(item.whenMs)} • {formatHour(item.whenMs)}
+            {subtitle} • {formatDatePtBR(item.startAtMs)} • {formatHour(item.startAtMs)}
           </Text>
           <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.price}>+{formatCurrency(item.price)}</Text>
+          <Text style={styles.price}>+{formatCurrencyBRL(item.price)}</Text>
         </View>
       </View>
     );
@@ -191,7 +74,11 @@ export default function HistoryScreen() {
             renderItem={renderItem}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             contentContainerStyle={{ paddingBottom: 40 }}
-            ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Sem registros.</Text>}
+            ListEmptyComponent={
+              <Text style={{ textAlign: 'center', color: '#6B7280' }}>
+                Sem registros.
+              </Text>
+            }
           />
         )}
       </View>
@@ -200,7 +87,13 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenTitle: { fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center', marginBottom: 12 },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
 
   card: {
     flexDirection: 'row',
