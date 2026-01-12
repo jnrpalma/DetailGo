@@ -8,10 +8,9 @@ import LoginScreen from '@features/auth/screens/LoginScreen';
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
 import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
 
-// ✅ agora vem do barrel
 import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 
-// ADMIN
+// ADMIN mostro
 import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';

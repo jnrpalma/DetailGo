@@ -18,7 +18,6 @@ import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore'
 
 import { isAdminEmail } from '@features/auth/utils/roles';
 
-// ✅ appointments barrel (como já fizemos)
 import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

@@ -1,5 +1,3 @@
-// src/features/appointments/data/appointmentsRepo.ts
-
 import {
   collection,
   getDocs,
@@ -44,7 +42,7 @@ export function watchUserAppointmentsWithFallback(params: {
 
   const unsub = onSnapshot(
     qy,
-    async (snap) => {
+    async snap => {
       const listFromSub = snap.docs
         .map((d: QDoc) => normalizeUserAppointmentFromSubcollection(d))
         .filter(Boolean) as UserAppointment[];
@@ -81,7 +79,7 @@ export function watchUserAppointmentsWithFallback(params: {
         onChange([]);
       }
     },
-    (err) => onError?.(err),
+    err => onError?.(err),
   );
 
   return unsub;

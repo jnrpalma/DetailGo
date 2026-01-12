@@ -161,7 +161,6 @@ export async function createAppointmentWithCapacityCheck(
   const cfg = await getShopSettings();
   const dayKey = toDayKey(input.startAtMs);
 
-  // pega nome do cliente 1x (fora da transaction)
   const userSnap = await getDoc(doc(db, 'users', input.customerUid));
   const userData = (userSnap.data() ?? {}) as {
     firstName?: string;

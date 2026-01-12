@@ -26,7 +26,12 @@ import {
 } from 'react-native-image-picker';
 
 import { getAuth } from '@react-native-firebase/auth';
-import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/firestore';
+import {
+  doc,
+  getFirestore,
+  onSnapshot,
+  setDoc,
+} from '@react-native-firebase/firestore';
 
 import { useAuth } from '@features/auth';
 import { isAdminEmail } from '@features/auth/utils/roles';
@@ -85,7 +90,6 @@ export default function DashboardScreen() {
   });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
 
-  // ✅ IMPORTANTE: estabiliza a função para não re-subscrever o snapshot (evita "piscar")
   const markNoShow = useCallback(
     async (appointmentId: string, customerUid: string) => {
       await updateAppointmentStatus({
@@ -97,12 +101,12 @@ export default function DashboardScreen() {
     [],
   );
 
-  // ✅ appointments vêm do hook
-  const { loading: loadingList, items: appointments } = useDashboardAppointments({
-    uid,
-    limitN: 30,
-    markNoShow,
-  });
+  const { loading: loadingList, items: appointments } =
+    useDashboardAppointments({
+      uid,
+      limitN: 30,
+      markNoShow,
+    });
 
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
@@ -138,7 +142,6 @@ export default function DashboardScreen() {
 
   const isAdmin = isAdminEmail(user.email);
 
-  // ✅ este effect cuida SÓ do profile
   useEffect(() => {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
@@ -183,7 +186,11 @@ export default function DashboardScreen() {
       if (!b64) return;
 
       setSaving('cover');
-      await setDoc(doc(getFirestore(), 'users', uid), { coverB64: b64 }, { merge: true });
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { coverB64: b64 },
+        { merge: true },
+      );
       setProfile(p => ({ ...p, coverB64: b64 }));
     } catch (e: any) {
       Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
@@ -198,10 +205,17 @@ export default function DashboardScreen() {
       if (!b64) return;
 
       setSaving('avatar');
-      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { photoB64: b64 },
+        { merge: true },
+      );
       setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
+      Alert.alert(
+        'Erro',
+        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
+      );
     } finally {
       setSaving(null);
     }
@@ -262,12 +276,24 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
         <View style={styles.headerWrapper}>
-          <ImageBackground style={styles.header} imageStyle={styles.headerImg} source={coverSource}>
-            <TouchableOpacity style={styles.menuBtn} activeOpacity={0.8} onPress={openMenu}>
+          <ImageBackground
+            style={styles.header}
+            imageStyle={styles.headerImg}
+            source={coverSource}
+          >
+            <TouchableOpacity
+              style={styles.menuBtn}
+              activeOpacity={0.8}
+              onPress={openMenu}
+            >
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={saveCover} style={styles.coverBtn} activeOpacity={0.9}>
+            <TouchableOpacity
+              onPress={saveCover}
+              style={styles.coverBtn}
+              activeOpacity={0.9}
+            >
               {saving === 'cover' ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
@@ -325,7 +351,13 @@ export default function DashboardScreen() {
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
-                <Text style={{ textAlign: 'center', color: '#6B7280', marginTop: 12 }}>
+                <Text
+                  style={{
+                    textAlign: 'center',
+                    color: '#6B7280',
+                    marginTop: 12,
+                  }}
+                >
                   Você ainda não possui serviços.
                 </Text>
               }
@@ -339,29 +371,47 @@ export default function DashboardScreen() {
               <Pressable style={{ flex: 1 }} onPress={closeMenu} />
             </Animated.View>
 
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}>
+            <Animated.View
+              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
+            >
               <View style={styles.drawerHeader}>
                 <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
                 <Text style={styles.drawerTitle}>Menu</Text>
               </View>
 
               {isAdmin && (
-                <TouchableOpacity style={styles.item} onPress={goAdmin} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.item}
+                  onPress={goAdmin}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.itemText}>Admin</Text>
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.item} onPress={goProfile} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goProfile}
+                activeOpacity={0.8}
+              >
                 <UserIcon size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={goMyAppointments} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goMyAppointments}
+                activeOpacity={0.8}
+              >
                 <ClipboardList size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Meus agendamentos</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.item} onPress={goHistory} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.item}
+                onPress={goHistory}
+                activeOpacity={0.8}
+              >
                 <History size={30} color={colors.sand} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
