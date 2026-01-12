@@ -8,9 +8,8 @@ import LoginScreen from '@features/auth/screens/LoginScreen';
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
 import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
 
-// ✅ AGORA VEM DE APPOINTMENTS (não scheduling)
-import MyAppointmentsScreen from '@features/appointments/screens/MyAppointmentsScreen';
-import HistoryScreen from '@features/appointments/screens/HistoryScreen';
+// ✅ agora vem do barrel
+import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 
 // ADMIN
 import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';

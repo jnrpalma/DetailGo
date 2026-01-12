@@ -14,7 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@app/types';
-import { useAuth } from '@features/auth/context/AuthContext';
+import { useAuth } from '@features/auth';
 import type { RegisterInput } from '@features/auth/services/auth.service';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { colors, surfaces, borders, radii, spacing, typography } from '@shared/theme';

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 
-import LoginScreen from '@features/auth/screens/LoginScreen';
-import RegisterScreen from '@features/auth/screens/RegisterScreen';
+import type { RootStackParamList } from '@app/types';
+
+import { useAuth, LoginScreen, RegisterScreen } from '@features/auth';
 
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
 import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
@@ -12,16 +13,13 @@ import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
 
-import type { RootStackParamList } from '@app/types';
-import { useAuth } from '@features/auth/context/AuthContext';
-
 import { ensureShopSettings } from '@app/bootstrap/ensureShopSettings';
 import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
+
 import { isAdminEmail } from '@features/auth/utils/roles';
 
-// ✅ AGORA VEM DE APPOINTMENTS (não scheduling)
-import MyAppointmentsScreen from '@features/appointments/screens/MyAppointmentsScreen';
-import HistoryScreen from '@features/appointments/screens/HistoryScreen';
+// ✅ appointments barrel (como já fizemos)
+import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -44,7 +42,6 @@ export default function RootNavigator() {
     }
 
     setLoadingRole(true);
-
     const db = getFirestore();
     const ref = doc(db, 'users', user.uid);
 
@@ -94,7 +91,6 @@ export default function RootNavigator() {
           <Stack.Group>
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
             <Stack.Screen name="Appointment" component={AppointmentScreen} />
-
             <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} />
             <Stack.Screen name="History" component={HistoryScreen} />
           </Stack.Group>
