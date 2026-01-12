@@ -8,6 +8,9 @@ import RegisterScreen from '@features/auth/screens/RegisterScreen';
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
 import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
 
+// ✅ USER screens (NOVAS)
+
+
 import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
@@ -18,6 +21,8 @@ import { useAuth } from '@features/auth/context/AuthContext';
 import { ensureShopSettings } from '@app/bootstrap/ensureShopSettings';
 import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
 import { isAdminEmail } from '@features/auth/utils/roles';
+import MyAppointmentsScreen from '@features/scheduling/screens/MyAppointmentsScreen';
+import HistoryScreen from '@features/scheduling/screens/HistoryScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -87,6 +92,10 @@ export default function RootNavigator() {
           <Stack.Group>
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
             <Stack.Screen name="Appointment" component={AppointmentScreen} />
+
+            {/* ✅ AGORA EXISTEM NO STACK */}
+            <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} />
+            <Stack.Screen name="History" component={HistoryScreen} />
           </Stack.Group>
         )
       ) : (
