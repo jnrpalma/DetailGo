@@ -11,7 +11,9 @@ import {
   Pressable,
   ScrollView,
 } from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getAuth } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
@@ -26,12 +28,20 @@ import {
   type Slot,
 } from '@features/scheduling/services/availability.service';
 
-import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
+import type {
+  VehicleType,
+  CarCategory,
+} from '@features/appointments/domain/appointment.types';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const CAR_CATEGORIES: CarCategory[] = ['Hatch', 'Sedan', 'SUV', 'Picape cabine dupla'];
+const CAR_CATEGORIES: CarCategory[] = [
+  'Hatch',
+  'Sedan',
+  'SUV',
+  'Picape cabine dupla',
+];
 
 const SERVICES = [
   { label: 'Lavagem simples', durationMin: 30 },
@@ -86,7 +96,10 @@ const SERVICE_DETAILS: Record<ServiceLabel, ServiceDetails> = {
       'Etapa de correção/realce de brilho na pintura (nível conforme avaliação)',
       'Acabamento para melhorar reflexo e aparência',
     ],
-    notIncluded: ['Repintura', 'Correção de danos profundos (dependendo do caso)'],
+    notIncluded: [
+      'Repintura',
+      'Correção de danos profundos (dependendo do caso)',
+    ],
     note: 'Recomendado para recuperar brilho e melhorar o aspecto da pintura.',
   },
   'Lavagem de motor': {
@@ -104,7 +117,10 @@ const SERVICE_DETAILS: Record<ServiceLabel, ServiceDetails> = {
 };
 
 function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 function formatDayBR(d: Date) {
   const dd = String(d.getDate()).padStart(2, '0');
@@ -113,7 +129,6 @@ function formatDayBR(d: Date) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-/** Dropdown simples (Modal) */
 function SelectField<T extends string>(props: {
   label: string;
   placeholder: string;
@@ -140,24 +155,37 @@ function SelectField<T extends string>(props: {
         <Text style={styles.chev}>›</Text>
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
         <Pressable style={styles.modalOverlay} onPress={() => setOpen(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>{label}</Text>
 
-            {options.map((opt) => {
+            {options.map(opt => {
               const selected = opt === value;
               return (
                 <TouchableOpacity
                   key={opt}
-                  style={[styles.modalItem, selected && styles.modalItemSelected]}
+                  style={[
+                    styles.modalItem,
+                    selected && styles.modalItemSelected,
+                  ]}
                   activeOpacity={0.85}
                   onPress={() => {
                     onChange(opt);
                     setOpen(false);
                   }}
                 >
-                  <Text style={[styles.modalItemText, selected && styles.modalItemTextSelected]}>
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      selected && styles.modalItemTextSelected,
+                    ]}
+                  >
                     {opt}
                   </Text>
                 </TouchableOpacity>
@@ -178,7 +206,6 @@ function SelectField<T extends string>(props: {
   );
 }
 
-/** Modal de detalhes do serviço (review) */
 function ServiceReviewModal(props: {
   visible: boolean;
   serviceLabel: ServiceLabel | null;
@@ -190,7 +217,12 @@ function ServiceReviewModal(props: {
   const details = SERVICE_DETAILS[serviceLabel];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <Pressable style={styles.reviewCard} onPress={() => {}}>
           <Text style={styles.reviewTitle}>{details.title}</Text>
@@ -204,7 +236,9 @@ function ServiceReviewModal(props: {
 
           {!!details.notIncluded?.length && (
             <>
-              <Text style={[styles.reviewSection, { marginTop: 12 }]}>O que não está incluso</Text>
+              <Text style={[styles.reviewSection, { marginTop: 12 }]}>
+                O que não está incluso
+              </Text>
               {details.notIncluded.map((it, idx) => (
                 <Text key={`no-${idx}`} style={styles.reviewItemMuted}>
                   • {it}
@@ -213,9 +247,15 @@ function ServiceReviewModal(props: {
             </>
           )}
 
-          {!!details.note && <Text style={styles.reviewNote}>{details.note}</Text>}
+          {!!details.note && (
+            <Text style={styles.reviewNote}>{details.note}</Text>
+          )}
 
-          <TouchableOpacity style={styles.reviewBtn} onPress={onClose} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.reviewBtn}
+            onPress={onClose}
+            activeOpacity={0.85}
+          >
             <Text style={styles.reviewBtnText}>Entendi</Text>
           </TouchableOpacity>
         </Pressable>
@@ -249,13 +289,16 @@ export default function AppointmentScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const selectedService = useMemo(
-    () => SERVICES.find((s) => s.label === serviceLabel) ?? null,
+    () => SERVICES.find(s => s.label === serviceLabel) ?? null,
     [serviceLabel],
   );
 
-  // continua calculando preço pra persistir no agendamento
   const basePrice = useMemo(
-    () => getBasePriceForAppointment(vehicleType, vehicleType === 'Carro' ? carCategory : null),
+    () =>
+      getBasePriceForAppointment(
+        vehicleType,
+        vehicleType === 'Carro' ? carCategory : null,
+      ),
     [vehicleType, carCategory],
   );
 
@@ -278,7 +321,10 @@ export default function AppointmentScreen() {
 
     try {
       setLoadingSlots(true);
-      const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
+      const list = await getAvailableSlotsForDay(
+        nextDay,
+        nextService.durationMin,
+      );
       setSlots(list);
       setSelectedSlot(null);
     } catch (e) {
@@ -291,7 +337,10 @@ export default function AppointmentScreen() {
     }
   };
 
-  const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
+  const handleDayChange = async (
+    event: DateTimePickerEvent,
+    selected?: Date,
+  ) => {
     if (Platform.OS === 'android' && event.type === 'dismissed') {
       setShowDayPicker(false);
       return;
@@ -340,7 +389,10 @@ export default function AppointmentScreen() {
       navigation.replace('Dashboard' as any);
     } catch (e: any) {
       if (e?.code === 'SLOT_FULL') {
-        Alert.alert('Ops', 'Esse horário acabou de ser ocupado. Vou atualizar a lista.');
+        Alert.alert(
+          'Ops',
+          'Esse horário acabou de ser ocupado. Vou atualizar a lista.',
+        );
         await refreshSlots(day, selectedService);
         return;
       }
@@ -399,9 +451,11 @@ export default function AppointmentScreen() {
           />
         )}
 
-        <Text style={[styles.label, { marginTop: spacing.lg }]}>Tipo de veículo</Text>
+        <Text style={[styles.label, { marginTop: spacing.lg }]}>
+          Tipo de veículo
+        </Text>
         <View style={styles.row}>
-          {(['Carro', 'Moto'] as VehicleType[]).map((opt) => {
+          {(['Carro', 'Moto'] as VehicleType[]).map(opt => {
             const selected = vehicleType === opt;
             return (
               <TouchableOpacity
@@ -414,7 +468,11 @@ export default function AppointmentScreen() {
                 }}
                 activeOpacity={0.85}
               >
-                <Text style={[styles.pillText, selected && styles.pillTextSelected]}>{opt}</Text>
+                <Text
+                  style={[styles.pillText, selected && styles.pillTextSelected]}
+                >
+                  {opt}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -427,7 +485,7 @@ export default function AppointmentScreen() {
               placeholder="Selecione"
               value={carCategory}
               options={CAR_CATEGORIES}
-              onChange={(v) => setCarCategory(v)}
+              onChange={v => setCarCategory(v)}
             />
           </View>
         )}
@@ -437,14 +495,13 @@ export default function AppointmentScreen() {
             label="Serviço"
             placeholder="Selecione"
             value={serviceLabel}
-            options={SERVICES.map((s) => s.label)}
-            onChange={async (v) => {
+            options={SERVICES.map(s => s.label)}
+            onChange={async v => {
               setServiceLabel(v);
 
-              // abre o review automaticamente ao selecionar
               setServiceReviewOpen(true);
 
-              const svc = SERVICES.find((s) => s.label === v)!;
+              const svc = SERVICES.find(s => s.label === v)!;
               await refreshSlots(day, svc);
             }}
           />
@@ -460,19 +517,25 @@ export default function AppointmentScreen() {
           )}
         </View>
 
-        <Text style={[styles.label, { marginTop: spacing.lg }]}>Horários disponíveis</Text>
+        <Text style={[styles.label, { marginTop: spacing.lg }]}>
+          Horários disponíveis
+        </Text>
 
         {!selectedService ? (
-          <Text style={styles.helperText}>Selecione um serviço para ver os horários.</Text>
+          <Text style={styles.helperText}>
+            Selecione um serviço para ver os horários.
+          </Text>
         ) : loadingSlots ? (
           <Text style={styles.helperText}>Carregando horários...</Text>
         ) : slots.length === 0 ? (
-          <Text style={styles.helperText}>Sem horários disponíveis nesse dia.</Text>
+          <Text style={styles.helperText}>
+            Sem horários disponíveis nesse dia.
+          </Text>
         ) : (
           <FlatList
             horizontal
             data={slots}
-            keyExtractor={(it) => String(it.startAtMs)}
+            keyExtractor={it => String(it.startAtMs)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 10, paddingVertical: 10 }}
             renderItem={({ item }) => {
@@ -483,7 +546,12 @@ export default function AppointmentScreen() {
                   onPress={() => setSelectedSlot(item)}
                   activeOpacity={0.85}
                 >
-                  <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
+                  <Text
+                    style={[
+                      styles.timeChipText,
+                      selected && styles.timeChipTextSelected,
+                    ]}
+                  >
                     {formatHour(item.startAtMs)}
                   </Text>
                 </TouchableOpacity>
@@ -534,7 +602,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIconText: { color: '#fff', fontSize: 28, fontWeight: '900', marginTop: -2 },
+  backIconText: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '900',
+    marginTop: -2,
+  },
   topTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
 
   scrollContent: {
@@ -550,7 +623,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  label: { fontSize: 15, fontWeight: '800', color: colors.text, marginBottom: 10 },
+  label: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 10,
+  },
   helperText: { color: '#6B7280', fontWeight: '700', marginTop: 2 },
 
   select: {
@@ -577,7 +655,11 @@ const styles = StyleSheet.create({
   pillText: { fontWeight: '900', color: colors.text, fontSize: 16 },
   pillTextSelected: { color: colors.bg },
 
-  detailsLink: { fontWeight: '900', color: colors.primary, textDecorationLine: 'underline' },
+  detailsLink: {
+    fontWeight: '900',
+    color: colors.primary,
+    textDecorationLine: 'underline',
+  },
 
   timeChip: {
     borderRadius: 999,
@@ -598,10 +680,13 @@ const styles = StyleSheet.create({
   },
   confirmText: { color: colors.bg, fontSize: 16, fontWeight: '900' },
 
-  cancelBtn: { marginTop: spacing.md, alignItems: 'center', paddingVertical: 8 },
+  cancelBtn: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
   cancelText: { color: '#6B7280', fontWeight: '800', fontSize: 16 },
 
-  // dropdown modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -615,7 +700,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginBottom: 10 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: colors.text,
+    marginBottom: 10,
+  },
   modalItem: {
     borderRadius: 14,
     paddingVertical: 12,
@@ -629,18 +719,43 @@ const styles = StyleSheet.create({
   modalClose: { marginTop: 6, alignItems: 'center', paddingVertical: 10 },
   modalCloseText: { fontWeight: '900', color: '#6B7280' },
 
-  // review modal
   reviewCard: {
     width: '100%',
     backgroundColor: '#fff',
     borderRadius: 18,
     padding: 16,
   },
-  reviewTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 10 },
-  reviewSection: { fontSize: 14, fontWeight: '900', color: colors.text, marginTop: 4, marginBottom: 8 },
-  reviewItem: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 6 },
-  reviewItemMuted: { fontSize: 14, fontWeight: '700', color: '#6B7280', marginBottom: 6 },
-  reviewNote: { marginTop: 12, fontSize: 13, fontWeight: '800', color: '#6B7280' },
+  reviewTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.text,
+    marginBottom: 10,
+  },
+  reviewSection: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: colors.text,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  reviewItem: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  reviewItemMuted: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  reviewNote: {
+    marginTop: 12,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#6B7280',
+  },
   reviewBtn: {
     marginTop: 14,
     backgroundColor: colors.primary,

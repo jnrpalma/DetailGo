@@ -7,8 +7,6 @@ export const CAR_BASE_PRICE_BY_CATEGORY: Record<CarCategory, number> = {
   'Picape cabine dupla': 110,
 };
 
-// Como você não definiu preço de Moto, deixei um padrão seguro.
-// Se quiser outro valor depois, é só mudar aqui.
 export const MOTO_BASE_PRICE = 70;
 
 export function getBasePriceForAppointment(
