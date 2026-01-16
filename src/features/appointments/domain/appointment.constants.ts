@@ -1,6 +1,13 @@
+import { AppointmentStatus } from "./appointment.types";
+
 export type VehicleType = 'Carro' | 'Moto';
 
 export type CarCategory = 'Hatch' | 'Sedan' | 'SUV' | 'PicapeDupla';
+
+
+export const ACTIVE_APPOINTMENT_SET = ['scheduled', 'in_progress'] as const satisfies readonly AppointmentStatus[];
+export const HISTORY_APPOINTMENT_SET = ['done', 'no_show'] as const satisfies readonly AppointmentStatus[];
+
 
 export const CAR_CATEGORY_BASE_PRICE: Record<CarCategory, number> = {
   Hatch: 80,
@@ -11,7 +18,5 @@ export const CAR_CATEGORY_BASE_PRICE: Record<CarCategory, number> = {
 
 export const MOTO_BASE_PRICE = 70;
 
-export const ACTIVE_APPOINTMENT_SET = ['scheduled', 'in_progress'] as const;
-export const HISTORY_APPOINTMENT_SET = ['done', 'no_show'] as const;
 
 export const NO_SHOW_GRACE_MS = 15 * 60 * 1000;

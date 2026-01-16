@@ -1,6 +1,6 @@
+// src/features/scheduling/screens/AppointmentScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
-  View,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -10,16 +10,15 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  View,
 } from 'react-native';
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getAuth } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { colors, radii, spacing } from '@shared/theme';
+import { colors, spacing } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 
 import {
@@ -28,20 +27,20 @@ import {
   type Slot,
 } from '@features/scheduling/services/availability.service';
 
-import type {
-  VehicleType,
-  CarCategory,
-} from '@features/appointments/domain/appointment.types';
+import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const CAR_CATEGORIES: CarCategory[] = [
-  'Hatch',
-  'Sedan',
-  'SUV',
-  'Picape cabine dupla',
-];
+/**
+ * ✅ Categorias do mercado (as que você definiu)
+ * Hatch: 80 | Sedan: 85 | SUV: 90 | Picape cabine dupla: 110
+ *
+ * IMPORTANTE:
+ * Esses valores devem estar dentro do getBasePriceForAppointment() (appointment.pricing)
+ * Aqui a gente apenas usa o retorno dele.
+ */
+const CAR_CATEGORIES: CarCategory[] = ['Hatch', 'Sedan', 'SUV', 'Picape cabine dupla'];
 
 const SERVICES = [
   { label: 'Lavagem simples', durationMin: 30 },
@@ -96,10 +95,7 @@ const SERVICE_DETAILS: Record<ServiceLabel, ServiceDetails> = {
       'Etapa de correção/realce de brilho na pintura (nível conforme avaliação)',
       'Acabamento para melhorar reflexo e aparência',
     ],
-    notIncluded: [
-      'Repintura',
-      'Correção de danos profundos (dependendo do caso)',
-    ],
+    notIncluded: ['Repintura', 'Correção de danos profundos (dependendo do caso)'],
     note: 'Recomendado para recuperar brilho e melhorar o aspecto da pintura.',
   },
   'Lavagem de motor': {
@@ -117,16 +113,18 @@ const SERVICE_DETAILS: Record<ServiceLabel, ServiceDetails> = {
 };
 
 function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
 function formatDayBR(d: Date) {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
+}
+
+function formatCurrencyBRL(v: number) {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function SelectField<T extends string>(props: {
@@ -143,6 +141,7 @@ function SelectField<T extends string>(props: {
   return (
     <>
       <Text style={styles.label}>{label}</Text>
+
       <TouchableOpacity
         style={[styles.select, disabled && { opacity: 0.6 }]}
         onPress={() => !disabled && setOpen(true)}
@@ -170,22 +169,14 @@ function SelectField<T extends string>(props: {
               return (
                 <TouchableOpacity
                   key={opt}
-                  style={[
-                    styles.modalItem,
-                    selected && styles.modalItemSelected,
-                  ]}
+                  style={[styles.modalItem, selected && styles.modalItemSelected]}
                   activeOpacity={0.85}
                   onPress={() => {
                     onChange(opt);
                     setOpen(false);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.modalItemText,
-                      selected && styles.modalItemTextSelected,
-                    ]}
-                  >
+                  <Text style={[styles.modalItemText, selected && styles.modalItemTextSelected]}>
                     {opt}
                   </Text>
                 </TouchableOpacity>
@@ -210,22 +201,24 @@ function ServiceReviewModal(props: {
   visible: boolean;
   serviceLabel: ServiceLabel | null;
   onClose: () => void;
+  price: number; // ✅ sempre number
 }) {
-  const { visible, serviceLabel, onClose } = props;
+  const { visible, serviceLabel, onClose, price } = props;
   if (!serviceLabel) return null;
 
   const details = SERVICE_DETAILS[serviceLabel];
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <Pressable style={styles.reviewCard} onPress={() => {}}>
           <Text style={styles.reviewTitle}>{details.title}</Text>
+
+          {/* ✅ PREÇO BEM VISÍVEL, APENAS AQUI */}
+          <View style={styles.priceBox}>
+            <Text style={styles.priceLabel}>Valor do serviço</Text>
+            <Text style={styles.priceValue}>{formatCurrencyBRL(price)}</Text>
+          </View>
 
           <Text style={styles.reviewSection}>O que contempla</Text>
           {details.includes.map((it, idx) => (
@@ -236,9 +229,7 @@ function ServiceReviewModal(props: {
 
           {!!details.notIncluded?.length && (
             <>
-              <Text style={[styles.reviewSection, { marginTop: 12 }]}>
-                O que não está incluso
-              </Text>
+              <Text style={[styles.reviewSection, { marginTop: 12 }]}>O que não está incluso</Text>
               {details.notIncluded.map((it, idx) => (
                 <Text key={`no-${idx}`} style={styles.reviewItemMuted}>
                   • {it}
@@ -247,15 +238,9 @@ function ServiceReviewModal(props: {
             </>
           )}
 
-          {!!details.note && (
-            <Text style={styles.reviewNote}>{details.note}</Text>
-          )}
+          {!!details.note && <Text style={styles.reviewNote}>{details.note}</Text>}
 
-          <TouchableOpacity
-            style={styles.reviewBtn}
-            onPress={onClose}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.reviewBtn} onPress={onClose} activeOpacity={0.85}>
             <Text style={styles.reviewBtnText}>Entendi</Text>
           </TouchableOpacity>
         </Pressable>
@@ -293,16 +278,19 @@ export default function AppointmentScreen() {
     [serviceLabel],
   );
 
-  const basePrice = useMemo(
-    () =>
-      getBasePriceForAppointment(
-        vehicleType,
-        vehicleType === 'Carro' ? carCategory : null,
-      ),
-    [vehicleType, carCategory],
-  );
+  /**
+   * ✅ Corrige o erro "number | null" no modal:
+   * Garante que sempre será number (fallback 0).
+   */
+  const basePrice: number = useMemo(() => {
+    const p = getBasePriceForAppointment(
+      vehicleType,
+      vehicleType === 'Carro' ? carCategory : null,
+    );
+    return typeof p === 'number' ? p : 0;
+  }, [vehicleType, carCategory]);
 
-  const finalPrice = basePrice;
+  const finalPrice: number = basePrice;
 
   if (!uid) {
     setTimeout(() => {
@@ -321,10 +309,7 @@ export default function AppointmentScreen() {
 
     try {
       setLoadingSlots(true);
-      const list = await getAvailableSlotsForDay(
-        nextDay,
-        nextService.durationMin,
-      );
+      const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
       setSlots(list);
       setSelectedSlot(null);
     } catch (e) {
@@ -337,10 +322,7 @@ export default function AppointmentScreen() {
     }
   };
 
-  const handleDayChange = async (
-    event: DateTimePickerEvent,
-    selected?: Date,
-  ) => {
+  const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android' && event.type === 'dismissed') {
       setShowDayPicker(false);
       return;
@@ -389,10 +371,7 @@ export default function AppointmentScreen() {
       navigation.replace('Dashboard' as any);
     } catch (e: any) {
       if (e?.code === 'SLOT_FULL') {
-        Alert.alert(
-          'Ops',
-          'Esse horário acabou de ser ocupado. Vou atualizar a lista.',
-        );
+        Alert.alert('Ops', 'Esse horário acabou de ser ocupado. Vou atualizar a lista.');
         await refreshSlots(day, selectedService);
         return;
       }
@@ -411,6 +390,7 @@ export default function AppointmentScreen() {
         visible={serviceReviewOpen}
         serviceLabel={serviceLabel}
         onClose={() => setServiceReviewOpen(false)}
+        price={finalPrice}
       />
 
       <View style={styles.topBar}>
@@ -421,7 +401,9 @@ export default function AppointmentScreen() {
         >
           <Text style={styles.backIconText}>‹</Text>
         </TouchableOpacity>
+
         <Text style={styles.topTitle}>Agendar Serviço</Text>
+
         <View style={{ width: 44 }} />
       </View>
 
@@ -451,9 +433,7 @@ export default function AppointmentScreen() {
           />
         )}
 
-        <Text style={[styles.label, { marginTop: spacing.lg }]}>
-          Tipo de veículo
-        </Text>
+        <Text style={[styles.label, { marginTop: spacing.lg }]}>Tipo de veículo</Text>
         <View style={styles.row}>
           {(['Carro', 'Moto'] as VehicleType[]).map(opt => {
             const selected = vehicleType === opt;
@@ -463,16 +443,14 @@ export default function AppointmentScreen() {
                 style={[styles.pill, selected && styles.pillSelected]}
                 onPress={() => {
                   setVehicleType(opt);
+
+                  // ✅ Regras corretas
                   if (opt === 'Moto') setCarCategory(null);
                   if (opt === 'Carro' && !carCategory) setCarCategory('Hatch');
                 }}
                 activeOpacity={0.85}
               >
-                <Text
-                  style={[styles.pillText, selected && styles.pillTextSelected]}
-                >
-                  {opt}
-                </Text>
+                <Text style={[styles.pillText, selected && styles.pillTextSelected]}>{opt}</Text>
               </TouchableOpacity>
             );
           })}
@@ -499,6 +477,7 @@ export default function AppointmentScreen() {
             onChange={async v => {
               setServiceLabel(v);
 
+              // ✅ abre modal de detalhes (com preço dentro)
               setServiceReviewOpen(true);
 
               const svc = SERVICES.find(s => s.label === v)!;
@@ -517,20 +496,14 @@ export default function AppointmentScreen() {
           )}
         </View>
 
-        <Text style={[styles.label, { marginTop: spacing.lg }]}>
-          Horários disponíveis
-        </Text>
+        <Text style={[styles.label, { marginTop: spacing.lg }]}>Horários disponíveis</Text>
 
         {!selectedService ? (
-          <Text style={styles.helperText}>
-            Selecione um serviço para ver os horários.
-          </Text>
+          <Text style={styles.helperText}>Selecione um serviço para ver os horários.</Text>
         ) : loadingSlots ? (
           <Text style={styles.helperText}>Carregando horários...</Text>
         ) : slots.length === 0 ? (
-          <Text style={styles.helperText}>
-            Sem horários disponíveis nesse dia.
-          </Text>
+          <Text style={styles.helperText}>Sem horários disponíveis nesse dia.</Text>
         ) : (
           <FlatList
             horizontal
@@ -546,12 +519,7 @@ export default function AppointmentScreen() {
                   onPress={() => setSelectedSlot(item)}
                   activeOpacity={0.85}
                 >
-                  <Text
-                    style={[
-                      styles.timeChipText,
-                      selected && styles.timeChipTextSelected,
-                    ]}
-                  >
+                  <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
                     {formatHour(item.startAtMs)}
                   </Text>
                 </TouchableOpacity>
@@ -571,13 +539,7 @@ export default function AppointmentScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.cancelText}>Cancelar</Text>
-        </TouchableOpacity>
+        {/* ✅ REMOVIDO: botão Cancelar (fica só a seta de voltar no topo) */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -680,13 +642,6 @@ const styles = StyleSheet.create({
   },
   confirmText: { color: colors.bg, fontSize: 16, fontWeight: '900' },
 
-  cancelBtn: {
-    marginTop: spacing.md,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  cancelText: { color: '#6B7280', fontWeight: '800', fontSize: 16 },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -731,6 +686,26 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 10,
   },
+
+  // ✅ preço bem destacado no modal
+  priceBox: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#F3F6FA',
+    marginBottom: 14,
+  },
+  priceLabel: {
+    color: '#6B7280',
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  priceValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: colors.primary,
+  },
+
   reviewSection: {
     fontSize: 14,
     fontWeight: '900',
