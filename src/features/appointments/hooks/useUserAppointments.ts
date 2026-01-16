@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  AppointmentStatus,
-  UserAppointment,
-} from '../domain/appointment.types';
+import type { UserAppointment, AppointmentStatus } from '../domain/appointment.types';
 import { watchUserAppointmentsWithFallback } from '../data/appointmentsRepo';
 
 type Params = {
   uid?: string | null;
-  statusIn?: AppointmentStatus[];
+  statusIn?: readonly AppointmentStatus[]; // ✅ aceita readonly (as const)
   limitN?: number;
 };
 
@@ -17,7 +14,10 @@ export function useUserAppointments(params: Params) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<UserAppointment[]>([]);
 
-  const statusSet = useMemo(() => new Set(statusIn ?? []), [statusIn]);
+  const statusSet = useMemo(
+    () => new Set<AppointmentStatus>(statusIn ?? []),
+    [statusIn]
+  );
 
   useEffect(() => {
     if (!uid) {
@@ -31,10 +31,10 @@ export function useUserAppointments(params: Params) {
     const unsub = watchUserAppointmentsWithFallback({
       uid,
       limitN,
-      onChange: list => {
+      onChange: (list) => {
         const filtered =
           statusIn && statusIn.length > 0
-            ? list.filter(it => statusSet.has(it.status))
+            ? list.filter((it) => statusSet.has(it.status))
             : list;
 
         setItems(filtered);
@@ -47,6 +47,7 @@ export function useUserAppointments(params: Params) {
     });
 
     return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, limitN, statusIn?.join('|')]);
 
   return { loading, items };
