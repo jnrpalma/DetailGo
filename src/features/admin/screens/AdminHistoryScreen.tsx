@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { 
+  ActivityIndicator, 
+  Alert, 
+  FlatList, 
+  StyleSheet, 
+  Text, 
+  View,
+  TouchableOpacity 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { ArrowLeft } from 'lucide-react-native';
 
 import { getAuth } from '@react-native-firebase/auth';
 import {
@@ -24,23 +34,13 @@ import type { AppointmentStatus } from '@features/appointments/domain/appointmen
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
+import { formatDatePtBR, formatHour } from '@shared/utils/date';
+import { formatCurrencyBRL } from '@shared/utils/money';
+
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
-function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-function formatDate(ms: number) {
-  const d = new Date(ms);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-function formatCurrency(v: number | null) {
-  return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
-}
-
 export default function AdminHistoryScreen() {
+  const navigation = useNavigation();
   const auth = getAuth();
   const user = auth.currentUser;
   const db = getFirestore();
@@ -174,14 +174,14 @@ export default function AdminHistoryScreen() {
           <Text style={styles.client}>👤 {item.customerName}</Text>
 
           <Text style={styles.sub}>
-            {subtitle} • {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
+            {subtitle} • {formatDatePtBR(item.startAtMs)} • {formatHour(item.startAtMs)}
           </Text>
 
           <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.price}>+{formatCurrency(item.price)}</Text>
+          <Text style={styles.price}>+{formatCurrencyBRL(item.price)}</Text>
         </View>
       </View>
     );
@@ -190,17 +190,43 @@ export default function AdminHistoryScreen() {
   const FilterBtn = ({ id, label }: { id: 'all' | 'done' | 'no_show'; label: string }) => {
     const active = filter === id;
     return (
-      <Pressable onPress={() => setFilter(id)} style={[styles.filterBtn, active && styles.filterBtnActive]}>
+      <TouchableOpacity 
+        onPress={() => setFilter(id)} 
+        style={[styles.filterBtn, active && styles.filterBtnActive]}
+        activeOpacity={0.7}
+      >
         <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
-      </Pressable>
+      </TouchableOpacity>
     );
   };
 
+  if (!user?.uid) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'left', 'right']}>
-      <View style={{ flex: 1, padding: spacing.lg }}>
-        <Text style={styles.screenTitle}>Histórico</Text>
+      {/* Header com botão voltar */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>Histórico Admin</Text>
+        <View style={styles.headerRightPlaceholder} />
+      </View>
 
+      <View style={{ flex: 1, padding: spacing.lg }}>
+        {/* Filtros */}
         <View style={styles.filtersRow}>
           <FilterBtn id="all" label="Todos" />
           <FilterBtn id="done" label="Concluídos" />
@@ -227,7 +253,11 @@ export default function AdminHistoryScreen() {
                 </View>
               ) : null
             }
-            ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#6B7280' }}>Sem registros.</Text>}
+            ListEmptyComponent={
+              <Text style={{ textAlign: 'center', color: '#6B7280', marginTop: 20 }}>
+                Sem registros para o filtro selecionado.
+              </Text>
+            }
           />
         )}
       </View>
@@ -236,21 +266,61 @@ export default function AdminHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenTitle: { fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center', marginBottom: 12 },
-
-  filtersRow: { flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 14 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    padding: spacing.xs,
+    borderRadius: 8,
+    backgroundColor: surfaces.card,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerRightPlaceholder: {
+    width: 40,
+  },
+  filtersRow: { 
+    flexDirection: 'row', 
+    gap: 10, 
+    justifyContent: 'center', 
+    marginBottom: spacing.lg 
+  },
   filterBtn: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: 999,
     backgroundColor: surfaces.card,
   },
-  filterBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { color: colors.text, fontWeight: '800' },
-  filterTextActive: { color: colors.bg },
-
+  filterBtnActive: { 
+    backgroundColor: colors.primary, 
+    borderColor: colors.primary 
+  },
+  filterText: { 
+    color: colors.text, 
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  filterTextActive: { 
+    color: colors.bg 
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -262,9 +332,31 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     gap: 12,
   },
-  title: { color: colors.text, fontSize: 16, fontWeight: '900', marginBottom: 4 },
-  client: { color: '#111827', fontWeight: '900', marginBottom: 6 },
-  sub: { color: '#616E7C', fontSize: 13, fontWeight: '700', marginBottom: 6 },
-  status: { fontWeight: '900' },
-  price: { color: colors.primary, fontWeight: '900' },
+  title: { 
+    color: colors.text, 
+    fontSize: 16, 
+    fontWeight: '900', 
+    marginBottom: 4 
+  },
+  client: { 
+    color: '#111827', 
+    fontWeight: '900', 
+    marginBottom: 6,
+    fontSize: 14,
+  },
+  sub: { 
+    color: '#616E7C', 
+    fontSize: 13, 
+    fontWeight: '700', 
+    marginBottom: 6 
+  },
+  status: { 
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  price: { 
+    color: colors.primary, 
+    fontWeight: '900',
+    fontSize: 16,
+  },
 });

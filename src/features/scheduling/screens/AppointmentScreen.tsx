@@ -17,8 +17,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getAuth } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { ArrowLeft } from 'lucide-react-native';
 
-import { colors, spacing } from '@shared/theme';
+import { colors, spacing, surfaces } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 
 import {
@@ -301,26 +302,26 @@ export default function AppointmentScreen() {
   }
 
   const refreshSlots = async (nextDay: Date, nextService = selectedService) => {
-    if (!nextService) {
-      setSlots([]);
-      setSelectedSlot(null);
-      return;
-    }
+  if (!nextService) {
+    setSlots([]);
+    setSelectedSlot(null);
+    return;
+  }
 
-    try {
-      setLoadingSlots(true);
-      const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
-      setSlots(list);
-      setSelectedSlot(null);
-    } catch (e) {
-      console.error(e);
-      setSlots([]);
-      setSelectedSlot(null);
-      Alert.alert('Erro', 'Não foi possível carregar os horários disponíveis.');
-    } finally {
-      setLoadingSlots(false);
-    }
-  };
+  try {
+    setLoadingSlots(true);
+    const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
+    setSlots(list);
+    setSelectedSlot(null);
+  } catch (e) {
+    console.error(e);
+    setSlots([]);
+    setSelectedSlot(null);
+    Alert.alert('Erro', 'Não foi possível carregar os horários disponíveis.');
+  } finally {
+    setLoadingSlots(false);
+  }
+};
 
   const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android' && event.type === 'dismissed') {
@@ -393,18 +394,17 @@ export default function AppointmentScreen() {
         price={finalPrice}
       />
 
-      <View style={styles.topBar}>
+      {/* Header com botão voltar - MESMO PADRÃO DAS OUTRAS TELAS */}
+      <View style={styles.header}>
         <TouchableOpacity
-          style={styles.backIcon}
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
-          activeOpacity={0.85}
+          activeOpacity={0.7}
         >
-          <Text style={styles.backIconText}>‹</Text>
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-
-        <Text style={styles.topTitle}>Agendar Serviço</Text>
-
-        <View style={{ width: 44 }} />
+        <Text style={styles.screenTitle}>Agendar Serviço</Text>
+        <View style={styles.headerRightPlaceholder} />
       </View>
 
       <ScrollView
@@ -546,31 +546,41 @@ export default function AppointmentScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+  safe: { 
+    flex: 1, 
+    backgroundColor: colors.bg 
+  },
 
-  topBar: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+  // NOVO HEADER - MESMO PADRÃO DAS OUTRAS TELAS
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  backIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#0B2A4A',
+  backButton: {
+    padding: spacing.xs,
+    borderRadius: 8,
+    backgroundColor: surfaces.card,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIconText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '900',
-    marginTop: -2,
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    flex: 1,
+    textAlign: 'center',
   },
-  topTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
+  headerRightPlaceholder: {
+    width: 40,
+  },
 
   scrollContent: {
     paddingHorizontal: spacing.lg,
@@ -591,7 +601,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 10,
   },
-  helperText: { color: '#6B7280', fontWeight: '700', marginTop: 2 },
+  helperText: { 
+    color: '#6B7280', 
+    fontWeight: '700', 
+    marginTop: 2 
+  },
 
   select: {
     borderRadius: 14,
@@ -602,10 +616,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#fff',
   },
-  selectText: { fontSize: 16, fontWeight: '700', color: colors.text },
-  chev: { fontSize: 22, fontWeight: '900', color: '#94A3B8' },
+  selectText: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: colors.text 
+  },
+  chev: { 
+    fontSize: 22, 
+    fontWeight: '900', 
+    color: '#94A3B8' 
+  },
 
-  row: { flexDirection: 'row', gap: 12 },
+  row: { 
+    flexDirection: 'row', 
+    gap: 12 
+  },
   pill: {
     flex: 1,
     borderRadius: 16,
@@ -613,9 +638,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-  pillSelected: { backgroundColor: colors.primary },
-  pillText: { fontWeight: '900', color: colors.text, fontSize: 16 },
-  pillTextSelected: { color: colors.bg },
+  pillSelected: { 
+    backgroundColor: colors.primary 
+  },
+  pillText: { 
+    fontWeight: '900', 
+    color: colors.text, 
+    fontSize: 16 
+  },
+  pillTextSelected: { 
+    color: colors.bg 
+  },
 
   detailsLink: {
     fontWeight: '900',
@@ -629,9 +662,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: '#fff',
   },
-  timeChipSelected: { backgroundColor: colors.primary },
-  timeChipText: { fontWeight: '900', color: colors.text, fontSize: 15 },
-  timeChipTextSelected: { color: colors.bg },
+  timeChipSelected: { 
+    backgroundColor: colors.primary 
+  },
+  timeChipText: { 
+    fontWeight: '900', 
+    color: colors.text, 
+    fontSize: 15 
+  },
+  timeChipTextSelected: { 
+    color: colors.bg 
+  },
 
   confirmBtn: {
     marginTop: spacing.xl,
@@ -640,7 +681,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  confirmText: { color: colors.bg, fontSize: 16, fontWeight: '900' },
+  confirmText: { 
+    color: colors.bg, 
+    fontSize: 16, 
+    fontWeight: '900' 
+  },
 
   modalOverlay: {
     flex: 1,
@@ -668,11 +713,26 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: '#F3F6FA',
   },
-  modalItemSelected: { backgroundColor: colors.primary },
-  modalItemText: { fontSize: 15, fontWeight: '800', color: colors.text },
-  modalItemTextSelected: { color: colors.bg },
-  modalClose: { marginTop: 6, alignItems: 'center', paddingVertical: 10 },
-  modalCloseText: { fontWeight: '900', color: '#6B7280' },
+  modalItemSelected: { 
+    backgroundColor: colors.primary 
+  },
+  modalItemText: { 
+    fontSize: 15, 
+    fontWeight: '800', 
+    color: colors.text 
+  },
+  modalItemTextSelected: { 
+    color: colors.bg 
+  },
+  modalClose: { 
+    marginTop: 6, 
+    alignItems: 'center', 
+    paddingVertical: 10 
+  },
+  modalCloseText: { 
+    fontWeight: '900', 
+    color: '#6B7280' 
+  },
 
   reviewCard: {
     width: '100%',
@@ -738,5 +798,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  reviewBtnText: { color: colors.bg, fontSize: 15, fontWeight: '900' },
+  reviewBtnText: { 
+    color: colors.bg, 
+    fontSize: 15, 
+    fontWeight: '900' 
+  },
 });
