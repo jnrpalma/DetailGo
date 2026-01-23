@@ -17,6 +17,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import {
+  launchImageLibrary,
+  type ImageLibraryOptions,
+  type Asset,
+} from 'react-native-image-picker';
+
 import { getAuth } from '@react-native-firebase/auth';
 import {
   collection,
@@ -28,6 +34,7 @@ import {
   query,
   updateDoc,
   where,
+  setDoc,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
@@ -138,6 +145,7 @@ export default function AdminDashboardScreen() {
   const db = getFirestore();
 
   const [profile, setProfile] = useState<UserProfile>({});
+  const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
 
   const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>(
     [],
@@ -169,6 +177,7 @@ export default function AdminDashboardScreen() {
       useNativeDriver: true,
     }).start();
   };
+  
   const closeMenu = () => {
     Animated.timing(anim, {
       toValue: 0,
@@ -186,6 +195,68 @@ export default function AdminDashboardScreen() {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
+
+  const pickAsBase64 = async () => {
+    const opts: ImageLibraryOptions = {
+      mediaType: 'photo',
+      selectionLimit: 1,
+      includeBase64: true,
+      quality: 0.6,
+      maxWidth: 640,
+      maxHeight: 640,
+    };
+
+    const res = await launchImageLibrary(opts);
+    if (res.didCancel) return null;
+
+    const a: Asset | undefined = res.assets?.[0];
+    if (!a?.base64) return null;
+
+    const mime = a.type && a.type.startsWith('image/') ? a.type : 'image/jpeg';
+    return `data:${mime};base64,${a.base64}`;
+  };
+
+  const saveCover = async () => {
+    try {
+      const b64 = await pickAsBase64();
+      if (!b64) return;
+
+      setSaving('cover');
+      await setDoc(
+        doc(getFirestore(), 'users', user!.uid),
+        { coverB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, coverB64: b64 }));
+    } catch (e: any) {
+      Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  // ADICIONAR FUNÇÃO PARA SALVAR AVATAR
+  const saveAvatar = async () => {
+    try {
+      const b64 = await pickAsBase64();
+      if (!b64) return;
+
+      setSaving('avatar');
+      await setDoc(
+        doc(getFirestore(), 'users', user!.uid),
+        { photoB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, photoB64: b64 }));
+    } catch (e: any) {
+      Alert.alert(
+        'Erro',
+        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
+      );
+    } finally {
+      setSaving(null);
+    }
+  };
 
   const resolveCustomerName = async (customerUid: string): Promise<string> => {
     const cached = nameCacheRef.current.get(customerUid);
@@ -538,15 +609,37 @@ export default function AdminDashboardScreen() {
             >
               <Menu size={26} color={colors.white} />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={saveCover}
+              style={styles.coverBtn}
+              activeOpacity={0.9}
+            >
+              {saving === 'cover' ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.coverBtnTxt}>Trocar capa</Text>
+              )}
+            </TouchableOpacity>
           </ImageBackground>
         </View>
 
+        {/* CONTAINER DO AVATAR COM TOUCHABLE OPACITY */}
         <View style={styles.avatarContainer}>
-          {avatarSource ? (
-            <Image source={avatarSource} style={styles.avatarImg} />
-          ) : (
-            <View style={[styles.avatarImg, styles.avatarFallback]}>
-              <Text style={styles.avatarPlaceholder}>Foto</Text>
+          <TouchableOpacity onPress={saveAvatar} activeOpacity={0.9}>
+            {avatarSource ? (
+              <Image source={avatarSource} style={styles.avatarImg} />
+            ) : (
+              <View style={[styles.avatarImg, styles.avatarFallback]}>
+                <Text style={styles.avatarPlaceholder}>Foto</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* INDICADOR DE LOADING PARA AVATAR */}
+          {saving === 'avatar' && (
+            <View style={styles.avatarLoading}>
+              <ActivityIndicator color={colors.white} />
             </View>
           )}
         </View>
@@ -657,6 +750,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.15)',
   },
+  coverBtn: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 10,
+  },
+  coverBtnTxt: { color: colors.white, fontWeight: '700' },
 
   avatarContainer: {
     alignSelf: 'center',
@@ -680,6 +783,15 @@ const styles = StyleSheet.create({
   },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
+  // ADICIONAR ESTILO PARA LOADING DO AVATAR
+  avatarLoading: {
+    position: 'absolute',
+    inset: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: AVATAR / 2,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
 
   body: {
     flex: 1,
