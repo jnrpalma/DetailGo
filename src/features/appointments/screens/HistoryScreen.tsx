@@ -1,7 +1,16 @@
 import React from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { 
+  ActivityIndicator, 
+  FlatList, 
+  StyleSheet, 
+  Text, 
+  View,
+  TouchableOpacity
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { getAuth } from '@react-native-firebase/auth';
+import { ArrowLeft } from 'lucide-react-native';
 
 import { colors, spacing, surfaces } from '@shared/theme';
 
@@ -13,6 +22,7 @@ import { formatDatePtBR, formatHour } from '@shared/utils/date';
 import { formatCurrencyBRL } from '@shared/utils/money';
 
 export default function HistoryScreen() {
+  const navigation = useNavigation();
   const auth = getAuth();
   const uid = auth.currentUser?.uid;
 
@@ -62,9 +72,20 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'left', 'right']}>
-      <View style={{ flex: 1, padding: spacing.lg }}>
+      {/* Header com botão voltar */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
         <Text style={styles.screenTitle}>Histórico</Text>
+        <View style={styles.headerRightPlaceholder} />
+      </View>
 
+      <View style={{ flex: 1, padding: spacing.lg }}>
         {loading ? (
           <View style={{ paddingTop: 30 }}>
             <ActivityIndicator />
@@ -87,14 +108,35 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 12,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-
+  backButton: {
+    padding: spacing.xs,
+    borderRadius: 8,
+    backgroundColor: surfaces.card,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerRightPlaceholder: {
+    width: 40,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
