@@ -548,5 +548,11 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
   },
-  itemText: { fontSize: 20, color: colors.bg, fontWeight: '600' },
+  itemText: { 
+  fontSize: 18, // Reduzido de 20
+  color: colors.bg, 
+  fontWeight: '600',
+  flexShrink: 1, // Permite quebrar linha se necessário
+  flexWrap: 'wrap',
+},
 });
