@@ -1,62 +1,68 @@
-// DashboardScreen.tsx - refatorado (appointments via hook + card) ✅ sem piscar
+// src/features/dashboard/screens/DashboardScreen.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
-  Easing,
   FlatList,
   Image,
-  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  LogBox,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import LinearGradient from 'react-native-linear-gradient';
 
-import {
-  launchImageLibrary,
-  type ImageLibraryOptions,
-  type Asset,
-} from 'react-native-image-picker';
-
+import { launchImageLibrary, type ImageLibraryOptions, type Asset } from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
-import {
-  doc,
-  getFirestore,
-  onSnapshot,
-  setDoc,
-} from '@react-native-firebase/firestore';
+import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/firestore';
 
 import { useAuth } from '@features/auth';
 import { isAdminEmail } from '@features/auth/utils/roles';
-
-import {
-  Menu,
-  User as UserIcon,
-  History,
-  LogOut,
-  Calendar,
-  ClipboardList,
-} from 'lucide-react-native';
-
-import { colors, surfaces, radii, spacing } from '@shared/theme';
+import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
+import { useDashboardAppointments, type DashboardAppointment } from '@features/appointments/hooks/useDashboardAppointments';
+import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
 import type { RootStackParamList } from '@app/types';
 
-import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
-
 import {
-  useDashboardAppointments,
-  type DashboardAppointment,
-} from '@features/appointments/hooks/useDashboardAppointments';
-import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
+  Calendar,
+  History,
+  LogOut,
+  Settings,
+  User,
+  ChevronRight,
+  Camera,
+  Clock,
+} from 'lucide-react-native';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+// Paleta DetailGo
+const colors = {
+  primary: '#175676', // Baltic Blue
+  secondary: '#4BA3C3', // Turquoise Surf
+  error: '#D62839', // Classic Crimson
+  errorLight: '#BA324F', // Rosewood
+  background: '#FFFFFF',
+  surface: '#F8FAFC',
+  border: '#E2E8F0',
+  text: {
+    primary: '#0F172A',
+    secondary: '#475569',
+    tertiary: '#64748B',
+    disabled: '#94A3B8',
+    white: '#FFFFFF',
+  },
+  card: {
+    background: '#FFFFFF',
+    border: '#F1F5F9',
+  }
+};
+
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 type UserProfile = {
   firstName?: string;
@@ -67,89 +73,46 @@ type UserProfile = {
   photoB64?: string;
 };
 
-const COVER_H = 285;
-const AVATAR = 130;
-const MENU_W = 220;
-
-LogBox.ignoreLogs([
-  'SafeAreaView has been deprecated',
-  'This method is deprecated (as well as all React Native Firebase namespaced API)',
-]);
+const AVATAR_SIZE = 96;
 
 export default function DashboardScreen() {
-  const navigation = useNavigation<Nav>();
-
+  const navigation = useNavigation<NavProp>();
   const auth = getAuth();
   const user = auth.currentUser!;
   const uid = user.uid;
-
   const { signOut } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile>({
     photoURL: user.photoURL ?? undefined,
   });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
-
-  const markNoShow = useCallback(
-    async (appointmentId: string, customerUid: string) => {
-      await updateAppointmentStatus({
-        appointmentId,
-        customerUid,
-        status: 'no_show',
-      });
-    },
-    [],
-  );
-
-  const { loading: loadingList, items: appointments } =
-    useDashboardAppointments({
-      uid,
-      limitN: 30,
-      markNoShow,
-    });
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
-
-  const openMenu = () => {
-    setMenuOpen(true);
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeMenu = () => {
-    Animated.timing(anim, {
-      toValue: 0,
-      duration: 200,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => finished && setMenuOpen(false));
-  };
-
-  const drawerTx = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-MENU_W, 0],
-  });
-
-  const overlayOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const [menuVisible, setMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-280)).current;
 
   const isAdmin = isAdminEmail(user.email);
+
+  const markNoShow = useCallback(async (appointmentId: string, customerUid: string) => {
+    await updateAppointmentStatus({
+      appointmentId,
+      customerUid,
+      status: 'no_show',
+    });
+  }, []);
+
+  const { loading: loadingAppointments, items: appointments } = useDashboardAppointments({
+    uid,
+    limitN: 30,
+    markNoShow,
+  });
 
   useEffect(() => {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
 
-    const unsubProfile = onSnapshot(userRef, snap => {
+    const unsubProfile = onSnapshot(userRef, (snap) => {
       const data = snap.data() as UserProfile | undefined;
       if (data) {
-        setProfile(p => ({
+        setProfile((p) => ({
           ...p,
           ...data,
           photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined,
@@ -160,399 +123,504 @@ export default function DashboardScreen() {
     return () => unsubProfile();
   }, [uid, user.photoURL]);
 
-  const pickAsBase64 = async () => {
+  const pickImage = async () => {
     const opts: ImageLibraryOptions = {
       mediaType: 'photo',
       selectionLimit: 1,
       includeBase64: true,
-      quality: 0.6,
-      maxWidth: 640,
-      maxHeight: 640,
+      quality: 0.7,
+      maxWidth: 500,
+      maxHeight: 500,
     };
 
     const res = await launchImageLibrary(opts);
     if (res.didCancel) return null;
 
-    const a: Asset | undefined = res.assets?.[0];
-    if (!a?.base64) return null;
+    const asset = res.assets?.[0];
+    if (!asset?.base64) return null;
 
-    const mime = a.type && a.type.startsWith('image/') ? a.type : 'image/jpeg';
-    return `data:${mime};base64,${a.base64}`;
-  };
-
-  const saveCover = async () => {
-    try {
-      const b64 = await pickAsBase64();
-      if (!b64) return;
-
-      setSaving('cover');
-      await setDoc(
-        doc(getFirestore(), 'users', uid),
-        { coverB64: b64 },
-        { merge: true },
-      );
-      setProfile(p => ({ ...p, coverB64: b64 }));
-    } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a capa.\n${e?.code ?? ''}`);
-    } finally {
-      setSaving(null);
-    }
+    const mime = asset.type?.startsWith('image/') ? asset.type : 'image/jpeg';
+    return `data:${mime};base64,${asset.base64}`;
   };
 
   const saveAvatar = async () => {
     try {
-      const b64 = await pickAsBase64();
+      const b64 = await pickImage();
       if (!b64) return;
 
       setSaving('avatar');
-      await setDoc(
-        doc(getFirestore(), 'users', uid),
-        { photoB64: b64 },
-        { merge: true },
-      );
-      setProfile(p => ({ ...p, photoB64: b64 }));
-    } catch (e: any) {
-      Alert.alert(
-        'Erro',
-        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
-      );
+      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
+      setProfile((p) => ({ ...p, photoB64: b64 }));
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível atualizar a foto');
     } finally {
       setSaving(null);
     }
   };
 
-  const coverSource = profile.coverB64
-    ? { uri: profile.coverB64 }
-    : profile.coverUrl
-    ? { uri: profile.coverUrl }
-    : { uri: 'https://singlecolorimage.com/get/0F7173/1200x600' };
+  const toggleMenu = () => {
+    if (menuVisible) {
+      Animated.timing(slideAnim, {
+        toValue: -280,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(() => setMenuVisible(false));
+    } else {
+      setMenuVisible(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  // Navegação pelo menu lateral - FECHA o menu primeiro
+  const navigateFromMenu = (route: keyof RootStackParamList, params?: any) => {
+    toggleMenu();
+    navigation.navigate(route, params);
+  };
+
+  // Navegação direta - NÃO mexe no menu
+  const navigateDirect = (route: keyof RootStackParamList, params?: any) => {
+    navigation.navigate(route, params);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      toggleMenu();
+      await signOut();
+    } catch {
+      Alert.alert('Erro', 'Falha ao sair da conta');
+    }
+  };
+
+  const fullName = profile.firstName
+    ? `${profile.firstName} ${profile.lastName || ''}`
+    : user.displayName || 'Usuário';
 
   const avatarSource = profile.photoB64
     ? { uri: profile.photoB64 }
     : profile.photoURL
     ? { uri: profile.photoURL }
-    : undefined;
+    : null;
 
-  const fullName = profile.firstName
-    ? `${profile.firstName} ${profile.lastName ?? ''}`
-    : user.displayName ?? 'Usuário';
-
-  const goProfile = () => {
-    closeMenu();
-    Alert.alert('Meu Perfil', 'TODO');
-  };
-
-  const goMyAppointments = () => {
-    closeMenu();
-    navigation.navigate('MyAppointments');
-  };
-
-  const goHistory = () => {
-    closeMenu();
-    navigation.navigate('History');
-  };
-
-  const goAdmin = () => {
-    closeMenu();
-    navigation.navigate('AdminDashboard');
-  };
-
-  const doSignOut = async () => {
-    closeMenu();
-    try {
-      await signOut();
-    } catch {
-      Alert.alert('Erro', 'Falha ao sair. Tente novamente.');
-    }
-  };
-
-  const overlayStyle = [
-    StyleSheet.absoluteFill,
-    styles.overlay,
-    { opacity: overlayOpacity },
-  ];
+  const recentAppointments = appointments.slice(0, 3);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.container}>
-        <View style={styles.headerWrapper}>
-          <ImageBackground
+    <>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          {/* Header com gradiente */}
+          <LinearGradient
+            colors={[colors.primary, colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.header}
-            imageStyle={styles.headerImg}
-            source={coverSource}
           >
-            <TouchableOpacity
-              style={styles.menuBtn}
-              activeOpacity={0.8}
-              onPress={openMenu}
-            >
-              <Menu size={26} color={colors.white} />
-            </TouchableOpacity>
+            <View style={styles.headerTop}>
+              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
+                <View style={styles.menuIcon}>
+                  <View style={styles.menuBar} />
+                  <View style={[styles.menuBar, { width: 20 }]} />
+                  <View style={[styles.menuBar, { width: 16 }]} />
+                </View>
+              </TouchableOpacity>
+              
+              <Text style={styles.brand}>DETAILGO</Text>
+              
+              <TouchableOpacity 
+                onPress={() => navigateDirect('MyAppointments')} 
+                style={styles.notificationButton}
+                activeOpacity={0.7}
+              >
+                <Clock size={22} color={colors.text.white} />
+              </TouchableOpacity>
+            </View>
 
+            {/* Perfil do usuário */}
+            <View style={styles.profileSection}>
+              <TouchableOpacity onPress={saveAvatar} style={styles.avatarWrapper} activeOpacity={0.9}>
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <User size={40} color={colors.primary} />
+                  </View>
+                )}
+                {saving === 'avatar' && (
+                  <View style={styles.avatarLoading}>
+                    <ActivityIndicator color={colors.primary} />
+                  </View>
+                )}
+                <View style={styles.cameraBadge}>
+                  <Camera size={14} color={colors.text.white} />
+                </View>
+              </TouchableOpacity>
+              
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{fullName}</Text>
+                <Text style={styles.userEmail}>{user.email}</Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Conteúdo principal */}
+          <View style={styles.content}>
+            {/* Botão de agendamento */}
             <TouchableOpacity
-              onPress={saveCover}
-              style={styles.coverBtn}
+              style={styles.bookingButton}
+              onPress={() => navigateDirect('Appointment')}
               activeOpacity={0.9}
             >
-              {saving === 'cover' ? (
-                <ActivityIndicator color={colors.white} />
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.bookingGradient}
+              >
+                <Calendar size={22} color={colors.text.white} />
+                <Text style={styles.bookingText}>Agendar novo serviço</Text>
+                <ChevronRight size={20} color={colors.text.white} />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Seção de próximos serviços */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Próximos serviços</Text>
+                {appointments.length > 3 && (
+                  <TouchableOpacity onPress={() => navigateDirect('MyAppointments')}>
+                    <Text style={styles.sectionLink}>Ver todos</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {loadingAppointments ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : recentAppointments.length > 0 ? (
+                <FlatList
+                  data={recentAppointments}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => <AppointmentCard item={item} />}
+                  ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+                  scrollEnabled={false}
+                  style={styles.appointmentsList}
+                />
               ) : (
-                <Text style={styles.coverBtnTxt}>Trocar capa</Text>
+                <View style={styles.emptyState}>
+                  <Calendar size={48} color={colors.text.disabled} />
+                  <Text style={styles.emptyStateTitle}>Nenhum serviço agendado</Text>
+                  <Text style={styles.emptyStateText}>
+                    Agende seu primeiro serviço de estética automotiva
+                  </Text>
+                </View>
               )}
-            </TouchableOpacity>
-          </ImageBackground>
-        </View>
-
-        <View style={styles.avatarContainer}>
-          <TouchableOpacity onPress={saveAvatar} activeOpacity={0.9}>
-            {avatarSource ? (
-              <Image source={avatarSource} style={styles.avatarImg} />
-            ) : (
-              <View style={[styles.avatarImg, styles.avatarFallback]}>
-                <Text style={styles.avatarPlaceholder}>Insira sua foto</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {saving === 'avatar' && (
-            <View style={styles.avatarLoading}>
-              <ActivityIndicator color={colors.white} />
             </View>
-          )}
-        </View>
-
-        <View style={styles.body}>
-          {/* HEADER FIXO */}
-          <View style={styles.headerFixed}>
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('Appointment')}
-            >
-              <Calendar size={18} color={colors.bg} />
-              <Text style={styles.primaryBtnText}>Agendar Serviço</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.sectionTitle}>Últimos serviços</Text>
           </View>
-
-          {/* LISTA */}
-          {loadingList ? (
-            <View style={{ paddingTop: 24 }}>
-              <ActivityIndicator />
-            </View>
-          ) : (
-            <FlatList<DashboardAppointment>
-              style={{ flex: 1 }}
-              data={appointments}
-              keyExtractor={it => it.id}
-              renderItem={({ item }) => <AppointmentCard item={item} />}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <Text
-                  style={{
-                    textAlign: 'center',
-                    color: '#6B7280',
-                    marginTop: 12,
-                  }}
-                >
-                  Você ainda não possui serviços.
-                </Text>
-              }
-            />
-          )}
         </View>
 
-        {menuOpen && (
+        {/* Menu lateral */}
+        {menuVisible && (
           <>
-            <Animated.View pointerEvents="auto" style={overlayStyle}>
-              <Pressable style={{ flex: 1 }} onPress={closeMenu} />
-            </Animated.View>
-
-            <Animated.View
-              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
-            >
+            <Pressable style={styles.overlay} onPress={toggleMenu} />
+            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
               <View style={styles.drawerHeader}>
-                <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
-                <Text style={styles.drawerTitle}>Menu</Text>
+                <View style={styles.drawerUserInfo}>
+                  <Text style={styles.drawerUserName}>{fullName}</Text>
+                  <Text style={styles.drawerUserEmail}>{user.email}</Text>
+                </View>
               </View>
 
-              {isAdmin && (
-                <TouchableOpacity
-                  style={styles.item}
-                  onPress={goAdmin}
-                  activeOpacity={0.8}
+              <View style={styles.drawerContent}>
+                <TouchableOpacity 
+                  style={styles.drawerItem}
+                  onPress={() => navigateFromMenu('MyAppointments')}
                 >
-                  <Text style={styles.itemText}>Admin</Text>
+                  <Calendar size={22} color={colors.primary} />
+                  <Text style={styles.drawerItemText}>Meus agendamentos</Text>
                 </TouchableOpacity>
-              )}
 
-              <TouchableOpacity
-                style={styles.item}
-                onPress={goProfile}
-                activeOpacity={0.8}
-              >
-                <UserIcon size={30} color={colors.sand} />
-                <Text style={styles.itemText}>Meu Perfil</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.drawerItem}
+                  onPress={() => navigateFromMenu('History')}
+                >
+                  <History size={22} color={colors.primary} />
+                  <Text style={styles.drawerItemText}>Histórico</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.item}
-                onPress={goMyAppointments}
-                activeOpacity={0.8}
-              >
-                <ClipboardList size={30} color={colors.sand} />
-                <Text style={styles.itemText}>Meus agendamentos</Text>
-              </TouchableOpacity>
+                {isAdmin && (
+                  <TouchableOpacity 
+                    style={styles.drawerItem}
+                    onPress={() => navigateFromMenu('AdminDashboard')}
+                  >
+                    <Settings size={22} color={colors.primary} />
+                    <Text style={styles.drawerItemText}>Painel Admin</Text>
+                  </TouchableOpacity>
+                )}
 
-              <TouchableOpacity
-                style={styles.item}
-                onPress={goHistory}
-                activeOpacity={0.8}
-              >
-                <History size={30} color={colors.sand} />
-                <Text style={styles.itemText}>Histórico</Text>
-              </TouchableOpacity>
+                <View style={styles.drawerDivider} />
 
-              <View style={{ flex: 1 }} />
-
-              <TouchableOpacity
-                style={[styles.item, { marginBottom: 50 }]}
-                onPress={doSignOut}
-                activeOpacity={0.8}
-              >
-                <LogOut size={30} color={colors.sand} />
-                <Text style={styles.itemText}>Sair</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.drawerItem, styles.drawerLogout]}
+                  onPress={handleSignOut}
+                >
+                  <LogOut size={22} color={colors.error} />
+                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
+                </TouchableOpacity>
+              </View>
             </Animated.View>
           </>
         )}
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  container: { flex: 1 },
-
-  headerWrapper: {
-    height: COVER_H,
-    borderBottomLeftRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-    overflow: 'hidden',
-    backgroundColor: colors.primary,
-  },
-  header: { flex: 1, justifyContent: 'center' },
-  headerImg: {
-    borderBottomLeftRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-  },
-  menuBtn: {
-    position: 'absolute',
-    left: 18,
-    top: 18,
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  coverBtn: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderRadius: 10,
-  },
-  coverBtnTxt: { color: colors.white, fontWeight: '700' },
-
-  avatarContainer: {
-    alignSelf: 'center',
-    marginTop: -(AVATAR / 2),
-    width: AVATAR + 12,
-    height: AVATAR + 12,
-    borderRadius: (AVATAR + 12) / 2,
-    backgroundColor: colors.white,
-    padding: 6,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  avatarImg: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
-    backgroundColor: colors.black,
-  },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
-  avatarLoading: {
-    position: 'absolute',
-    inset: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: AVATAR / 2,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-
-  body: {
+  safe: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background,
   },
-
-  headerFixed: { gap: 14, paddingBottom: 10 },
-
-  primaryBtn: {
-    height: 48,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  menuIcon: {
+    width: 24,
+    height: 20,
+    justifyContent: 'space-between',
+  },
+  menuBar: {
+    height: 2,
+    width: 24,
+    backgroundColor: colors.text.white,
+    borderRadius: 2,
+  },
+  brand: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text.white,
+    letterSpacing: 1.5,
+  },
+  notificationButton: {
+    padding: 8,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatar: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    borderWidth: 3,
+    borderColor: colors.text.white,
+  },
+  avatarPlaceholder: {
+    backgroundColor: colors.text.white,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnText: { color: colors.bg, fontSize: 16, fontWeight: '900' },
-
-  sectionTitle: {
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
+  avatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: AVATAR_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  overlay: { backgroundColor: surfaces.overlay },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.text.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text.white,
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  bookingButton: {
+    marginBottom: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  bookingGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  bookingText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.white,
+    flex: 1,
+    marginLeft: 12,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  sectionLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  appointmentsList: {
+    marginTop: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   drawer: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: MENU_W,
-    backgroundColor: surfaces.drawer,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.md,
+    width: 280,
+    backgroundColor: colors.background,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    shadowOffset: { width: 2, height: 0 },
+    elevation: 8,
   },
-  drawerHeader: { minHeight: 56, gap: 2, marginBottom: 8 },
-  drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
-  drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
-  item: {
+  drawerHeader: {
+    padding: 24,
+    paddingTop: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  drawerUserInfo: {
+    gap: 4,
+  },
+  drawerUserName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  drawerUserEmail: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+  },
+  drawerContent: {
+    padding: 16,
+  },
+  drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 14,
   },
-  itemText: { 
-  fontSize: 18, // Reduzido de 20
-  color: colors.bg, 
-  fontWeight: '600',
-  flexShrink: 1, // Permite quebrar linha se necessário
-  flexWrap: 'wrap',
-},
+  drawerItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text.primary,
+  },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 16,
+  },
+  drawerLogout: {
+    marginTop: 'auto',
+  },
+  drawerLogoutText: {
+    color: colors.error,
+    fontWeight: '600',
+  },
 });
