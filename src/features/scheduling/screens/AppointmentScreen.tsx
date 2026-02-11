@@ -1,4 +1,6 @@
 // src/features/scheduling/screens/AppointmentScreen.tsx
+// VERSÃO FINAL - COM DETALHES COMPLETOS DO SERVIÇO
+
 import React, { useMemo, useState } from 'react';
 import {
   Text,
@@ -11,36 +13,46 @@ import {
   Pressable,
   ScrollView,
   View,
+  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getAuth } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Clock, Car, Info, ChevronRight } from 'lucide-react-native';
 
-import { colors, spacing, surfaces } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
-
 import {
   getAvailableSlotsForDay,
   createAppointmentWithCapacityCheck,
   type Slot,
 } from '@features/scheduling/services/availability.service';
-
 import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+// Paleta DetailGo
+const colors = {
+  primary: '#175676',
+  secondary: '#4BA3C3',
+  error: '#D62839',
+  success: '#16A34A',
+  warning: '#2563EB',
+  background: '#FFFFFF',
+  surface: '#F8FAFC',
+  border: '#E2E8F0',
+  text: {
+    primary: '#0F172A',
+    secondary: '#475569',
+    tertiary: '#64748B',
+    disabled: '#94A3B8',
+    white: '#FFFFFF',
+  }
+};
 
-/**
- * ✅ Categorias do mercado (as que você definiu)
- * Hatch: 80 | Sedan: 85 | SUV: 90 | Picape cabine dupla: 110
- *
- * IMPORTANTE:
- * Esses valores devem estar dentro do getBasePriceForAppointment() (appointment.pricing)
- * Aqui a gente apenas usa o retorno dele.
- */
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
+
 const CAR_CATEGORIES: CarCategory[] = ['Hatch', 'Sedan', 'SUV', 'Picape cabine dupla'];
 
 const SERVICES = [
@@ -113,138 +125,54 @@ const SERVICE_DETAILS: Record<ServiceLabel, ServiceDetails> = {
   },
 };
 
-function formatHour(ms: number) {
+const formatHour = (ms: number) => {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
+};
 
-function formatDayBR(d: Date) {
+const formatDayBR = (d: Date) => {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
-}
+};
 
-function formatCurrencyBRL(v: number) {
+const formatCurrencyBRL = (v: number) => {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+};
 
-function SelectField<T extends string>(props: {
-  label: string;
-  placeholder: string;
-  value: T | null;
-  options: readonly T[];
-  onChange: (v: T) => void;
-  disabled?: boolean;
-}) {
-  const { label, placeholder, value, options, onChange, disabled } = props;
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <Text style={styles.label}>{label}</Text>
-
-      <TouchableOpacity
-        style={[styles.select, disabled && { opacity: 0.6 }]}
-        onPress={() => !disabled && setOpen(true)}
-        activeOpacity={0.85}
-        disabled={disabled}
-      >
-        <Text style={[styles.selectText, !value && { color: '#9AA6B2' }]}>
-          {value ?? placeholder}
-        </Text>
-        <Text style={styles.chev}>›</Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>{label}</Text>
-
-            {options.map(opt => {
-              const selected = opt === value;
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.modalItem, selected && styles.modalItemSelected]}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    onChange(opt);
-                    setOpen(false);
-                  }}
-                >
-                  <Text style={[styles.modalItemText, selected && styles.modalItemTextSelected]}>
-                    {opt}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            <TouchableOpacity
-              style={styles.modalClose}
-              onPress={() => setOpen(false)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.modalCloseText}>Fechar</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
-  );
-}
-
-function ServiceReviewModal(props: {
+function SelectModal<T extends string>(props: {
   visible: boolean;
-  serviceLabel: ServiceLabel | null;
+  title: string;
+  options: readonly T[];
+  selected: T | null;
+  onSelect: (value: T) => void;
   onClose: () => void;
-  price: number; // ✅ sempre number
 }) {
-  const { visible, serviceLabel, onClose, price } = props;
-  if (!serviceLabel) return null;
-
-  const details = SERVICE_DETAILS[serviceLabel];
+  const { visible, title, options, selected, onSelect, onClose } = props;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={styles.reviewCard} onPress={() => {}}>
-          <Text style={styles.reviewTitle}>{details.title}</Text>
-
-          {/* ✅ PREÇO BEM VISÍVEL, APENAS AQUI */}
-          <View style={styles.priceBox}>
-            <Text style={styles.priceLabel}>Valor do serviço</Text>
-            <Text style={styles.priceValue}>{formatCurrencyBRL(price)}</Text>
-          </View>
-
-          <Text style={styles.reviewSection}>O que contempla</Text>
-          {details.includes.map((it, idx) => (
-            <Text key={`inc-${idx}`} style={styles.reviewItem}>
-              • {it}
-            </Text>
-          ))}
-
-          {!!details.notIncluded?.length && (
-            <>
-              <Text style={[styles.reviewSection, { marginTop: 12 }]}>O que não está incluso</Text>
-              {details.notIncluded.map((it, idx) => (
-                <Text key={`no-${idx}`} style={styles.reviewItemMuted}>
-                  • {it}
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          {options.map((opt) => {
+            const isSelected = opt === selected;
+            return (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.modalItem, isSelected && styles.modalItemSelected]}
+                onPress={() => {
+                  onSelect(opt);
+                  onClose();
+                }}
+              >
+                <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>
+                  {opt}
                 </Text>
-              ))}
-            </>
-          )}
-
-          {!!details.note && <Text style={styles.reviewNote}>{details.note}</Text>}
-
-          <TouchableOpacity style={styles.reviewBtn} onPress={onClose} activeOpacity={0.85}>
-            <Text style={styles.reviewBtnText}>Entendi</Text>
-          </TouchableOpacity>
-        </Pressable>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </Pressable>
     </Modal>
   );
@@ -252,13 +180,15 @@ function ServiceReviewModal(props: {
 
 export default function AppointmentScreen() {
   const auth = getAuth();
-  const navigation = useNavigation<Nav>();
+  const navigation = useNavigation<NavProp>();
   const uid = auth.currentUser?.uid;
 
   const [vehicleType, setVehicleType] = useState<VehicleType>('Carro');
   const [carCategory, setCarCategory] = useState<CarCategory | null>('Hatch');
   const [serviceLabel, setServiceLabel] = useState<ServiceLabel | null>(null);
-
+  
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [serviceReviewOpen, setServiceReviewOpen] = useState(false);
 
   const [day, setDay] = useState<Date>(() => {
@@ -267,61 +197,55 @@ export default function AppointmentScreen() {
     return d;
   });
   const [showDayPicker, setShowDayPicker] = useState(false);
-
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
-
   const [submitting, setSubmitting] = useState(false);
 
   const selectedService = useMemo(
-    () => SERVICES.find(s => s.label === serviceLabel) ?? null,
+    () => SERVICES.find((s) => s.label === serviceLabel) ?? null,
     [serviceLabel],
   );
 
-  /**
-   * ✅ Corrige o erro "number | null" no modal:
-   * Garante que sempre será number (fallback 0).
-   */
-  const basePrice: number = useMemo(() => {
-    const p = getBasePriceForAppointment(
+  const basePrice = useMemo(() => {
+    const price = getBasePriceForAppointment(
       vehicleType,
       vehicleType === 'Carro' ? carCategory : null,
     );
-    return typeof p === 'number' ? p : 0;
+    return typeof price === 'number' ? price : 0;
   }, [vehicleType, carCategory]);
 
-  const finalPrice: number = basePrice;
+  const finalPrice = basePrice;
 
   if (!uid) {
     setTimeout(() => {
       Alert.alert('Sessão expirada', 'Faça login novamente.');
-      navigation.replace('Login' as any);
+      navigation.replace('Login');
     }, 0);
     return null;
   }
 
   const refreshSlots = async (nextDay: Date, nextService = selectedService) => {
-  if (!nextService) {
-    setSlots([]);
-    setSelectedSlot(null);
-    return;
-  }
+    if (!nextService) {
+      setSlots([]);
+      setSelectedSlot(null);
+      return;
+    }
 
-  try {
-    setLoadingSlots(true);
-    const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
-    setSlots(list);
-    setSelectedSlot(null);
-  } catch (e) {
-    console.error(e);
-    setSlots([]);
-    setSelectedSlot(null);
-    Alert.alert('Erro', 'Não foi possível carregar os horários disponíveis.');
-  } finally {
-    setLoadingSlots(false);
-  }
-};
+    try {
+      setLoadingSlots(true);
+      const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
+      setSlots(list);
+      setSelectedSlot(null);
+    } catch (error) {
+      console.error(error);
+      setSlots([]);
+      setSelectedSlot(null);
+      Alert.alert('Erro', 'Não foi possível carregar os horários.');
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android' && event.type === 'dismissed') {
@@ -334,8 +258,14 @@ export default function AppointmentScreen() {
     const next = new Date(selected);
     next.setHours(0, 0, 0, 0);
     setDay(next);
-
     await refreshSlots(next, selectedService);
+  };
+
+  const handleSelectService = async (service: ServiceLabel) => {
+    setServiceLabel(service);
+    setServiceReviewOpen(true);
+    const svc = SERVICES.find((s) => s.label === service)!;
+    await refreshSlots(day, svc);
   };
 
   const handleSave = async () => {
@@ -345,18 +275,17 @@ export default function AppointmentScreen() {
     }
 
     if (vehicleType === 'Carro' && !carCategory) {
-      Alert.alert('Atenção', 'Selecione a categoria do carro.');
+      Alert.alert('Atenção', 'Selecione a categoria do veículo.');
       return;
     }
 
     if (!selectedSlot) {
-      Alert.alert('Atenção', 'Selecione um horário disponível.');
+      Alert.alert('Atenção', 'Selecione um horário.');
       return;
     }
 
     try {
       setSubmitting(true);
-
       await createAppointmentWithCapacityCheck({
         customerUid: uid,
         vehicleType,
@@ -368,16 +297,16 @@ export default function AppointmentScreen() {
         endAtMs: selectedSlot.endAtMs,
       });
 
-      Alert.alert('Sucesso', 'Agendamento confirmado!');
-      navigation.replace('Dashboard' as any);
-    } catch (e: any) {
-      if (e?.code === 'SLOT_FULL') {
-        Alert.alert('Ops', 'Esse horário acabou de ser ocupado. Vou atualizar a lista.');
+      Alert.alert('Sucesso', 'Agendamento confirmado!', [
+        { text: 'OK', onPress: () => navigation.replace('Dashboard') }
+      ]);
+    } catch (error: any) {
+      if (error?.code === 'SLOT_FULL') {
+        Alert.alert('Ops', 'Horário ocupado. Atualizando...');
         await refreshSlots(day, selectedService);
-        return;
+      } else {
+        Alert.alert('Erro', 'Falha ao agendar.');
       }
-      console.error(e);
-      Alert.alert('Erro', 'Falha ao agendar o serviço.');
     } finally {
       setSubmitting(false);
     }
@@ -386,421 +315,618 @@ export default function AppointmentScreen() {
   const canConfirm = !!selectedService && !!selectedSlot && !submitting;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ServiceReviewModal
-        visible={serviceReviewOpen}
-        serviceLabel={serviceLabel}
-        onClose={() => setServiceReviewOpen(false)}
-        price={finalPrice}
-      />
-
-      {/* Header com botão voltar - MESMO PADRÃO DAS OUTRAS TELAS */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <ArrowLeft size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.screenTitle}>Agendar Serviço</Text>
-        <View style={styles.headerRightPlaceholder} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.sectionTitle}>Escolha um serviço</Text>
-
-        <Text style={styles.label}>Dia</Text>
-        <TouchableOpacity
-          style={styles.select}
-          onPress={() => setShowDayPicker(true)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.selectText}>{formatDayBR(day)}</Text>
-          <Text style={styles.chev}>›</Text>
-        </TouchableOpacity>
-
-        {showDayPicker && (
-          <DateTimePicker
-            value={day}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'inline' : 'default'}
-            onChange={handleDayChange}
-          />
-        )}
-
-        <Text style={[styles.label, { marginTop: spacing.lg }]}>Tipo de veículo</Text>
-        <View style={styles.row}>
-          {(['Carro', 'Moto'] as VehicleType[]).map(opt => {
-            const selected = vehicleType === opt;
-            return (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.pill, selected && styles.pillSelected]}
-                onPress={() => {
-                  setVehicleType(opt);
-
-                  // ✅ Regras corretas
-                  if (opt === 'Moto') setCarCategory(null);
-                  if (opt === 'Carro' && !carCategory) setCarCategory('Hatch');
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.pillText, selected && styles.pillTextSelected]}>{opt}</Text>
-              </TouchableOpacity>
-            );
-          })}
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        {/* Header padrão DetailGo */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <ArrowLeft size={22} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Calendar size={22} color={colors.primary} />
+            <Text style={styles.headerTitle}>Agendar Serviço</Text>
+          </View>
+          <View style={styles.headerRight} />
         </View>
 
-        {vehicleType === 'Carro' && (
-          <View style={{ marginTop: spacing.lg }}>
-            <SelectField<CarCategory>
-              label="Categoria"
-              placeholder="Selecione"
-              value={carCategory}
-              options={CAR_CATEGORIES}
-              onChange={v => setCarCategory(v)}
-            />
-          </View>
-        )}
+        {/* Modais de seleção */}
+        <SelectModal
+          visible={categoryModalOpen}
+          title="Categoria"
+          options={CAR_CATEGORIES}
+          selected={carCategory}
+          onSelect={(value) => setCarCategory(value)}
+          onClose={() => setCategoryModalOpen(false)}
+        />
 
-        <View style={{ marginTop: spacing.lg }}>
-          <SelectField<ServiceLabel>
-            label="Serviço"
-            placeholder="Selecione"
-            value={serviceLabel}
-            options={SERVICES.map(s => s.label)}
-            onChange={async v => {
-              setServiceLabel(v);
+        <SelectModal
+          visible={serviceModalOpen}
+          title="Serviço"
+          options={SERVICES.map(s => s.label)}
+          selected={serviceLabel}
+          onSelect={handleSelectService}
+          onClose={() => setServiceModalOpen(false)}
+        />
 
-              // ✅ abre modal de detalhes (com preço dentro)
-              setServiceReviewOpen(true);
+        {/* Modal de detalhes do serviço - VERSÃO COMPLETA */}
+        <Modal visible={serviceReviewOpen} transparent animationType="fade">
+          <Pressable style={styles.modalOverlay} onPress={() => setServiceReviewOpen(false)}>
+            <View style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewTitle}>
+                  {serviceLabel ? SERVICE_DETAILS[serviceLabel].title : ''}
+                </Text>
+                <TouchableOpacity onPress={() => setServiceReviewOpen(false)}>
+                  <Text style={styles.reviewClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
 
-              const svc = SERVICES.find(s => s.label === v)!;
-              await refreshSlots(day, svc);
-            }}
-          />
+              <View style={styles.priceBox}>
+                <Text style={styles.priceLabel}>Valor do serviço</Text>
+                <Text style={styles.priceValue}>{formatCurrencyBRL(finalPrice)}</Text>
+              </View>
 
-          {!!serviceLabel && (
+              {serviceLabel && (
+                <>
+                  <View style={styles.reviewSection}>
+                    <Text style={styles.reviewSectionTitle}>✓ O que contempla</Text>
+                    {SERVICE_DETAILS[serviceLabel].includes.map((item, idx) => (
+                      <Text key={`inc-${idx}`} style={styles.reviewItem}>
+                        • {item}
+                      </Text>
+                    ))}
+                  </View>
+
+                  {SERVICE_DETAILS[serviceLabel].notIncluded && 
+                   SERVICE_DETAILS[serviceLabel].notIncluded!.length > 0 && (
+                    <View style={styles.reviewSection}>
+                      <Text style={[styles.reviewSectionTitle, styles.reviewSectionTitleExcluded]}>
+                        ✕ Não incluso
+                      </Text>
+                      {SERVICE_DETAILS[serviceLabel].notIncluded!.map((item, idx) => (
+                        <Text key={`exc-${idx}`} style={styles.reviewItemExcluded}>
+                          • {item}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {SERVICE_DETAILS[serviceLabel].note && (
+                    <View style={styles.reviewNoteBox}>
+                      <Info size={16} color={colors.text.tertiary} />
+                      <Text style={styles.reviewNote}>{SERVICE_DETAILS[serviceLabel].note}</Text>
+                    </View>
+                  )}
+                </>
+              )}
+
+              <TouchableOpacity 
+                style={styles.reviewButton}
+                onPress={() => setServiceReviewOpen(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.reviewButtonText}>Entendi</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Formulário COM BOTÃO NO FINAL */}
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Data */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Data</Text>
             <TouchableOpacity
-              onPress={() => setServiceReviewOpen(true)}
-              activeOpacity={0.85}
-              style={{ alignSelf: 'flex-start', marginTop: 10 }}
+              style={styles.select}
+              onPress={() => setShowDayPicker(true)}
+              activeOpacity={0.7}
             >
-              <Text style={styles.detailsLink}>Ver detalhes do serviço</Text>
+              <View style={styles.selectContent}>
+                <Calendar size={18} color={colors.text.tertiary} />
+                <Text style={styles.selectText}>{formatDayBR(day)}</Text>
+              </View>
+              <ChevronRight size={18} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+
+          {showDayPicker && (
+            <DateTimePicker
+              value={day}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              onChange={handleDayChange}
+              minimumDate={new Date()}
+            />
+          )}
+
+          {/* Tipo de veículo */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Tipo de veículo</Text>
+            <View style={styles.vehicleRow}>
+              <TouchableOpacity
+                style={[styles.vehicleButton, vehicleType === 'Carro' && styles.vehicleButtonSelected]}
+                onPress={() => {
+                  setVehicleType('Carro');
+                  if (!carCategory) setCarCategory('Hatch');
+                }}
+              >
+                <Car size={16} color={vehicleType === 'Carro' ? colors.text.white : colors.text.tertiary} />
+                <Text style={[styles.vehicleButtonText, vehicleType === 'Carro' && styles.vehicleButtonTextSelected]}>
+                  Carro
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.vehicleButton, vehicleType === 'Moto' && styles.vehicleButtonSelected]}
+                onPress={() => {
+                  setVehicleType('Moto');
+                  setCarCategory(null);
+                }}
+              >
+                <Car size={16} color={vehicleType === 'Moto' ? colors.text.white : colors.text.tertiary} />
+                <Text style={[styles.vehicleButtonText, vehicleType === 'Moto' && styles.vehicleButtonTextSelected]}>
+                  Moto
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Categoria (apenas Carro) */}
+          {vehicleType === 'Carro' && (
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Categoria</Text>
+              <TouchableOpacity
+                style={styles.select}
+                onPress={() => setCategoryModalOpen(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.selectContent}>
+                  <Car size={18} color={colors.text.tertiary} />
+                  <Text style={[styles.selectText, !carCategory && styles.selectPlaceholder]}>
+                    {carCategory ?? 'Selecione a categoria'}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Serviço */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Serviço</Text>
+            <TouchableOpacity
+              style={styles.select}
+              onPress={() => setServiceModalOpen(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.selectContent}>
+                <Clock size={18} color={colors.text.tertiary} />
+                <Text style={[styles.selectText, !serviceLabel && styles.selectPlaceholder]}>
+                  {serviceLabel ?? 'Selecione o serviço'}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Link de detalhes */}
+          {serviceLabel && (
+            <TouchableOpacity
+              style={styles.detailsLink}
+              onPress={() => setServiceReviewOpen(true)}
+              activeOpacity={0.7}
+            >
+              <Info size={14} color={colors.primary} />
+              <Text style={styles.detailsLinkText}>Ver detalhes do serviço</Text>
             </TouchableOpacity>
           )}
-        </View>
 
-        <Text style={[styles.label, { marginTop: spacing.lg }]}>Horários disponíveis</Text>
+          {/* Horários disponíveis */}
+          <View style={[styles.fieldGroup, { marginTop: 8 }]}>
+            <Text style={styles.label}>Horários disponíveis</Text>
+            
+            {!selectedService ? (
+              <View style={styles.emptySlots}>
+                <Clock size={18} color={colors.text.disabled} />
+                <Text style={styles.emptySlotsText}>Selecione um serviço</Text>
+              </View>
+            ) : loadingSlots ? (
+              <View style={styles.emptySlots}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.emptySlotsText}>Carregando horários...</Text>
+              </View>
+            ) : slots.length === 0 ? (
+              <View style={styles.emptySlots}>
+                <Calendar size={18} color={colors.text.disabled} />
+                <Text style={styles.emptySlotsText}>Nenhum horário disponível</Text>
+              </View>
+            ) : (
+              <FlatList
+                horizontal
+                data={slots}
+                keyExtractor={(item) => String(item.startAtMs)}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.slotsList}
+                renderItem={({ item }) => {
+                  const selected = selectedSlot?.startAtMs === item.startAtMs;
+                  return (
+                    <TouchableOpacity
+                      style={[styles.slotChip, selected && styles.slotChipSelected]}
+                      onPress={() => setSelectedSlot(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.slotChipText, selected && styles.slotChipTextSelected]}>
+                        {formatHour(item.startAtMs)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
 
-        {!selectedService ? (
-          <Text style={styles.helperText}>Selecione um serviço para ver os horários.</Text>
-        ) : loadingSlots ? (
-          <Text style={styles.helperText}>Carregando horários...</Text>
-        ) : slots.length === 0 ? (
-          <Text style={styles.helperText}>Sem horários disponíveis nesse dia.</Text>
-        ) : (
-          <FlatList
-            horizontal
-            data={slots}
-            keyExtractor={it => String(it.startAtMs)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 10, paddingVertical: 10 }}
-            renderItem={({ item }) => {
-              const selected = selectedSlot?.startAtMs === item.startAtMs;
-              return (
-                <TouchableOpacity
-                  style={[styles.timeChip, selected && styles.timeChipSelected]}
-                  onPress={() => setSelectedSlot(item)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.timeChipText, selected && styles.timeChipTextSelected]}>
-                    {formatHour(item.startAtMs)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-        )}
-
-        <TouchableOpacity
-          style={[styles.confirmBtn, !canConfirm && { opacity: 0.45 }]}
-          onPress={handleSave}
-          disabled={!canConfirm}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.confirmText}>
-            {submitting ? 'Salvando...' : 'Confirmar Agendamento'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* ✅ REMOVIDO: botão Cancelar (fica só a seta de voltar no topo) */}
-      </ScrollView>
-    </SafeAreaView>
+          {/* Botão Confirmar - HARMONIOSAMENTE DEPOIS DOS HORÁRIOS */}
+          <TouchableOpacity
+            style={[styles.confirmButton, !canConfirm && styles.confirmButtonDisabled]}
+            onPress={handleSave}
+            disabled={!canConfirm || submitting}
+            activeOpacity={0.8}
+          >
+            <View style={styles.confirmContent}>
+              <Text style={styles.confirmButtonText}>Confirmar Agendamento</Text>
+              <Text style={styles.confirmButtonPrice}>{formatCurrencyBRL(finalPrice)}</Text>
+            </View>
+          </TouchableOpacity>
+          
+          {/* Espaço extra no final */}
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { 
-    flex: 1, 
-    backgroundColor: colors.bg 
+  safe: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-
-  // NOVO HEADER - MESMO PADRÃO DAS OUTRAS TELAS
+  // Header padrão DetailGo
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.bg,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
   },
   backButton: {
-    padding: spacing.xs,
-    borderRadius: 8,
-    backgroundColor: surfaces.card,
     width: 40,
     height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  screenTitle: {
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-    flex: 1,
-    textAlign: 'center',
+    fontWeight: '700',
+    color: colors.text.primary,
   },
-  headerRightPlaceholder: {
+  headerRight: {
     width: 40,
   },
-
+  // Scroll
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 0,
   },
-
-  sectionTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: colors.text,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+  // Campos - ESPAÇAMENTO AJUSTADO
+  fieldGroup: {
+    marginBottom: 16,
   },
-
   label: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 6,
   },
-  helperText: { 
-    color: '#6B7280', 
-    fontWeight: '700', 
-    marginTop: 2 
-  },
-
   select: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
   },
-  selectText: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: colors.text 
-  },
-  chev: { 
-    fontSize: 22, 
-    fontWeight: '900', 
-    color: '#94A3B8' 
-  },
-
-  row: { 
-    flexDirection: 'row', 
-    gap: 12 
-  },
-  pill: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 14,
+  selectContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    gap: 10,
   },
-  pillSelected: { 
-    backgroundColor: colors.primary 
+  selectText: {
+    fontSize: 15,
+    color: colors.text.primary,
+    fontWeight: '500',
   },
-  pillText: { 
-    fontWeight: '900', 
-    color: colors.text, 
-    fontSize: 16 
+  selectPlaceholder: {
+    color: colors.text.disabled,
   },
-  pillTextSelected: { 
-    color: colors.bg 
+  // Vehicle buttons
+  vehicleRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-
-  detailsLink: {
-    fontWeight: '900',
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
-
-  timeChip: {
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-  },
-  timeChipSelected: { 
-    backgroundColor: colors.primary 
-  },
-  timeChipText: { 
-    fontWeight: '900', 
-    color: colors.text, 
-    fontSize: 15 
-  },
-  timeChipTextSelected: { 
-    color: colors.bg 
-  },
-
-  confirmBtn: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  confirmText: { 
-    color: colors.bg, 
-    fontSize: 16, 
-    fontWeight: '900' 
-  },
-
-  modalOverlay: {
+  vehicleButton: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 18,
+    gap: 8,
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  vehicleButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  vehicleButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  vehicleButtonTextSelected: {
+    color: colors.text.white,
+  },
+  // Details link
+  detailsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  detailsLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  // Empty slots
+  emptySlots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptySlotsText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    fontWeight: '500',
+  },
+  // Slots list
+  slotsList: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  slotChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  slotChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  slotChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  slotChipTextSelected: {
+    color: colors.text.white,
+  },
+  // Botão Confirmar - DENTRO DO SCROLLVIEW
+  confirmButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    marginTop: 24,
+    marginBottom: 8,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  confirmContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.white,
+  },
+  confirmButtonPrice: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text.white,
+  },
+  confirmButtonDisabled: {
+    backgroundColor: colors.text.disabled,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  // Modais
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
   },
   modalCard: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    padding: 24,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.text,
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 20,
   },
   modalItem: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 10,
-    backgroundColor: '#F3F6FA',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  modalItemSelected: { 
-    backgroundColor: colors.primary 
+  modalItemSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  modalItemText: { 
-    fontSize: 15, 
-    fontWeight: '800', 
-    color: colors.text 
+  modalItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text.primary,
   },
-  modalItemTextSelected: { 
-    color: colors.bg 
+  modalItemTextSelected: {
+    color: colors.text.white,
   },
-  modalClose: { 
-    marginTop: 6, 
-    alignItems: 'center', 
-    paddingVertical: 10 
-  },
-  modalCloseText: { 
-    fontWeight: '900', 
-    color: '#6B7280' 
-  },
-
+  // Review modal - VERSÃO COMPLETA
   reviewCard: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: colors.background,
+    borderRadius: 24,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   reviewTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: colors.text,
-    marginBottom: 10,
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.text.primary,
+    flex: 1,
   },
-
-  // ✅ preço bem destacado no modal
+  reviewClose: {
+    fontSize: 24,
+    color: colors.text.tertiary,
+    padding: 4,
+  },
   priceBox: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: '#F3F6FA',
-    marginBottom: 14,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   priceLabel: {
-    color: '#6B7280',
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.tertiary,
     marginBottom: 4,
   },
   priceValue: {
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 32,
+    fontWeight: '800',
     color: colors.primary,
   },
-
   reviewSection: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: colors.text,
-    marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 20,
+  },
+  reviewSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.success,
+    marginBottom: 12,
+  },
+  reviewSectionTitleExcluded: {
+    color: colors.error,
   },
   reviewItem: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 6,
+    fontSize: 15,
+    color: colors.text.secondary,
+    marginBottom: 8,
+    lineHeight: 22,
+    paddingLeft: 4,
   },
-  reviewItemMuted: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6B7280',
-    marginBottom: 6,
+  reviewItemExcluded: {
+    fontSize: 15,
+    color: colors.text.tertiary,
+    marginBottom: 8,
+    lineHeight: 22,
+    paddingLeft: 4,
+  },
+  reviewNoteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
   },
   reviewNote: {
-    marginTop: 12,
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#6B7280',
+    flex: 1,
+    fontSize: 14,
+    color: colors.text.tertiary,
+    lineHeight: 20,
   },
-  reviewBtn: {
-    marginTop: 14,
+  reviewButton: {
     backgroundColor: colors.primary,
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  reviewBtnText: { 
-    color: colors.bg, 
-    fontSize: 15, 
-    fontWeight: '900' 
+  reviewButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.white,
   },
 });
