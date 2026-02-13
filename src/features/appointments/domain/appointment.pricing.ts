@@ -1,3 +1,4 @@
+// src/features/appointments/domain/appointment.pricing.ts
 import type { VehicleType, CarCategory } from './appointment.types';
 
 export const CAR_BASE_PRICE_BY_CATEGORY: Record<CarCategory, number> = {
