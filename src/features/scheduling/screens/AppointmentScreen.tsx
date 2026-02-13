@@ -1,4 +1,3 @@
-// src/features/scheduling/screens/AppointmentScreen.tsx
 import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   Text,
@@ -16,7 +15,9 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getAuth } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
@@ -44,12 +45,14 @@ import {
   createAppointmentWithCapacityCheck,
   type Slot,
 } from '@features/scheduling/services/availability.service';
-import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
+import type {
+  VehicleType,
+  CarCategory,
+} from '@features/appointments/domain/appointment.types';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 
 const { width, height } = Dimensions.get('window');
 
-// Paleta DetailGo - Moderna e sofisticada
 const colors = {
   primary: '#0A4D68',
   primaryLight: '#E6F3F5',
@@ -73,37 +76,63 @@ const colors = {
   overlay: 'rgba(0,0,0,0.5)',
 } as const;
 
-// Ícones para serviços
 const SERVICE_ICONS = {
   'Lavagem simples': Droplets,
   'Lavagem completa': Sparkles,
-  'Polimento': Zap,
+  Polimento: Zap,
   'Lavagem de motor': Wrench,
 } as const;
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const CAR_CATEGORIES: CarCategory[] = ['Hatch', 'Sedan', 'SUV', 'Picape cabine dupla'];
+const CAR_CATEGORIES: CarCategory[] = [
+  'Hatch',
+  'Sedan',
+  'SUV',
+  'Picape cabine dupla',
+];
 
 const SERVICES = [
-  { label: 'Lavagem simples', durationMin: 30, icon: Droplets, description: 'Limpeza rápida e essencial' },
-  { label: 'Lavagem completa', durationMin: 60, icon: Sparkles, description: 'Limpeza detalhada completa' },
-  { label: 'Polimento', durationMin: 120, icon: Zap, description: 'Recuperação de brilho da pintura' },
-  { label: 'Lavagem de motor', durationMin: 45, icon: Wrench, description: 'Limpeza especializada do motor' },
+  {
+    label: 'Lavagem simples',
+    durationMin: 30,
+    icon: Droplets,
+    description: 'Limpeza rápida e essencial',
+  },
+  {
+    label: 'Lavagem completa',
+    durationMin: 60,
+    icon: Sparkles,
+    description: 'Limpeza detalhada completa',
+  },
+  {
+    label: 'Polimento',
+    durationMin: 120,
+    icon: Zap,
+    description: 'Recuperação de brilho da pintura',
+  },
+  {
+    label: 'Lavagem de motor',
+    durationMin: 45,
+    icon: Wrench,
+    description: 'Limpeza especializada do motor',
+  },
 ] as const;
 
 type ServiceLabel = (typeof SERVICES)[number]['label'];
 
-// Detalhes enriquecidos com ícones e categorias
-const SERVICE_DETAILS: Record<ServiceLabel, {
-  title: string;
-  description: string;
-  duration: string;
-  includes: Array<{ text: string; icon: any }>;
-  notIncluded?: Array<{ text: string; icon: any }>;
-  note: string;
-  recommendedFor: string[];
-}> = {
+const SERVICE_DETAILS: Record<
+  ServiceLabel,
+  {
+    title: string;
+    description: string;
+    duration: string;
+    includes: Array<{ text: string; icon: any }>;
+    notIncluded?: Array<{ text: string; icon: any }>;
+    note: string;
+    recommendedFor: string[];
+  }
+> = {
   'Lavagem simples': {
     title: 'Lavagem Simples',
     description: 'Manutenção diária',
@@ -139,7 +168,7 @@ const SERVICE_DETAILS: Record<ServiceLabel, {
     note: 'Perfeito para ocasiões especiais.',
     recommendedFor: ['Eventos', 'Viagens', 'Showroom'],
   },
-  'Polimento': {
+  Polimento: {
     title: 'Polimento Técnico',
     description: 'Recuperação de brilho',
     duration: '120 min',
@@ -172,7 +201,10 @@ const SERVICE_DETAILS: Record<ServiceLabel, {
 };
 
 const formatHour = (ms: number) => {
-  return new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(ms).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const formatDayBR = (d: Date) => {
@@ -186,7 +218,6 @@ const formatCurrencyBRL = (v: number) => {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
-// Modal customizado com bottom sheet
 function ServiceDetailsModal({
   visible,
   serviceLabel,
@@ -249,8 +280,8 @@ function ServiceDetailsModal({
           ]}
         >
           <View style={styles.modalHandle} />
-          
-          <ScrollView 
+
+          <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.modalScrollContent}
           >
@@ -260,7 +291,9 @@ function ServiceDetailsModal({
               </View>
               <View style={styles.detailsTitleContainer}>
                 <Text style={styles.detailsTitle}>{details.title}</Text>
-                <Text style={styles.detailsSubtitle}>{details.description}</Text>
+                <Text style={styles.detailsSubtitle}>
+                  {details.description}
+                </Text>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <X size={18} color={colors.text.tertiary} />
@@ -270,7 +303,9 @@ function ServiceDetailsModal({
             <View style={styles.priceDurationRow}>
               <View style={styles.priceBadge}>
                 <Text style={styles.priceBadgeLabel}>Valor</Text>
-                <Text style={styles.priceBadgeValue}>{formatCurrencyBRL(price)}</Text>
+                <Text style={styles.priceBadgeValue}>
+                  {formatCurrencyBRL(price)}
+                </Text>
               </View>
               <View style={styles.durationBadge}>
                 <Clock size={14} color={colors.text.secondary} />
@@ -280,7 +315,12 @@ function ServiceDetailsModal({
 
             <View style={styles.detailsSection}>
               <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, { backgroundColor: colors.success + '20' }]}>
+                <View
+                  style={[
+                    styles.sectionIcon,
+                    { backgroundColor: colors.success + '20' },
+                  ]}
+                >
                   <Check size={14} color={colors.success} />
                 </View>
                 <Text style={styles.sectionHeaderTitle}>Inclui</Text>
@@ -290,7 +330,12 @@ function ServiceDetailsModal({
                   const ItemIcon = item.icon;
                   return (
                     <View key={`inc-${idx}`} style={styles.includedItem}>
-                      <View style={[styles.itemIcon, { backgroundColor: colors.success + '10' }]}>
+                      <View
+                        style={[
+                          styles.itemIcon,
+                          { backgroundColor: colors.success + '10' },
+                        ]}
+                      >
                         <ItemIcon size={12} color={colors.success} />
                       </View>
                       <Text style={styles.includedItemText}>{item.text}</Text>
@@ -303,7 +348,12 @@ function ServiceDetailsModal({
             {details.notIncluded && details.notIncluded.length > 0 && (
               <View style={styles.detailsSection}>
                 <View style={styles.sectionHeader}>
-                  <View style={[styles.sectionIcon, { backgroundColor: colors.error + '20' }]}>
+                  <View
+                    style={[
+                      styles.sectionIcon,
+                      { backgroundColor: colors.error + '20' },
+                    ]}
+                  >
                     <AlertCircle size={14} color={colors.error} />
                   </View>
                   <Text style={styles.sectionHeaderTitle}>Não inclui</Text>
@@ -313,7 +363,12 @@ function ServiceDetailsModal({
                     const ItemIcon = item.icon;
                     return (
                       <View key={`exc-${idx}`} style={styles.excludedItem}>
-                        <View style={[styles.itemIcon, { backgroundColor: colors.error + '10' }]}>
+                        <View
+                          style={[
+                            styles.itemIcon,
+                            { backgroundColor: colors.error + '10' },
+                          ]}
+                        >
                           <ItemIcon size={12} color={colors.error} />
                         </View>
                         <Text style={styles.excludedItemText}>{item.text}</Text>
@@ -327,7 +382,12 @@ function ServiceDetailsModal({
             {details.recommendedFor && (
               <View style={styles.detailsSection}>
                 <View style={styles.sectionHeader}>
-                  <View style={[styles.sectionIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <View
+                    style={[
+                      styles.sectionIcon,
+                      { backgroundColor: colors.primary + '20' },
+                    ]}
+                  >
                     <Sparkles size={14} color={colors.primary} />
                   </View>
                   <Text style={styles.sectionHeaderTitle}>Recomendado</Text>
@@ -361,7 +421,6 @@ function ServiceDetailsModal({
   );
 }
 
-// Modal de seleção melhorado
 function SelectModal<T extends string>({
   visible,
   title,
@@ -378,7 +437,12 @@ function SelectModal<T extends string>({
   onClose: () => void;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <View style={styles.modalCard}>
           <View style={styles.modalCardHeader}>
@@ -387,21 +451,29 @@ function SelectModal<T extends string>({
               <X size={18} color={colors.text.tertiary} />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView showsVerticalScrollIndicator={false}>
-            {options.map((opt) => {
+            {options.map(opt => {
               const isSelected = opt === selected;
               return (
                 <TouchableOpacity
                   key={opt}
-                  style={[styles.modalItem, isSelected && styles.modalItemSelected]}
+                  style={[
+                    styles.modalItem,
+                    isSelected && styles.modalItemSelected,
+                  ]}
                   onPress={() => {
                     onSelect(opt);
                     onClose();
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      isSelected && styles.modalItemTextSelected,
+                    ]}
+                  >
                     {opt}
                   </Text>
                   {isSelected && (
@@ -427,7 +499,7 @@ export default function AppointmentScreen() {
   const [vehicleType, setVehicleType] = useState<VehicleType>('Carro');
   const [carCategory, setCarCategory] = useState<CarCategory | null>('Hatch');
   const [serviceLabel, setServiceLabel] = useState<ServiceLabel | null>(null);
-  
+
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
@@ -444,43 +516,52 @@ export default function AppointmentScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const selectedService = useMemo(
-    () => SERVICES.find((s) => s.label === serviceLabel) ?? null,
+    () => SERVICES.find(s => s.label === serviceLabel) ?? null,
     [serviceLabel],
   );
 
   const basePrice = useMemo(() => {
     const price = getBasePriceForAppointment(
       vehicleType,
-      vehicleType === 'Carro' ? carCategory : null
+      vehicleType === 'Carro' ? carCategory : null,
     );
     return typeof price === 'number' ? price : 0;
   }, [vehicleType, carCategory]);
 
   const finalPrice = basePrice;
 
-  const refreshSlots = useCallback(async (nextDay: Date, nextService = selectedService) => {
-    if (!nextService) {
-      setSlots([]);
-      setSelectedSlot(null);
-      return;
-    }
+  const refreshSlots = useCallback(
+    async (nextDay: Date, nextService = selectedService) => {
+      if (!nextService) {
+        setSlots([]);
+        setSelectedSlot(null);
+        return;
+      }
 
-    try {
-      setLoadingSlots(true);
-      const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin);
-      setSlots(list);
-      setSelectedSlot(null);
-    } catch (error) {
-      console.error(error);
-      setSlots([]);
-      setSelectedSlot(null);
-      Alert.alert('Erro', 'Não foi possível carregar os horários.');
-    } finally {
-      setLoadingSlots(false);
-    }
-  }, [selectedService]);
+      try {
+        setLoadingSlots(true);
+        const list = await getAvailableSlotsForDay(
+          nextDay,
+          nextService.durationMin,
+        );
+        setSlots(list);
+        setSelectedSlot(null);
+      } catch (error) {
+        console.error(error);
+        setSlots([]);
+        setSelectedSlot(null);
+        Alert.alert('Erro', 'Não foi possível carregar os horários.');
+      } finally {
+        setLoadingSlots(false);
+      }
+    },
+    [selectedService],
+  );
 
-  const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
+  const handleDayChange = async (
+    event: DateTimePickerEvent,
+    selected?: Date,
+  ) => {
     if (Platform.OS === 'android' && event.type === 'dismissed') {
       setShowDayPicker(false);
       return;
@@ -496,7 +577,7 @@ export default function AppointmentScreen() {
 
   const handleSelectService = async (service: ServiceLabel) => {
     setServiceLabel(service);
-    const svc = SERVICES.find((s) => s.label === service)!;
+    const svc = SERVICES.find(s => s.label === service)!;
     await refreshSlots(day, svc);
   };
 
@@ -530,7 +611,10 @@ export default function AppointmentScreen() {
       });
 
       Alert.alert('Sucesso!', 'Seu agendamento foi confirmado.', [
-        { text: 'Ver agendamentos', onPress: () => navigation.replace('Dashboard') }
+        {
+          text: 'Ver agendamentos',
+          onPress: () => navigation.replace('Dashboard'),
+        },
       ]);
     } catch (error: any) {
       if (error?.code === 'SLOT_FULL') {
@@ -558,17 +642,20 @@ export default function AppointmentScreen() {
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {/* Header minimalista */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
             <ArrowLeft size={18} color={colors.text.primary} />
           </TouchableOpacity>
-          
+
           <View style={styles.headerTitleContainer}>
             <View style={styles.headerIcon}>
               <Calendar size={16} color={colors.primary} />
             </View>
             <Text style={styles.headerTitle}>Agendar</Text>
           </View>
-          
+
           <View style={styles.headerRight} />
         </View>
 
@@ -577,7 +664,7 @@ export default function AppointmentScreen() {
           title="Categoria"
           options={CAR_CATEGORIES}
           selected={carCategory}
-          onSelect={(value) => setCarCategory(value)}
+          onSelect={value => setCarCategory(value)}
           onClose={() => setCategoryModalOpen(false)}
         />
 
@@ -605,7 +692,10 @@ export default function AppointmentScreen() {
           {/* Data */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>DATA</Text>
-            <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDayPicker(true)}>
+            <TouchableOpacity
+              style={styles.dateSelector}
+              onPress={() => setShowDayPicker(true)}
+            >
               <View style={styles.dateSelectorContent}>
                 <Calendar size={18} color={colors.primary} />
                 <Text style={styles.dateSelectorText}>{formatDayBR(day)}</Text>
@@ -629,27 +719,57 @@ export default function AppointmentScreen() {
             <Text style={styles.sectionLabel}>VEÍCULO</Text>
             <View style={styles.vehicleGrid}>
               <TouchableOpacity
-                style={[styles.vehicleCard, vehicleType === 'Carro' && styles.vehicleCardSelected]}
+                style={[
+                  styles.vehicleCard,
+                  vehicleType === 'Carro' && styles.vehicleCardSelected,
+                ]}
                 onPress={() => {
                   setVehicleType('Carro');
                   if (!carCategory) setCarCategory('Hatch');
                 }}
               >
-                <Car size={16} color={vehicleType === 'Carro' ? colors.primary : colors.text.tertiary} />
-                <Text style={[styles.vehicleLabel, vehicleType === 'Carro' && styles.vehicleLabelSelected]}>
+                <Car
+                  size={16}
+                  color={
+                    vehicleType === 'Carro'
+                      ? colors.primary
+                      : colors.text.tertiary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.vehicleLabel,
+                    vehicleType === 'Carro' && styles.vehicleLabelSelected,
+                  ]}
+                >
                   Carro
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.vehicleCard, vehicleType === 'Moto' && styles.vehicleCardSelected]}
+                style={[
+                  styles.vehicleCard,
+                  vehicleType === 'Moto' && styles.vehicleCardSelected,
+                ]}
                 onPress={() => {
                   setVehicleType('Moto');
                   setCarCategory(null);
                 }}
               >
-                <Car size={16} color={vehicleType === 'Moto' ? colors.primary : colors.text.tertiary} />
-                <Text style={[styles.vehicleLabel, vehicleType === 'Moto' && styles.vehicleLabelSelected]}>
+                <Car
+                  size={16}
+                  color={
+                    vehicleType === 'Moto'
+                      ? colors.primary
+                      : colors.text.tertiary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.vehicleLabel,
+                    vehicleType === 'Moto' && styles.vehicleLabelSelected,
+                  ]}
+                >
                   Moto
                 </Text>
               </TouchableOpacity>
@@ -660,10 +780,18 @@ export default function AppointmentScreen() {
           {vehicleType === 'Carro' && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>CATEGORIA</Text>
-              <TouchableOpacity style={styles.selector} onPress={() => setCategoryModalOpen(true)}>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setCategoryModalOpen(true)}
+              >
                 <View style={styles.selectorContent}>
                   <Car size={16} color={colors.text.secondary} />
-                  <Text style={[styles.selectorText, !carCategory && styles.selectorPlaceholder]}>
+                  <Text
+                    style={[
+                      styles.selectorText,
+                      !carCategory && styles.selectorPlaceholder,
+                    ]}
+                  >
                     {carCategory ?? 'Selecione'}
                   </Text>
                 </View>
@@ -675,9 +803,12 @@ export default function AppointmentScreen() {
           {/* Serviço */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>SERVIÇO</Text>
-            
+
             {serviceLabel ? (
-              <TouchableOpacity style={styles.serviceCard} onPress={() => setServiceModalOpen(true)}>
+              <TouchableOpacity
+                style={styles.serviceCard}
+                onPress={() => setServiceModalOpen(true)}
+              >
                 <View style={styles.serviceCardLeft}>
                   <View style={styles.serviceIconContainer}>
                     <SelectedServiceIcon size={18} color={colors.primary} />
@@ -685,21 +816,30 @@ export default function AppointmentScreen() {
                   <View style={styles.serviceInfo}>
                     <Text style={styles.serviceName}>{serviceLabel}</Text>
                     <Text style={styles.serviceDuration}>
-                      {selectedService?.durationMin}min • {formatCurrencyBRL(finalPrice)}
+                      {selectedService?.durationMin}min •{' '}
+                      {formatCurrencyBRL(finalPrice)}
                     </Text>
                   </View>
                 </View>
-                
-                <TouchableOpacity style={styles.detailsBadge} onPress={() => setServiceDetailsOpen(true)}>
+
+                <TouchableOpacity
+                  style={styles.detailsBadge}
+                  onPress={() => setServiceDetailsOpen(true)}
+                >
                   <Info size={11} color={colors.primary} />
                   <Text style={styles.detailsBadgeText}>Detalhes</Text>
                 </TouchableOpacity>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={styles.selector} onPress={() => setServiceModalOpen(true)}>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setServiceModalOpen(true)}
+              >
                 <View style={styles.selectorContent}>
                   <Clock size={16} color={colors.text.secondary} />
-                  <Text style={styles.selectorPlaceholder}>Selecione um serviço</Text>
+                  <Text style={styles.selectorPlaceholder}>
+                    Selecione um serviço
+                  </Text>
                 </View>
                 <ChevronRight size={16} color={colors.text.tertiary} />
               </TouchableOpacity>
@@ -736,17 +876,25 @@ export default function AppointmentScreen() {
               <FlatList
                 horizontal
                 data={slots}
-                keyExtractor={(item) => String(item.startAtMs)}
+                keyExtractor={item => String(item.startAtMs)}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.slotsList}
                 renderItem={({ item }) => {
                   const isSelected = selectedSlot?.startAtMs === item.startAtMs;
                   return (
                     <TouchableOpacity
-                      style={[styles.slotCard, isSelected && styles.slotCardSelected]}
+                      style={[
+                        styles.slotCard,
+                        isSelected && styles.slotCardSelected,
+                      ]}
                       onPress={() => setSelectedSlot(item)}
                     >
-                      <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
+                      <Text
+                        style={[
+                          styles.slotTime,
+                          isSelected && styles.slotTimeSelected,
+                        ]}
+                      >
                         {formatHour(item.startAtMs)}
                       </Text>
                     </TouchableOpacity>
@@ -760,13 +908,18 @@ export default function AppointmentScreen() {
           {canConfirm && (
             <View style={styles.totalCard}>
               <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>{formatCurrencyBRL(finalPrice)}</Text>
+              <Text style={styles.totalValue}>
+                {formatCurrencyBRL(finalPrice)}
+              </Text>
             </View>
           )}
 
           {/* Botão confirmar */}
           <TouchableOpacity
-            style={[styles.confirmButton, !canConfirm && styles.confirmButtonDisabled]}
+            style={[
+              styles.confirmButton,
+              !canConfirm && styles.confirmButtonDisabled,
+            ]}
             onPress={handleSave}
             disabled={!canConfirm || submitting}
           >
@@ -778,7 +931,7 @@ export default function AppointmentScreen() {
               </Text>
             )}
           </TouchableOpacity>
-          
+
           <View style={{ height: 20 }} />
         </ScrollView>
       </SafeAreaView>
@@ -791,8 +944,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  
-  // Header minimalista
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -835,7 +987,6 @@ const styles = StyleSheet.create({
     width: 36,
   },
 
-  // Layout
   scrollView: {
     flex: 1,
   },
@@ -860,7 +1011,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  // Date selector
   dateSelector: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -883,7 +1033,6 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
 
-  // Vehicle cards - SUPER COMPACTOS
   vehicleGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -914,7 +1063,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Selector padrão
   selector: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -941,7 +1089,6 @@ const styles = StyleSheet.create({
     color: colors.text.disabled,
   },
 
-  // Service card
   serviceCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -994,7 +1141,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Slots
   slotsList: {
     gap: 8,
     paddingVertical: 4,
@@ -1031,7 +1177,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // States
   emptyState: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1064,7 +1209,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
 
-  // Total card - Compacto
   totalCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1086,7 +1230,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Botão confirmar
   confirmButton: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1109,7 +1252,6 @@ const styles = StyleSheet.create({
     color: colors.text.white,
   },
 
-  // Modais
   modalOverlay: {
     flex: 1,
     backgroundColor: colors.overlay,
@@ -1168,7 +1310,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Service Details Modal
   detailsModal: {
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
