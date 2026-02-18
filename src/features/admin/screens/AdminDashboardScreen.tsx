@@ -1,3 +1,4 @@
+// src/features/admin/screens/AdminDashboardScreen.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,17 +13,18 @@ import {
   Text,
   TouchableOpacity,
   View,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import LinearGradient from 'react-native-linear-gradient';
 
 import {
   launchImageLibrary,
   type ImageLibraryOptions,
   type Asset,
 } from 'react-native-image-picker';
-
 import { getAuth } from '@react-native-firebase/auth';
 import {
   collection,
@@ -44,24 +46,25 @@ import {
   History,
   LogOut,
   Calendar,
-  PlayCircle,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  PlayCircle,
+  Settings,
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-
-// 👇 IMPORTS CORRETOS
 import { colors, spacing, radii, surfaces, borders } from '@shared/theme';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
+import { UI } from '@shared/constants/app.constants';
 
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
-
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
@@ -77,12 +80,11 @@ type UserProfile = {
   role?: 'admin' | 'user';
 };
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
-const COVER_H = 285;
-const AVATAR = 130;
-const MENU_W = 220;
+const AVATAR_SIZE = UI.AVATAR_SIZE;
+const COVER_H = UI.COVER_HEIGHT;
+const MENU_W = UI.MENU_WIDTH;
 
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<Nav>();
@@ -92,66 +94,42 @@ export default function AdminDashboardScreen() {
 
   const [profile, setProfile] = useState<UserProfile>({});
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-MENU_W)).current;
 
-  const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>(
-    [],
-  );
+  const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(true);
-
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
-
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
 
-  const weekStartMs = useMemo(
-    () => dateUtils.startOfWeek(weekAnchor),
-    [weekAnchor],
-  );
-  const weekEndMs = useMemo(
-    () => dateUtils.endOfWeek(weekAnchor),
-    [weekAnchor],
-  );
+  const weekStartMs = useMemo(() => dateUtils.startOfWeek(weekAnchor), [weekAnchor]);
+  const weekEndMs = useMemo(() => dateUtils.endOfWeek(weekAnchor), [weekAnchor]);
   const weekLabel = useMemo(
     () => dateUtils.formatWeekLabel(weekStartMs, weekEndMs),
     [weekStartMs, weekEndMs],
   );
-  const onCurrentWeek = useMemo(
-    () => dateUtils.isCurrentWeek(weekAnchor),
-    [weekAnchor],
-  );
+  const onCurrentWeek = useMemo(() => dateUtils.isCurrentWeek(weekAnchor), [weekAnchor]);
 
   const { fetchCustomerName } = useCustomerName();
 
-  const openMenu = () => {
-    setMenuOpen(true);
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+  const toggleMenu = () => {
+    if (menuVisible) {
+      Animated.timing(slideAnim, {
+        toValue: -MENU_W,
+        duration: UI.DRAWER_ANIMATION_DURATION,
+        useNativeDriver: true,
+      }).start(() => setMenuVisible(false));
+    } else {
+      setMenuVisible(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: UI.DRAWER_ANIMATION_DURATION,
+        useNativeDriver: true,
+      }).start();
+    }
   };
-
-  const closeMenu = () => {
-    Animated.timing(anim, {
-      toValue: 0,
-      duration: 200,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => finished && setMenuOpen(false));
-  };
-
-  const drawerTx = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-MENU_W, 0],
-  });
-  const overlayOpacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
 
   const pickAsBase64 = async () => {
     const opts: ImageLibraryOptions = {
@@ -169,7 +147,7 @@ export default function AdminDashboardScreen() {
     const a: Asset | undefined = res.assets?.[0];
     if (!a?.base64) return null;
 
-    const mime = a.type && a.type.startsWith('image/') ? a.type : 'image/jpeg';
+    const mime = a.type?.startsWith('image/') ? a.type : 'image/jpeg';
     return `data:${mime};base64,${a.base64}`;
   };
 
@@ -205,10 +183,7 @@ export default function AdminDashboardScreen() {
       );
       setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
-      Alert.alert(
-        'Erro',
-        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
-      );
+      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
     } finally {
       setSaving(null);
     }
@@ -229,13 +204,10 @@ export default function AdminDashboardScreen() {
             customerName: name,
           });
         } catch {}
-
         updated.push({ ...it, customerName: name });
       }),
     );
-
-    updated.sort((a, b) => a.startAtMs - b.startAtMs);
-    return updated;
+    return updated.sort((a, b) => a.startAtMs - b.startAtMs);
   };
 
   useEffect(() => {
@@ -318,13 +290,9 @@ export default function AdminDashboardScreen() {
 
   if (!user?.uid) {
     return (
-      <SafeAreaView
-        style={{ flex: 1, backgroundColor: colors.background.main }}
-      >
-        <View
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <ActivityIndicator color={colors.primary.main} />
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.main} />
         </View>
       </SafeAreaView>
     );
@@ -357,7 +325,6 @@ export default function AdminDashboardScreen() {
 
   const doUpdate = async (item: AdminAppointment, next: AppointmentStatus) => {
     if (updatingId) return;
-
     setUpdatingId(item.id);
     try {
       await updateAppointmentStatus({
@@ -378,6 +345,149 @@ export default function AdminDashboardScreen() {
     }
   };
 
+  const navigateFromMenu = (route: keyof RootStackParamList) => {
+    toggleMenu();
+    navigation.navigate(route);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      toggleMenu();
+      await auth.signOut();
+    } catch {
+      Alert.alert('Erro', 'Falha ao sair da conta');
+    }
+  };
+
+  // Header Premium da Semana - Versão Compacta
+  // Substitua a função WeekHeaderPremium por esta versão melhorada
+const WeekHeaderPremium = () => {
+  const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+  const startDate = new Date(weekStartMs);
+  const endDate = new Date(weekEndMs);
+  
+  const startDay = startDate.getDate();
+  const endDay = endDate.getDate();
+  
+  // Formatação inteligente do mês/ano
+  const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+  const endMonth = endDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+  const startYear = startDate.getFullYear();
+  const endYear = endDate.getFullYear();
+  
+  // Lógica para mostrar o período corretamente
+  let periodText = '';
+  if (startMonth === endMonth && startYear === endYear) {
+    // Mesmo mês e ano
+    periodText = `${startDay}–${endDay} ${startMonth} ${startYear}`;
+  } else if (startYear === endYear) {
+    // Mesmo ano, meses diferentes
+    periodText = `${startDay} ${startMonth} – ${endDay} ${endMonth} ${startYear}`;
+  } else {
+    // Anos diferentes
+    periodText = `${startDay} ${startMonth} ${startYear} – ${endDay} ${endMonth} ${endYear}`;
+  }
+  
+  const totalAppointments = appointmentsWeek.length;
+
+  return (
+    <View style={styles.premiumContainer}>
+      {/* Linha 1: Título e contador */}
+      <View style={styles.premiumHeader}>
+        <View style={styles.premiumTitleContainer}>
+          <Text style={styles.premiumSubtitle}>AGENDAMENTOS</Text>
+          <Text style={styles.premiumTitle}>
+            {periodText}
+          </Text>
+        </View>
+        <View style={styles.premiumCount}>
+          <Text style={styles.premiumCountText}>{totalAppointments}</Text>
+          <Text style={styles.premiumCountLabel}>agend.</Text>
+        </View>
+      </View>
+
+      {/* Linha 2: Navegação */}
+      <View style={styles.premiumNav}>
+        <TouchableOpacity 
+          style={styles.premiumNavButton}
+          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
+          activeOpacity={0.7}
+        >
+          <ChevronLeft size={16} color={colors.primary.main} />
+          <Text style={styles.premiumNavText}>Anterior</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.premiumNavToday}
+          onPress={() => setWeekAnchor(new Date())}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.premiumNavTodayText}>Hoje</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.premiumNavButton}
+          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.premiumNavText}>Próxima</Text>
+          <ChevronRight size={16} color={colors.primary.main} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Linha 3: Barra de progresso */}
+      <View style={styles.premiumProgress}>
+        <View 
+          style={[
+            styles.premiumProgressBar, 
+            { width: `${(new Date().getDay() / 6) * 100}%` }
+          ]} 
+        />
+      </View>
+
+      {/* Linha 4: Dias da semana */}
+      <View style={styles.premiumDays}>
+        {weekDays.map((day, index) => {
+          const dayDate = dateUtils.addDays(startDate, index);
+          const dayNumber = dayDate.getDate();
+          const isToday = dateUtils.isCurrentWeek(weekAnchor) && 
+                         dayDate.getDate() === new Date().getDate() &&
+                         dayDate.getMonth() === new Date().getMonth() &&
+                         dayDate.getFullYear() === new Date().getFullYear();
+          
+          const dayAppointments = appointmentsWeek.filter(item => {
+            const itemDate = new Date(item.startAtMs);
+            return itemDate.getDate() === dayNumber &&
+                   itemDate.getMonth() === dayDate.getMonth() &&
+                   itemDate.getFullYear() === dayDate.getFullYear();
+          }).length;
+
+          return (
+            <TouchableOpacity 
+              key={day} 
+              style={[styles.premiumDay, isToday && styles.premiumDayToday]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.premiumDayName, isToday && styles.premiumDayTextToday]}>
+                {day}
+              </Text>
+              <Text style={[styles.premiumDayNumber, isToday && styles.premiumDayTextToday]}>
+                {dayNumber}
+              </Text>
+              <View 
+                style={[
+                  styles.premiumDayDot, 
+                  dayAppointments > 0 && styles.premiumDayDotActive
+                ]} 
+              />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
   const renderAppointment = ({ item }: { item: AdminAppointment }) => {
     const subtitle =
       item.vehicleType === 'Carro' && item.carCategory
@@ -386,481 +496,655 @@ export default function AdminDashboardScreen() {
 
     const expired = dateUtils.isExpired(item.startAtMs, NO_SHOW_GRACE_MS);
     const isNoShow = item.status === 'scheduled' && expired;
-
     const displayStatus: AppointmentStatus = isNoShow ? 'no_show' : item.status;
 
-    const statusLabel =
-      displayStatus === 'in_progress'
-        ? 'Em andamento'
-        : displayStatus === 'done'
-        ? 'Concluído'
-        : displayStatus === 'no_show'
-        ? 'Não realizado'
-        : 'Agendado';
+    const getStatusConfig = () => {
+      switch (displayStatus) {
+        case 'done':
+          return { label: 'Concluído', color: colors.status.success, icon: CheckCircle2 };
+        case 'in_progress':
+          return { label: 'Em andamento', color: colors.status.warning, icon: Clock };
+        case 'no_show':
+          return { label: 'Não realizado', color: colors.status.error, icon: XCircle };
+        default:
+          return { label: 'Agendado', color: colors.text.disabled, icon: Calendar };
+      }
+    };
 
-    const statusColor =
-      displayStatus === 'done'
-        ? colors.status.success
-        : displayStatus === 'in_progress'
-        ? colors.status.warning
-        : displayStatus === 'no_show'
-        ? colors.status.error
-        : colors.text.disabled;
-
-    const canPress = !isNoShow && updatingId !== item.id;
+    const status = getStatusConfig();
+    const StatusIcon = status.icon;
 
     const action =
-      displayStatus === 'scheduled'
+      displayStatus === 'scheduled' && !isNoShow
         ? {
             label: 'Começar',
-            icon: <PlayCircle size={18} color={colors.text.white} />,
+            icon: PlayCircle,
             next: 'in_progress' as AppointmentStatus,
+            color: colors.status.warning,
           }
         : displayStatus === 'in_progress'
         ? {
             label: 'Concluir',
-            icon: <CheckCircle2 size={18} color={colors.text.white} />,
+            icon: CheckCircle2,
             next: 'done' as AppointmentStatus,
+            color: colors.status.success,
           }
         : null;
 
+    const canPress = !isNoShow && updatingId !== item.id;
+
     return (
       <View style={styles.card}>
-        <View style={styles.cardLeft}>
-          <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
-          <Text style={styles.cardClient}>👤 {item.customerName}</Text>
-
-          <Text style={styles.cardSubtitle}>
-            {subtitle} • {dateUtils.formatDate(item.startAtMs)} •{' '}
-            {dateUtils.formatHour(item.startAtMs)}
-          </Text>
-
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {statusLabel}
-          </Text>
-          <Text style={styles.cardPrice}>
-            +{formatUtils.currencyCompact(item.price)}
-          </Text>
-        </View>
-
-        <View style={styles.actions}>
-          {action ? (
-            <TouchableOpacity
-              style={[
-                styles.primaryActionBtn,
-                displayStatus === 'in_progress' && styles.primaryActionBtnAlt,
-                (!canPress || isNoShow) && styles.disabledBtn,
-              ]}
-              onPress={() =>
-                isNoShow ? alertCannotWork() : doUpdate(item, action.next)
-              }
-              activeOpacity={0.85}
-              disabled={!canPress || isNoShow}
-            >
-              {updatingId === item.id ? (
-                <ActivityIndicator color={colors.text.white} />
-              ) : (
-                <>
-                  {action.icon}
-                  <Text style={styles.primaryActionText}>{action.label}</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.primaryActionBtn, styles.disabledBtn]}>
-              <Text style={styles.primaryActionText}>Sem ação</Text>
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.serviceName} numberOfLines={2}>
+              {item.serviceLabel ?? 'Serviço'}
+            </Text>
+            <View style={[styles.statusBadge, { backgroundColor: `${status.color}10` }]}>
+              <StatusIcon size={14} color={status.color} />
+              <Text style={[styles.statusText, { color: status.color }]}>
+                {status.label}
+              </Text>
             </View>
-          )}
+          </View>
+
+          <Text style={styles.clientName} numberOfLines={1}>
+            👤 {item.customerName}
+          </Text>
+
+          <View style={styles.detailsRow}>
+            <View style={styles.detailItem}>
+              <Calendar size={14} color={colors.text.tertiary} />
+              <Text style={styles.detailText}>{dateUtils.formatDate(item.startAtMs)}</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Clock size={14} color={colors.text.tertiary} />
+              <Text style={styles.detailText}>{dateUtils.formatHour(item.startAtMs)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.vehicleBadge}>
+            <Text style={styles.vehicleText}>{subtitle}</Text>
+          </View>
+
+          <View style={styles.cardFooter}>
+            <Text style={styles.price}>{formatUtils.currency(item.price)}</Text>
+            {action && (
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: action.color },
+                  (!canPress || isNoShow) && styles.actionButtonDisabled,
+                ]}
+                onPress={() => (isNoShow ? alertCannotWork() : doUpdate(item, action.next))}
+                disabled={!canPress || isNoShow}
+                activeOpacity={0.7}
+              >
+                {updatingId === item.id ? (
+                  <ActivityIndicator size="small" color={colors.text.white} />
+                ) : (
+                  <>
+                    <action.icon size={16} color={colors.text.white} />
+                    <Text style={styles.actionButtonText}>{action.label}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     );
   };
 
-  const overlayStyle = [
-    StyleSheet.absoluteFill,
-    styles.overlay,
-    { opacity: overlayOpacity },
-  ];
-
-  const doSignOut = async () => {
-    closeMenu();
-    try {
-      await auth.signOut();
-    } catch {
-      Alert.alert('Erro', 'Falha ao sair. Tente novamente.');
-    }
-  };
-
-  const HeaderWeek = () => (
-    <View style={styles.weekHeader}>
-      <Text style={styles.sectionTitle}>Agendamentos da semana</Text>
-      <Text style={styles.weekRangeTitle}>{weekLabel}</Text>
-
-      <View style={styles.weekNavRow}>
-        <TouchableOpacity
-          style={styles.weekNavBtn}
-          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
-          activeOpacity={0.85}
-        >
-          <ChevronLeft size={18} color={colors.text.white} />
-          <Text style={styles.weekNavTxt}>Anterior</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.weekChip, onCurrentWeek && styles.weekChipDisabled]}
-          onPress={() => setWeekAnchor(new Date())}
-          activeOpacity={0.85}
-          disabled={onCurrentWeek}
-        >
-          <Text
-            style={[
-              styles.weekChipTxt,
-              onCurrentWeek && styles.weekChipTxtDisabled,
-            ]}
-          >
-            Semana atual
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.weekNavBtn}
-          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.weekNavTxt}>Próxima</Text>
-          <ChevronRight size={18} color={colors.text.white} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.container}>
-        <View style={styles.headerWrapper}>
-          <ImageBackground
+    <>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary.main} />
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          {/* Header com gradiente */}
+          <LinearGradient
+            colors={[colors.primary.main, colors.secondary.main]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.header}
-            imageStyle={styles.headerImg}
-            source={coverSource}
           >
-            <TouchableOpacity
-              style={styles.menuBtn}
-              activeOpacity={0.8}
-              onPress={openMenu}
-            >
-              <Menu size={26} color={colors.text.white} />
-            </TouchableOpacity>
+            <View style={styles.headerTop}>
+              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
+                <View style={styles.menuIcon}>
+                  <View style={styles.menuBar} />
+                  <View style={[styles.menuBar, { width: 20 }]} />
+                  <View style={[styles.menuBar, { width: 16 }]} />
+                </View>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={saveCover}
-              style={styles.coverBtn}
-              activeOpacity={0.9}
-            >
-              {saving === 'cover' ? (
-                <ActivityIndicator color={colors.text.white} />
-              ) : (
-                <Text style={styles.coverBtnTxt}>Trocar capa</Text>
-              )}
-            </TouchableOpacity>
-          </ImageBackground>
-        </View>
+              <Text style={styles.brand}>DETAILGO</Text>
 
-        <View style={styles.avatarContainer}>
-          <TouchableOpacity onPress={saveAvatar} activeOpacity={0.9}>
-            {avatarSource ? (
-              <Image source={avatarSource} style={styles.avatarImg} />
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('AdminHistory')} 
+                style={styles.notificationButton}
+                activeOpacity={0.7}
+              >
+                <History size={22} color={colors.text.white} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Perfil do usuário */}
+            <View style={styles.profileSection}>
+              <TouchableOpacity onPress={saveAvatar} style={styles.avatarWrapper} activeOpacity={0.9}>
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <UserIcon size={40} color={colors.primary.main} />
+                  </View>
+                )}
+                {saving === 'avatar' && (
+                  <View style={styles.avatarLoading}>
+                    <ActivityIndicator color={colors.primary.main} />
+                  </View>
+                )}
+                <View style={styles.cameraBadge}>
+                  <Text style={styles.cameraBadgeText}>📷</Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{fullName}</Text>
+                <Text style={styles.userEmail}>{user.email}</Text>
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>Administrador</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Conteúdo principal */}
+          <View style={styles.content}>
+            {loadingWeek ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary.main} />
+              </View>
             ) : (
-              <View style={[styles.avatarImg, styles.avatarFallback]}>
-                <Text style={styles.avatarPlaceholder}>Foto</Text>
-              </View>
+              <FlatList
+                data={appointmentsWeek}
+                keyExtractor={item => item.id}
+                renderItem={renderAppointment}
+                ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                ListHeaderComponent={<WeekHeaderPremium />}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Calendar size={48} color={colors.text.disabled} />
+                    <Text style={styles.emptyStateTitle}>Nenhum agendamento</Text>
+                    <Text style={styles.emptyStateText}>
+                      Não há serviços agendados para esta semana.
+                    </Text>
+                  </View>
+                }
+              />
             )}
-          </TouchableOpacity>
-
-          {saving === 'avatar' && (
-            <View style={styles.avatarLoading}>
-              <ActivityIndicator color={colors.text.white} />
-            </View>
-          )}
+          </View>
         </View>
 
-        <View style={styles.body}>
-          {loadingWeek ? (
-            <View style={{ paddingTop: 18 }}>
-              <ActivityIndicator color={colors.primary.main} />
-            </View>
-          ) : (
-            <FlatList
-              data={appointmentsWeek}
-              keyExtractor={it => `week-${it.id}`}
-              renderItem={renderAppointment}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
-              ListHeaderComponent={<HeaderWeek />}
-              ListEmptyComponent={
-                <Text
-                  style={{ textAlign: 'center', color: colors.text.disabled }}
-                >
-                  Nada marcado nessa semana.
-                </Text>
-              }
-            />
-          )}
-        </View>
-
-        {menuOpen && (
+        {/* Menu lateral */}
+        {menuVisible && (
           <>
-            <Animated.View pointerEvents="auto" style={overlayStyle}>
-              <Pressable style={{ flex: 1 }} onPress={closeMenu} />
-            </Animated.View>
-
-            <Animated.View
-              style={[styles.drawer, { transform: [{ translateX: drawerTx }] }]}
-            >
+            <Pressable style={styles.overlay} onPress={toggleMenu} />
+            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
               <View style={styles.drawerHeader}>
-                <Text style={styles.drawerWelcome}>Bem-vindo {fullName}</Text>
-                <Text style={styles.drawerTitle}>Menu</Text>
+                <Text style={styles.drawerUserName}>{fullName}</Text>
+                <Text style={styles.drawerUserEmail}>{user.email}</Text>
               </View>
 
-              <TouchableOpacity
-                style={styles.item}
-                onPress={() => Alert.alert('Meu Perfil', 'TODO')}
-                activeOpacity={0.8}
-              >
-                <UserIcon size={30} color={colors.text.white} />
-                <Text style={styles.itemText}>Meu Perfil</Text>
-              </TouchableOpacity>
+              <View style={styles.drawerContent}>
+                <TouchableOpacity style={styles.drawerItem} onPress={() => navigateFromMenu('AdminDashboard')}>
+                  <Calendar size={22} color={colors.primary.main} />
+                  <Text style={styles.drawerItemText}>Dashboard</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.item}
-                onPress={() => navigation.navigate('AdminHistory')}
-                activeOpacity={0.8}
-              >
-                <History size={30} color={colors.text.white} />
-                <Text style={styles.itemText}>Histórico</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.drawerItem} onPress={() => navigateFromMenu('AdminHistory')}>
+                  <History size={22} color={colors.primary.main} />
+                  <Text style={styles.drawerItemText}>Histórico</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.item}
-                onPress={() => navigation.navigate('AdminManage')}
-                activeOpacity={0.8}
-              >
-                <Calendar size={30} color={colors.text.white} />
-                <Text style={styles.itemText}>Gerenciar</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.drawerItem} onPress={() => navigateFromMenu('AdminManage')}>
+                  <Settings size={22} color={colors.primary.main} />
+                  <Text style={styles.drawerItemText}>Gerenciar</Text>
+                </TouchableOpacity>
 
-              <View style={{ flex: 1 }} />
+                <View style={styles.drawerDivider} />
 
-              <TouchableOpacity
-                style={[styles.item, { marginBottom: 50 }]}
-                onPress={doSignOut}
-                activeOpacity={0.8}
-              >
-                <LogOut size={30} color={colors.text.white} />
-                <Text style={styles.itemText}>Sair</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={[styles.drawerItem, styles.drawerLogout]} onPress={handleSignOut}>
+                  <LogOut size={22} color={colors.status.error} />
+                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
+                </TouchableOpacity>
+              </View>
             </Animated.View>
           </>
         )}
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background.main },
-  container: { flex: 1 },
-
-  headerWrapper: {
-    height: COVER_H,
-    borderBottomLeftRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-    overflow: 'hidden',
-    backgroundColor: colors.primary.main,
-  },
-  header: { flex: 1, justifyContent: 'center' },
-  headerImg: {
-    borderBottomLeftRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-  },
-  menuBtn: {
-    position: 'absolute',
-    left: 18,
-    top: 18,
-    padding: 6,
-    borderRadius: radii.sm,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  coverBtn: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderRadius: radii.sm,
-  },
-  coverBtnTxt: { color: colors.text.white, fontWeight: '700' },
-
-  avatarContainer: {
-    alignSelf: 'center',
-    marginTop: -(AVATAR / 2),
-    width: AVATAR + 12,
-    height: AVATAR + 12,
-    borderRadius: (AVATAR + 12) / 2,
-    backgroundColor: colors.background.card,
-    padding: 6,
-    elevation: 6,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  avatarImg: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
-    backgroundColor: colors.background.drawer,
-  },
-  avatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlaceholder: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  avatarLoading: {
-    position: 'absolute',
-    inset: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: AVATAR / 2,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-
-  body: {
+  safe: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     backgroundColor: colors.background.main,
   },
-
-  sectionTitle: {
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 6,
-    color: colors.text.primary,
+  container: {
+    flex: 1,
   },
-
-  weekHeader: { marginBottom: 12, gap: 10, alignItems: 'center' },
-  weekRangeTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: colors.text.primary,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  weekNavRow: {
+  // Header styles
+  header: {
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 32,
+    borderBottomLeftRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
-    width: '100%',
+    marginBottom: spacing.lg,
   },
-
-  weekNavBtn: {
+  menuButton: {
+    padding: spacing.xs,
+  },
+  menuIcon: {
+    width: 24,
+    height: 20,
+    justifyContent: 'space-between',
+  },
+  menuBar: {
+    height: 2,
+    width: 24,
+    backgroundColor: colors.text.white,
+    borderRadius: 2,
+  },
+  brand: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text.white,
+    letterSpacing: 1.5,
+  },
+  notificationButton: {
+    padding: spacing.xs,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatar: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    borderWidth: 3,
+    borderColor: colors.text.white,
+  },
+  avatarPlaceholder: {
+    backgroundColor: colors.text.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: AVATAR_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary.main,
+    borderWidth: 2,
+    borderColor: colors.text.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraBadgeText: {
+    fontSize: 14,
+    color: colors.text.white,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text.white,
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 4,
+  },
+  adminBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+    alignSelf: 'flex-start',
+  },
+  adminBadgeText: {
+    color: colors.text.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Content styles
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  listContent: {
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.xs,
+  },
+  // Premium Week Header Styles - Versão Compacta
+  premiumContainer: {
+    backgroundColor: colors.background.card,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    shadowColor: colors.text.primary,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  premiumHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  premiumTitleContainer: {
+    flex: 1,
+  },
+  premiumSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  premiumTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  premiumCount: {
+    alignItems: 'flex-end',
+    marginLeft: spacing.xs,
+  },
+  premiumCountText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.primary.main,
+    lineHeight: 20,
+  },
+  premiumCountLabel: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    fontWeight: '500',
+  },
+  premiumNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: 4,
+  },
+  premiumNavButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  premiumNavText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary.main,
+  },
+  premiumNavToday: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.sm,
+    flex: 1,
+    alignItems: 'center',
+  },
+  premiumNavTodayText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.white,
+  },
+  premiumProgress: {
+    height: 3,
+    backgroundColor: colors.background.surface,
+    borderRadius: 1.5,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  premiumProgressBar: {
+    height: '100%',
+    backgroundColor: colors.primary.main,
+    borderRadius: 1.5,
+  },
+  premiumDays: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 2,
+  },
+  premiumDay: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    borderRadius: radii.sm,
+  },
+  premiumDayToday: {
+    backgroundColor: colors.primary.light,
+  },
+  premiumDayName: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+    marginBottom: 1,
+  },
+  premiumDayNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  premiumDayTextToday: {
+    color: colors.primary.main,
+  },
+  premiumDayDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'transparent',
+  },
+  premiumDayDotActive: {
+    backgroundColor: colors.primary.main,
+  },
+  // Card styles - Versão Ajustada
+  card: {
+    backgroundColor: colors.background.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    overflow: 'hidden',
+    marginBottom: spacing.sm,
+  },
+  cardContent: {
+    padding: spacing.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    flex: 1,
+    marginRight: spacing.xs,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  clientName: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    fontWeight: '500',
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 80,
+  },
+  detailText: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    fontWeight: '500',
+  },
+  vehicleBadge: {
+    backgroundColor: colors.background.surface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  vehicleText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '600',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border.main,
+    paddingTop: spacing.md,
+    marginTop: spacing.xs,
+  },
+  price: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.primary.main,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.primary.main,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
-    minWidth: 110,
+    minWidth: 100,
     justifyContent: 'center',
+    elevation: 2,
+    shadowColor: colors.text.primary,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
-  weekNavTxt: { color: colors.text.white, fontWeight: '900' },
-
-  weekChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: borders.default,
-    backgroundColor: surfaces.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
+  actionButtonDisabled: {
+    opacity: 0.5,
+    elevation: 0,
+    shadowOpacity: 0,
   },
-  weekChipTxt: { fontWeight: '900', color: colors.primary.main },
-  weekChipDisabled: { opacity: 0.6 },
-  weekChipTxtDisabled: { color: colors.text.disabled },
-
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: surfaces.card,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: borders.default,
-    gap: 12,
-  },
-  cardLeft: { flex: 1 },
-  cardTitle: {
-    color: colors.text.primary,
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  cardClient: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: colors.text.primary,
-    marginBottom: 6,
-  },
-  cardSubtitle: {
-    color: colors.text.tertiary,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  cardPrice: {
-    color: colors.primary.main,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-
-  actions: { gap: 10 },
-
-  primaryActionBtn: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    backgroundColor: colors.status.warning,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    minWidth: 130,
-    justifyContent: 'center',
-  },
-  primaryActionBtnAlt: {
-    backgroundColor: colors.primary.main,
-  },
-  primaryActionText: {
+  actionButtonText: {
     color: colors.text.white,
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '700',
   },
-  disabledBtn: { opacity: 0.45 },
-
-  overlay: { backgroundColor: colors.overlay },
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
+  // Overlay and drawer
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay,
+  },
   drawer: {
     position: 'absolute',
     left: 0,
@@ -868,33 +1152,52 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: MENU_W,
     backgroundColor: surfaces.drawer,
-    paddingTop: spacing.md,
+    paddingTop: 48,
     paddingHorizontal: spacing.md,
   },
   drawerHeader: {
-    minHeight: 56,
-    gap: 2,
-    marginBottom: 8,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.main,
+    marginBottom: spacing.lg,
   },
-  drawerWelcome: {
+  drawerUserName: {
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.text.white,
-    fontWeight: '600',
+    marginBottom: 2,
+  },
+  drawerUserEmail: {
     fontSize: 14,
+    color: colors.text.disabled,
   },
-  drawerTitle: {
-    color: colors.text.white,
-    fontWeight: '800',
-    fontSize: 20,
+  drawerContent: {
+    flex: 1,
   },
-  item: {
+  drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    marginBottom: 4,
   },
-  itemText: {
-    fontSize: 20,
+  drawerItemText: {
+    fontSize: 16,
     color: colors.text.white,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: colors.border.main,
+    marginVertical: spacing.md,
+  },
+  drawerLogout: {
+    marginTop: 'auto',
+    marginBottom: spacing.xl,
+  },
+  drawerLogoutText: {
+    color: colors.status.error,
   },
 });
