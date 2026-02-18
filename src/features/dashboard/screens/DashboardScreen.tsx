@@ -24,7 +24,6 @@ import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/fi
 
 import { useAuth } from '@features/auth';
 import { isAdminEmail } from '@features/auth/utils/roles';
-import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 import { useDashboardAppointments, type DashboardAppointment } from '@features/appointments/hooks/useDashboardAppointments';
 import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
 import type { RootStackParamList } from '@app/types';
@@ -91,18 +90,20 @@ export default function DashboardScreen() {
 
   const isAdmin = isAdminEmail(user.email);
 
-  const markNoShow = useCallback(async (appointmentId: string, customerUid: string) => {
-    await updateAppointmentStatus({
-      appointmentId,
-      customerUid,
-      status: 'no_show',
-    });
-  }, []);
+  // 👇 REMOVIDO: markNoShow não é mais necessário
+  // const markNoShow = useCallback(async (appointmentId: string, customerUid: string) => {
+  //   await updateAppointmentStatus({
+  //     appointmentId,
+  //     customerUid,
+  //     status: 'no_show',
+  //   });
+  // }, []);
 
+  // 👇 CORRIGIDO: markNoShow removido dos parâmetros
   const { loading: loadingAppointments, items: appointments } = useDashboardAppointments({
     uid,
     limitN: 30,
-    markNoShow,
+    // markNoShow foi removido
   });
 
   useEffect(() => {

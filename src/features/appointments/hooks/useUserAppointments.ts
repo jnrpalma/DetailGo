@@ -1,10 +1,14 @@
+
 import { useEffect, useMemo, useState } from 'react';
-import type { UserAppointment, AppointmentStatus } from '../domain/appointment.types';
+
+import { resolveDisplayStatus } from '../services/appointmentRules';
+import { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
 import { watchUserAppointmentsWithFallback } from '../data/appointmentsRepo';
+import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
 
 type Params = {
   uid?: string | null;
-  statusIn?: readonly AppointmentStatus[]; // ✅ aceita readonly (as const)
+  statusIn?: readonly AppointmentStatus[];
   limitN?: number;
 };
 
@@ -32,10 +36,24 @@ export function useUserAppointments(params: Params) {
       uid,
       limitN,
       onChange: (list) => {
-        const filtered =
-          statusIn && statusIn.length > 0
-            ? list.filter((it) => statusSet.has(it.status))
-            : list;
+        // 👇 A MAGIA ACONTECE AQUI: atualiza o status em memória
+        const now = Date.now();
+        const updatedList = list.map(item => {
+          // Se o status original é 'scheduled' mas já passou da data + tolerância
+          if (item.status === 'scheduled' && 
+              now > item.startAtMs + NO_SHOW_GRACE_MS) {
+            return {
+              ...item,
+              status: 'no_show' as const  // Força ser 'no_show' na interface
+            };
+          }
+          return item;
+        });
+
+        // Filtra pelo status desejado (usando o status atualizado)
+        const filtered = statusIn && statusIn.length > 0
+          ? updatedList.filter((it) => statusSet.has(it.status))
+          : updatedList;
 
         setItems(filtered);
         setLoading(false);

@@ -1,4 +1,4 @@
-// src/features/history/screens/HistoryScreen.tsx
+// src/features/appointments/domain/screens/HistoryScreen.tsx
 import React from 'react';
 import {
   ActivityIndicator,
@@ -17,18 +17,19 @@ import { ArrowLeft, History, Calendar, Clock, CheckCircle, XCircle } from 'lucid
 
 import type { RootStackParamList } from '@app/types';
 import { useUserAppointments } from '../hooks/useUserAppointments';
-import type { UserAppointment } from '../domain/appointment.types';
-import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
+
 
 import { formatDatePtBR, formatHour } from '@shared/utils/date';
 import { formatCurrencyBRL } from '@shared/utils/money';
+import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
+import { UserAppointment } from '../domain/appointment.types';
 
 // Paleta DetailGo
 const colors = {
-  primary: '#175676', // Baltic Blue
-  secondary: '#4BA3C3', // Turquoise Surf
-  error: '#D62839', // Classic Crimson
-  errorLight: '#BA324F', // Rosewood
+  primary: '#175676',
+  secondary: '#4BA3C3',
+  error: '#D62839',
+  errorLight: '#BA324F',
   success: '#16A34A',
   background: '#FFFFFF',
   surface: '#F8FAFC',
@@ -111,7 +112,6 @@ export default function HistoryScreen() {
     <>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -127,7 +127,6 @@ export default function HistoryScreen() {
           <View style={styles.headerRight} />
         </View>
 
-        {/* Content */}
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -161,6 +160,7 @@ export default function HistoryScreen() {
   );
 }
 
+// Styles continuam iguais...
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
