@@ -1,4 +1,3 @@
-// src/features/auth/screens/RegisterScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,33 +14,12 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '@app/types';
+import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react-native';
+
+import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
 import type { RegisterInput } from '@features/auth/services/auth.service';
-import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react-native';
-import { spacing } from '@shared/theme';
-
-// Paleta DetailGo (mesma do Login)
-const colors = {
-  primary: '#175676', // Baltic Blue
-  secondary: '#4BA3C3', // Turquoise Surf
-  error: '#D62839', // Classic Crimson
-  errorLight: '#BA324F', // Rosewood
-  background: '#FFFFFF',
-  surface: '#F8FAFC',
-  border: '#E2E8F0',
-  text: {
-    primary: '#0F172A',
-    secondary: '#475569',
-    tertiary: '#64748B',
-    disabled: '#94A3B8',
-  },
-  input: {
-    background: '#F8FAFC',
-    border: '#E2E8F0',
-    placeholder: '#94A3B8',
-  }
-};
+import { colors, radii, spacing } from '@shared/theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -69,20 +47,34 @@ export default function RegisterScreen() {
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
-  // Validações
-  const emailValid = useMemo(() => emailRegex.test(form.email.trim()), [form.email]);
-  const phoneValid = useMemo(() => phoneDigits(form.phone).length >= 10, [form.phone]);
-  const passwordValid = useMemo(() => form.password.length >= 6, [form.password]);
-  const confirmValid = useMemo(() => 
-    form.confirm === form.password && form.confirm.length > 0, 
-    [form.confirm, form.password]
+  const emailValid = useMemo(
+    () => emailRegex.test(form.email.trim()),
+    [form.email],
   );
-  const namesValid = useMemo(() => 
-    form.firstName.trim().length > 1 && form.lastName.trim().length > 1, 
-    [form.firstName, form.lastName]
+  const phoneValid = useMemo(
+    () => phoneDigits(form.phone).length >= 10,
+    [form.phone],
+  );
+  const passwordValid = useMemo(
+    () => form.password.length >= 6,
+    [form.password],
+  );
+  const confirmValid = useMemo(
+    () => form.confirm === form.password && form.confirm.length > 0,
+    [form.confirm, form.password],
+  );
+  const namesValid = useMemo(
+    () => form.firstName.trim().length > 1 && form.lastName.trim().length > 1,
+    [form.firstName, form.lastName],
   );
 
-  const canSubmit = namesValid && emailValid && phoneValid && passwordValid && confirmValid && !submitting;
+  const canSubmit =
+    namesValid &&
+    emailValid &&
+    phoneValid &&
+    passwordValid &&
+    confirmValid &&
+    !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -104,26 +96,26 @@ export default function RegisterScreen() {
       return;
     }
 
-    Alert.alert(
-      'Conta criada!', 
-      'Seu cadastro foi realizado com sucesso.',
-      [{ text: 'Fazer login', onPress: () => navigation.navigate('Login') }]
-    );
+    Alert.alert('Conta criada!', 'Seu cadastro foi realizado com sucesso.', [
+      { text: 'Fazer login', onPress: () => navigation.navigate('Login') },
+    ]);
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView 
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.background.main}
+      />
+      <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.brand}>DETAILGO</Text>
           <Text style={styles.title}>Criar nova conta</Text>
@@ -133,27 +125,28 @@ export default function RegisterScreen() {
           </Text>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
-          {/* Nome e Sobrenome - Row */}
           <View style={styles.row}>
             <View style={styles.col}>
               <Text style={styles.label}>Nome</Text>
               <TextInput
                 style={[
                   styles.input,
-                  form.firstName.length > 1 && form.firstName.trim().length < 2 && styles.inputError
+                  form.firstName.length > 1 &&
+                    form.firstName.trim().length < 2 &&
+                    styles.inputError,
                 ]}
                 placeholder="Seu nome"
-                placeholderTextColor={colors.input.placeholder}
+                placeholderTextColor={colors.text.disabled}
                 value={form.firstName}
-                onChangeText={(v) => updateForm('firstName', v)}
+                onChangeText={v => updateForm('firstName', v)}
                 returnKeyType="next"
                 editable={!submitting}
               />
-              {form.firstName.length > 0 && form.firstName.trim().length < 2 && (
-                <Text style={styles.errorText}>Nome muito curto</Text>
-              )}
+              {form.firstName.length > 0 &&
+                form.firstName.trim().length < 2 && (
+                  <Text style={styles.errorText}>Nome muito curto</Text>
+                )}
             </View>
 
             <View style={styles.col}>
@@ -161,12 +154,14 @@ export default function RegisterScreen() {
               <TextInput
                 style={[
                   styles.input,
-                  form.lastName.length > 1 && form.lastName.trim().length < 2 && styles.inputError
+                  form.lastName.length > 1 &&
+                    form.lastName.trim().length < 2 &&
+                    styles.inputError,
                 ]}
                 placeholder="Seu sobrenome"
-                placeholderTextColor={colors.input.placeholder}
+                placeholderTextColor={colors.text.disabled}
                 value={form.lastName}
-                onChangeText={(v) => updateForm('lastName', v)}
+                onChangeText={v => updateForm('lastName', v)}
                 returnKeyType="next"
                 editable={!submitting}
               />
@@ -176,7 +171,6 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {/* Email */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>E-mail</Text>
             <View style={styles.inputWrapper}>
@@ -184,9 +178,9 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.inputField}
                 placeholder="seu@email.com"
-                placeholderTextColor={colors.input.placeholder}
+                placeholderTextColor={colors.text.disabled}
                 value={form.email}
-                onChangeText={(v) => updateForm('email', v)}
+                onChangeText={v => updateForm('email', v)}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
@@ -201,7 +195,6 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* Telefone */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Telefone</Text>
             <View style={styles.inputWrapper}>
@@ -209,9 +202,9 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.inputField}
                 placeholder="(11) 91234-5678"
-                placeholderTextColor={colors.input.placeholder}
+                placeholderTextColor={colors.text.disabled}
                 value={form.phone}
-                onChangeText={(v) => updateForm('phone', v)}
+                onChangeText={v => updateForm('phone', v)}
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 textContentType="telephoneNumber"
@@ -220,11 +213,12 @@ export default function RegisterScreen() {
               />
             </View>
             {form.phone.length > 0 && !phoneValid && (
-              <Text style={styles.errorText}>Telefone com DDD e 8-9 dígitos</Text>
+              <Text style={styles.errorText}>
+                Telefone com DDD e 8-9 dígitos
+              </Text>
             )}
           </View>
 
-          {/* Senha */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Senha</Text>
             <View style={styles.inputWrapper}>
@@ -232,9 +226,9 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.inputField}
                 placeholder="mínimo 6 caracteres"
-                placeholderTextColor={colors.input.placeholder}
+                placeholderTextColor={colors.text.disabled}
                 value={form.password}
-                onChangeText={(v) => updateForm('password', v)}
+                onChangeText={v => updateForm('password', v)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -243,7 +237,7 @@ export default function RegisterScreen() {
                 returnKeyType="next"
                 editable={!submitting}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setShowPassword(!showPassword)}
               >
@@ -259,7 +253,6 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* Confirmar Senha */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Confirmar senha</Text>
             <View style={styles.inputWrapper}>
@@ -267,9 +260,9 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.inputField}
                 placeholder="repita a senha"
-                placeholderTextColor={colors.input.placeholder}
+                placeholderTextColor={colors.text.disabled}
                 value={form.confirm}
-                onChangeText={(v) => updateForm('confirm', v)}
+                onChangeText={v => updateForm('confirm', v)}
                 secureTextEntry={!showConfirm}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -279,7 +272,7 @@ export default function RegisterScreen() {
                 onSubmitEditing={handleSubmit}
                 editable={!submitting}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setShowConfirm(!showConfirm)}
               >
@@ -295,7 +288,6 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* Botão de cadastro */}
           <TouchableOpacity
             style={[styles.button, !canSubmit && styles.buttonDisabled]}
             onPress={handleSubmit}
@@ -303,13 +295,12 @@ export default function RegisterScreen() {
             activeOpacity={0.8}
           >
             {submitting ? (
-              <ActivityIndicator color={colors.background} />
+              <ActivityIndicator color={colors.text.white} />
             ) : (
               <Text style={styles.buttonText}>Criar conta</Text>
             )}
           </TouchableOpacity>
 
-          {/* Link para login */}
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>Já tem uma conta? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
@@ -318,7 +309,6 @@ export default function RegisterScreen() {
           </View>
         </View>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.divider} />
           <Text style={styles.copyright}>© 2026 DETAILGO</Text>
@@ -331,13 +321,13 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.main,
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.lg,
     paddingTop: 60,
-    paddingBottom: 24,
+    paddingBottom: spacing.lg,
   },
   header: {
     alignItems: 'center',
@@ -346,16 +336,16 @@ const styles = StyleSheet.create({
   brand: {
     fontSize: 24,
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.primary.main,
     letterSpacing: 2,
-    marginBottom: 24,
+    marginBottom: spacing.lg,
     textTransform: 'uppercase',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: colors.text.primary,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: 16,
@@ -368,30 +358,30 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
   col: {
     flex: 1,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
-    backgroundColor: colors.input.background,
-    borderRadius: 12,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.input.border,
-    paddingHorizontal: 16,
+    borderColor: colors.border.main,
+    paddingHorizontal: spacing.md,
     gap: 12,
   },
   inputField: {
@@ -402,23 +392,23 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 52,
-    backgroundColor: colors.input.background,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
     fontSize: 16,
     color: colors.text.primary,
     borderWidth: 1,
-    borderColor: colors.input.border,
+    borderColor: colors.border.main,
   },
   inputError: {
-    borderColor: colors.error,
+    borderColor: colors.status.error,
     borderWidth: 1.5,
   },
   errorText: {
-    color: colors.error,
+    color: colors.status.error,
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 6,
+    marginTop: spacing.xs,
     marginLeft: 4,
   },
   eyeButton: {
@@ -426,12 +416,12 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 52,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
-    shadowColor: colors.primary,
+    marginTop: spacing.lg,
+    shadowColor: colors.primary.main,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -443,7 +433,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   buttonText: {
-    color: colors.background,
+    color: colors.text.white,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -452,7 +442,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: spacing.lg,
   },
   loginText: {
     fontSize: 15,
@@ -461,15 +451,15 @@ const styles = StyleSheet.create({
   loginLink: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   footer: {
     marginTop: 'auto',
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginBottom: 24,
+    backgroundColor: colors.border.main,
+    marginBottom: spacing.lg,
   },
   copyright: {
     fontSize: 13,

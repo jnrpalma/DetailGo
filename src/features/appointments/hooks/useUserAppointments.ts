@@ -1,8 +1,9 @@
-
 import { useEffect, useMemo, useState } from 'react';
 
-import { resolveDisplayStatus } from '../services/appointmentRules';
-import { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
+import {
+  AppointmentStatus,
+  UserAppointment,
+} from '../domain/appointment.types';
 import { watchUserAppointmentsWithFallback } from '../data/appointmentsRepo';
 import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
 
@@ -20,7 +21,7 @@ export function useUserAppointments(params: Params) {
 
   const statusSet = useMemo(
     () => new Set<AppointmentStatus>(statusIn ?? []),
-    [statusIn]
+    [statusIn],
   );
 
   useEffect(() => {
@@ -35,27 +36,30 @@ export function useUserAppointments(params: Params) {
     const unsub = watchUserAppointmentsWithFallback({
       uid,
       limitN,
-      onChange: (list) => {
-        // 👇 A MAGIA ACONTECE AQUI: atualiza o status em memória
+      onChange: list => {
         const now = Date.now();
+
         const updatedList = list.map(item => {
-          // Se o status original é 'scheduled' mas já passou da data + tolerância
-          if (item.status === 'scheduled' && 
-              now > item.startAtMs + NO_SHOW_GRACE_MS) {
+          if (
+            item.status === 'scheduled' &&
+            now > item.startAtMs + NO_SHOW_GRACE_MS
+          ) {
             return {
               ...item,
-              status: 'no_show' as const  // Força ser 'no_show' na interface
+              status: 'no_show' as const,
             };
           }
           return item;
         });
 
-        // Filtra pelo status desejado (usando o status atualizado)
-        const filtered = statusIn && statusIn.length > 0
-          ? updatedList.filter((it) => statusSet.has(it.status))
-          : updatedList;
+        const filtered =
+          statusIn && statusIn.length > 0
+            ? updatedList.filter(it => statusSet.has(it.status))
+            : updatedList;
 
-        setItems(filtered);
+        const sorted = [...filtered].sort((a, b) => a.startAtMs - b.startAtMs);
+
+        setItems(sorted);
         setLoading(false);
       },
       onError: () => {

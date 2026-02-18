@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import {
   subscribeAuth,
@@ -11,7 +17,10 @@ import {
 type AuthContextValue = {
   user: FirebaseAuthTypes.User | null;
   initializing: boolean;
-  signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: boolean; message?: string }>;
   register: (data: RegisterInput) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
 };
@@ -23,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsub = subscribeAuth((u) => {
+    const unsub = subscribeAuth(u => {
       setUser(u);
       setInitializing(false);
     });
@@ -36,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   };
 
-  const register: AuthContextValue['register'] = async (data) => {
+  const register: AuthContextValue['register'] = async data => {
     const res = await svcRegister(data);
     if (!res.ok) return { ok: false, message: res.message };
     return { ok: true };
@@ -48,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, initializing, signIn, register, signOut }),
-    [user, initializing]
+    [user, initializing],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

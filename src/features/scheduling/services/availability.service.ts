@@ -1,28 +1,28 @@
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   getFirestore,
   query,
-  runTransaction,
   where,
+  runTransaction,
+  doc,
   serverTimestamp,
+  type FirebaseFirestoreTypes,
+  getDoc,
 } from '@react-native-firebase/firestore';
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
+import {
+  getShopSettings,
+  type ShopSettings,
+} from '@features/settings/services/shopSettings.service';
 import type {
   VehicleType,
   CarCategory,
   AppointmentStatus,
 } from '@features/appointments/domain/appointment.types';
 
-export type ShopSettings = {
-  openHour: number;
-  closeHour: number;
-  slotStepMin: number;
-  parallelCapacity: number;
-};
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 export type Slot = {
   startAtMs: number;
@@ -47,46 +47,51 @@ type AppointmentDoc = {
   status: AppointmentStatus;
 };
 
-function toDayKey(dateOrMs: Date | number) {
-  const d = typeof dateOrMs === 'number' ? new Date(dateOrMs) : new Date(dateOrMs);
+export class AvailabilityError extends Error {
+  code: string;
+
+  constructor(message: string, code: string) {
+    super(message);
+    this.name = 'AvailabilityError';
+    this.code = code;
+  }
+}
+
+function toDayKey(dateOrMs: Date | number): string {
+  const d = typeof dateOrMs === 'number' ? new Date(dateOrMs) : dateOrMs;
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function startOfDayMs(date: Date) {
+function startOfDay(date: Date): number {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
-function endOfDayMs(date: Date) {
+
+function endOfDay(date: Date): number {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
   return d.getTime();
 }
-function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
+
+function overlaps(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
 
-export async function getShopSettings(): Promise<ShopSettings> {
+async function getScheduledAppointmentsForDay(
+  dayKey: string,
+  dayStart: number,
+  dayEnd: number,
+): Promise<AppointmentDoc[]> {
   const db = getFirestore();
-  const snap = await getDoc(doc(db, 'settings', 'shop'));
-  const data = snap.data() as Partial<ShopSettings> | undefined;
-
-  return {
-    openHour: data?.openHour ?? 8,
-    closeHour: data?.closeHour ?? 18,
-    slotStepMin: data?.slotStepMin ?? 30,
-    parallelCapacity: data?.parallelCapacity ?? 1,
-  };
-}
-
-export async function getAvailableSlotsForDay(day: Date, durationMin: number): Promise<Slot[]> {
-  const db = getFirestore();
-  const cfg = await getShopSettings();
-
-  const dayKey = toDayKey(day);
 
   const qByDayKey = query(
     collection(db, 'appointments'),
@@ -96,34 +101,34 @@ export async function getAvailableSlotsForDay(day: Date, durationMin: number): P
 
   const snapByDayKey = await getDocs(qByDayKey);
 
-  let appointments: AppointmentDoc[] = snapByDayKey.docs.map(
-    (d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => d.data() as AppointmentDoc,
-  );
-
-  if (appointments.length === 0) {
-    const dayStart = startOfDayMs(day);
-    const dayEnd = endOfDayMs(day);
-
-    const qRange = query(
-      collection(db, 'appointments'),
-      where('status', '==', 'scheduled'),
-      where('startAtMs', '>=', dayStart),
-      where('startAtMs', '<=', dayEnd),
-    );
-
-    const snapRange = await getDocs(qRange);
-    appointments = snapRange.docs.map(
-      (d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => d.data() as AppointmentDoc,
-    );
+  if (!snapByDayKey.empty) {
+    return snapByDayKey.docs.map((d: QDoc) => d.data() as AppointmentDoc);
   }
 
+  const qRange = query(
+    collection(db, 'appointments'),
+    where('status', '==', 'scheduled'),
+    where('startAtMs', '>=', dayStart),
+    where('startAtMs', '<=', dayEnd),
+  );
+
+  const snapRange = await getDocs(qRange);
+
+  return snapRange.docs.map((d: QDoc) => d.data() as AppointmentDoc);
+}
+
+function generateSlots(
+  day: Date,
+  settings: ShopSettings,
+  durationMin: number,
+): Slot[] {
   const open = new Date(day);
-  open.setHours(cfg.openHour, 0, 0, 0);
+  open.setHours(settings.openHour, 0, 0, 0);
 
   const close = new Date(day);
-  close.setHours(cfg.closeHour, 0, 0, 0);
+  close.setHours(settings.closeHour, 0, 0, 0);
 
-  const stepMs = cfg.slotStepMin * 60 * 1000;
+  const stepMs = settings.slotStepMin * 60 * 1000;
   const durationMs = durationMin * 60 * 1000;
 
   const slots: Slot[] = [];
@@ -132,28 +137,70 @@ export async function getAvailableSlotsForDay(day: Date, durationMin: number): P
   }
 
   const now = Date.now();
-  const slotsFuture = slots.filter(s => s.startAtMs > now);
+  return slots.filter(s => s.startAtMs > now);
+}
 
-  return slotsFuture.filter(slot => {
+function filterAvailableSlots(
+  slots: Slot[],
+  appointments: AppointmentDoc[],
+  capacity: number,
+): Slot[] {
+  return slots.filter(slot => {
     let concurrent = 0;
     for (const appt of appointments) {
-      if (overlaps(appt.startAtMs, appt.endAtMs, slot.startAtMs, slot.endAtMs)) {
+      if (
+        overlaps(appt.startAtMs, appt.endAtMs, slot.startAtMs, slot.endAtMs)
+      ) {
         concurrent += 1;
-        if (concurrent >= cfg.parallelCapacity) return false;
+        if (concurrent >= capacity) return false;
       }
     }
     return true;
   });
 }
 
-export async function createAppointmentWithCapacityCheck(input: AppointmentCreateInput) {
-  const db = getFirestore();
-  const cfg = await getShopSettings();
-  const dayKey = toDayKey(input.startAtMs);
+export async function getAvailableSlotsForDay(
+  day: Date,
+  durationMin: number,
+): Promise<Slot[]> {
+  const settings = await getShopSettings();
+  const dayKey = toDayKey(day);
+  const dayStart = startOfDay(day);
+  const dayEnd = endOfDay(day);
 
-  const userSnap = await getDoc(doc(db, 'users', input.customerUid));
-  const userData = (userSnap.data() ?? {}) as { firstName?: string; lastName?: string };
-  const customerName = `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim() || 'Cliente';
+  const appointments = await getScheduledAppointmentsForDay(
+    dayKey,
+    dayStart,
+    dayEnd,
+  );
+  const allSlots = generateSlots(day, settings, durationMin);
+
+  return filterAvailableSlots(
+    allSlots,
+    appointments,
+    settings.parallelCapacity,
+  );
+}
+
+async function getCustomerName(customerUid: string): Promise<string> {
+  const db = getFirestore();
+  const userSnap = await getDoc(doc(db, 'users', customerUid));
+  const userData = (userSnap.data() ?? {}) as {
+    firstName?: string;
+    lastName?: string;
+  };
+  return (
+    `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim() || 'Cliente'
+  );
+}
+
+export async function createAppointmentWithCapacityCheck(
+  input: AppointmentCreateInput,
+) {
+  const db = getFirestore();
+  const settings = await getShopSettings();
+  const customerName = await getCustomerName(input.customerUid);
+  const dayKey = toDayKey(input.startAtMs);
 
   return runTransaction(db, async tx => {
     const qy = query(
@@ -165,17 +212,18 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
     const snap = await getDocs(qy);
 
     let concurrent = 0;
-    snap.docs.forEach((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
+
+    snap.docs.forEach((d: QDoc) => {
       const appt = d.data() as AppointmentDoc;
-      if (overlaps(appt.startAtMs, appt.endAtMs, input.startAtMs, input.endAtMs)) {
+      if (
+        overlaps(appt.startAtMs, appt.endAtMs, input.startAtMs, input.endAtMs)
+      ) {
         concurrent += 1;
       }
     });
 
-    if (concurrent >= cfg.parallelCapacity) {
-      const err: any = new Error('Horário ocupado');
-      err.code = 'SLOT_FULL';
-      throw err;
+    if (concurrent >= settings.parallelCapacity) {
+      throw new AvailabilityError('Horário ocupado', 'SLOT_FULL');
     }
 
     const apptRef = doc(collection(db, 'appointments'));
@@ -190,11 +238,17 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
       price: input.price,
       startAtMs: input.startAtMs,
       endAtMs: input.endAtMs,
-      status: 'scheduled' as AppointmentStatus,
+      status: 'scheduled',
       createdAt: serverTimestamp(),
     });
 
-    const userRef = doc(db, 'users', input.customerUid, 'appointments', apptRef.id);
+    const userRef = doc(
+      db,
+      'users',
+      input.customerUid,
+      'appointments',
+      apptRef.id,
+    );
     tx.set(userRef, {
       dayKey,
       appointmentId: apptRef.id,
@@ -204,7 +258,7 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
       serviceLabel: input.serviceLabel,
       price: input.price,
       whenMs: input.startAtMs,
-      status: 'scheduled' as AppointmentStatus,
+      status: 'scheduled',
       createdAt: serverTimestamp(),
     });
 

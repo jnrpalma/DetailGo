@@ -1,4 +1,3 @@
-// src/features/appointments/domain/screens/HistoryScreen.tsx
 import React from 'react';
 import {
   ActivityIndicator,
@@ -13,16 +12,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
-import { ArrowLeft, History, Calendar, Clock, CheckCircle, XCircle } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  History,
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 
-
-import { formatDatePtBR, formatHour } from '@shared/utils/date';
-import { formatCurrencyBRL } from '@shared/utils/money';
+import { dateUtils } from '@shared/utils/date.utils';
+import { formatUtils } from '@shared/utils/format.utils';
 import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
-import { UserAppointment } from '../domain/appointment.types';
+import type { UserAppointment } from '../domain/appointment.types';
 
 // Paleta DetailGo
 const colors = {
@@ -40,7 +45,7 @@ const colors = {
     tertiary: '#64748B',
     disabled: '#94A3B8',
     white: '#FFFFFF',
-  }
+  },
 };
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -57,9 +62,10 @@ export default function HistoryScreen() {
   });
 
   const renderItem = ({ item }: { item: UserAppointment }) => {
-    const subtitle = item.vehicleType === 'Carro' && item.carCategory
-      ? `${item.vehicleType} • ${item.carCategory}`
-      : item.vehicleType;
+    const subtitle =
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `${item.vehicleType} • ${item.carCategory}`
+        : item.vehicleType;
 
     const isDone = item.status === 'done';
     const statusLabel = isDone ? 'Concluído' : 'Não realizado';
@@ -70,13 +76,23 @@ export default function HistoryScreen() {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>{item.serviceLabel ?? 'Serviço'}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}10` }]}>
+            <Text style={styles.serviceName}>
+              {item.serviceLabel ?? 'Serviço'}
+            </Text>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: `${statusColor}10` },
+              ]}
+            >
               <StatusIcon size={14} color={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {statusLabel}
+              </Text>
             </View>
           </View>
-          <Text style={styles.price}>{formatCurrencyBRL(item.price)}</Text>
+          {/* 👇 USANDO formatUtils */}
+          <Text style={styles.price}>{formatUtils.currency(item.price)}</Text>
         </View>
 
         <View style={styles.divider} />
@@ -84,11 +100,17 @@ export default function HistoryScreen() {
         <View style={styles.cardFooter}>
           <View style={styles.infoRow}>
             <Calendar size={16} color={colors.text.tertiary} />
-            <Text style={styles.infoText}>{formatDatePtBR(item.startAtMs)}</Text>
+            {/* 👇 USANDO dateUtils */}
+            <Text style={styles.infoText}>
+              {dateUtils.formatDate(item.startAtMs)}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Clock size={16} color={colors.text.tertiary} />
-            <Text style={styles.infoText}>{formatHour(item.startAtMs)}</Text>
+            {/* 👇 USANDO dateUtils */}
+            <Text style={styles.infoText}>
+              {dateUtils.formatHour(item.startAtMs)}
+            </Text>
           </View>
           <View style={styles.vehicleBadge}>
             <Text style={styles.vehicleText}>{subtitle}</Text>
@@ -135,7 +157,7 @@ export default function HistoryScreen() {
           ) : (
             <FlatList
               data={items}
-              keyExtractor={(item) => item.id}
+              keyExtractor={item => item.id}
               renderItem={renderItem}
               ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
               contentContainerStyle={styles.listContent}
@@ -160,7 +182,6 @@ export default function HistoryScreen() {
   );
 }
 
-// Styles continuam iguais...
 const styles = StyleSheet.create({
   safe: {
     flex: 1,

@@ -24,10 +24,17 @@ export type RegisterInput = {
 };
 
 export type AuthResult =
-  | { ok: true; user: FirebaseAuthTypes.User; cred?: FirebaseAuthTypes.UserCredential }
+  | {
+      ok: true;
+      user: FirebaseAuthTypes.User;
+      cred?: FirebaseAuthTypes.UserCredential;
+    }
   | { ok: false; message: string; code?: string };
 
-function mapFirebaseError(code?: string, fallback = 'Ocorreu um erro. Tente novamente.') {
+function mapFirebaseError(
+  code?: string,
+  fallback = 'Ocorreu um erro. Tente novamente.',
+) {
   switch (code) {
     case 'auth/invalid-email':
       return 'E-mail inválido.';
@@ -45,7 +52,10 @@ function mapFirebaseError(code?: string, fallback = 'Ocorreu um erro. Tente nova
   }
 }
 
-async function ensureUserDocument(uid: string, data: Partial<RegisterInput> & { email: string }) {
+async function ensureUserDocument(
+  uid: string,
+  data: Partial<RegisterInput> & { email: string },
+) {
   const db = getFirestore();
   const ref = doc(db, 'users', uid);
   await setDoc(
@@ -58,24 +68,35 @@ async function ensureUserDocument(uid: string, data: Partial<RegisterInput> & { 
       phone: data.phone ?? '',
       createdAt: serverTimestamp(),
     },
-    { merge: true }
+    { merge: true },
   );
 }
 
-export async function signIn(email: string, password: string): Promise<AuthResult> {
+export async function signIn(
+  email: string,
+  password: string,
+): Promise<AuthResult> {
   try {
     const auth = getAuth();
     const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
     return { ok: true, user: cred.user, cred };
   } catch (e: any) {
-    return { ok: false, message: mapFirebaseError(e?.code, 'Erro ao autenticar.'), code: e?.code };
+    return {
+      ok: false,
+      message: mapFirebaseError(e?.code, 'Erro ao autenticar.'),
+      code: e?.code,
+    };
   }
 }
 
 export async function register(data: RegisterInput): Promise<AuthResult> {
   try {
     const auth = getAuth();
-    const cred = await createUserWithEmailAndPassword(auth, data.email.trim(), data.password);
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      data.email.trim(),
+      data.password,
+    );
 
     const displayName = `${data.firstName} ${data.lastName}`.trim();
     if (displayName) await updateProfile(cred.user, { displayName });
@@ -83,7 +104,11 @@ export async function register(data: RegisterInput): Promise<AuthResult> {
     await ensureUserDocument(cred.user.uid, data);
     return { ok: true, user: cred.user, cred };
   } catch (e: any) {
-    return { ok: false, message: mapFirebaseError(e?.code, 'Erro ao criar conta.'), code: e?.code };
+    return {
+      ok: false,
+      message: mapFirebaseError(e?.code, 'Erro ao criar conta.'),
+      code: e?.code,
+    };
   }
 }
 
@@ -95,6 +120,8 @@ export function getCurrentUser(): FirebaseAuthTypes.User | null {
   return getAuth().currentUser;
 }
 
-export function subscribeAuth(callback: (user: FirebaseAuthTypes.User | null) => void) {
+export function subscribeAuth(
+  callback: (user: FirebaseAuthTypes.User | null) => void,
+) {
   return onAuthStateChanged(getAuth(), callback);
 }

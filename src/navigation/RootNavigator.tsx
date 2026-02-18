@@ -13,12 +13,13 @@ import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
 
-import { ensureShopSettings } from '@app/bootstrap/ensureShopSettings';
+
 import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
 
 import { isAdminEmail } from '@features/auth/utils/roles';
 
 import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
+import { ensureShopSettings } from '@features/settings/services/shopSettings.service';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

@@ -1,31 +1,14 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, surfaces } from '@shared/theme';
-import type { UserAppointment } from '@features/appointments/domain/appointment.types';
+import { colors } from '@shared/theme/colors';
+import { dateUtils } from '@shared/utils/date.utils';
+import { formatUtils } from '@shared/utils/format.utils';
+import type { UserAppointment } from '../../domain/appointment.types';
 
 type Props = {
   item: UserAppointment;
 };
-
-function formatCurrency(v: number | null) {
-  return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
-}
-
-function formatDate(ms: number) {
-  const d = new Date(ms);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export default function AppointmentCard({ item }: Props) {
   const subtitle =
@@ -44,12 +27,12 @@ export default function AppointmentCard({ item }: Props) {
 
   const statusColor =
     item.status === 'done'
-      ? '#16A34A'
+      ? colors.status.success
       : item.status === 'in_progress'
-      ? '#2563EB'
+      ? colors.status.warning
       : item.status === 'no_show'
-      ? '#DC2626'
-      : '#6B7280';
+      ? colors.status.error
+      : colors.text.disabled;
 
   return (
     <View style={styles.card}>
@@ -62,9 +45,12 @@ export default function AppointmentCard({ item }: Props) {
       </View>
 
       <View style={styles.cardRight}>
-        <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
+        <Text style={styles.cardPrice}>
+          +{formatUtils.currencyCompact(item.price)}
+        </Text>
         <Text style={styles.cardDate}>
-          {formatDate(item.startAtMs)} • {formatHour(item.startAtMs)}
+          {dateUtils.formatDate(item.startAtMs)} •{' '}
+          {dateUtils.formatHour(item.startAtMs)}
         </Text>
       </View>
     </View>
@@ -75,30 +61,39 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: surfaces.card,
+    backgroundColor: colors.background.card,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.border.main,
   },
   cardLeft: { flex: 1 },
   cardRight: { alignItems: 'flex-end' },
 
   cardTitle: {
-    color: colors.text,
+    color: colors.text.primary,
     fontSize: 18,
     fontWeight: '800',
     marginBottom: 4,
   },
-  cardSubtitle: { color: '#616E7C', fontSize: 15 },
-  status: { fontWeight: '900', marginTop: 6 },
+  cardSubtitle: {
+    color: colors.text.tertiary,
+    fontSize: 15,
+  },
+  status: {
+    fontWeight: '900',
+    marginTop: 6,
+  },
 
   cardPrice: {
-    color: colors.primary,
+    color: colors.primary.main,
     fontSize: 16,
     fontWeight: '900',
     marginBottom: 6,
   },
-  cardDate: { color: '#616E7C', fontSize: 15 },
+  cardDate: {
+    color: colors.text.tertiary,
+    fontSize: 15,
+  },
 });

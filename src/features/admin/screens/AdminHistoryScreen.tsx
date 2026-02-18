@@ -1,3 +1,4 @@
+// src/features/admin/screens/AdminHistoryScreen.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   ActivityIndicator, 
@@ -28,14 +29,15 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import { colors, spacing, surfaces } from '@shared/theme';
+// 👇 IMPORTS CORRETOS
+import { dateUtils } from '@shared/utils/date.utils';
+import { formatUtils } from '@shared/utils/format.utils';
+import { colors, spacing, radii, surfaces, borders } from '@shared/theme'; // 👈 TODOS os exports
+import { useCustomerName } from '@shared/hooks/useFirestoreCache';
 
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
-
-import { formatDatePtBR, formatHour } from '@shared/utils/date';
-import { formatCurrencyBRL } from '@shared/utils/money';
 
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
@@ -50,31 +52,18 @@ export default function AdminHistoryScreen() {
   const [filter, setFilter] = useState<'all' | 'done' | 'no_show'>('all');
 
   const [loadingMore, setLoadingMore] = useState(false);
+  // 👈 CORRIGIDO: useRef em vez de useState
   const lastDocRef = useRef<QDoc | null>(null);
   const canLoadMoreRef = useRef(true);
 
-  const nameCacheRef = useRef<Map<string, string>>(new Map());
+  // 👇 Usando o hook de cache
+  const { fetchCustomerName } = useCustomerName();
 
   const statusSet = useMemo(() => {
     if (filter === 'done') return ['done'] as AppointmentStatus[];
     if (filter === 'no_show') return ['no_show'] as AppointmentStatus[];
     return ['done', 'no_show'] as AppointmentStatus[];
   }, [filter]);
-
-  const resolveCustomerNameSafe = async (customerUid: string): Promise<string> => {
-    const cached = nameCacheRef.current.get(customerUid);
-    if (cached) return cached;
-
-    try {
-      const snap = await getDoc(doc(db, 'users', customerUid));
-      const data = (snap.data() ?? {}) as { firstName?: string; lastName?: string };
-      const name = `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
-      nameCacheRef.current.set(customerUid, name);
-      return name;
-    } catch {
-      return 'Cliente';
-    }
-  };
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -100,10 +89,11 @@ export default function AdminHistoryScreen() {
         lastDocRef.current = (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? null;
         canLoadMoreRef.current = snap.docs.length >= 30;
 
+        // 👇 Usando fetchCustomerName
         const withNames = await Promise.all(
           base.map(async (it) => {
             if (it.customerName && it.customerName !== 'Cliente') return it;
-            const name = await resolveCustomerNameSafe(it.customerUid);
+            const name = await fetchCustomerName(it.customerUid);
             return { ...it, customerName: name };
           }),
         );
@@ -115,7 +105,7 @@ export default function AdminHistoryScreen() {
     );
 
     return () => unsub();
-  }, [user?.uid, statusSet, db]);
+  }, [user?.uid, statusSet, db, fetchCustomerName]);
 
   const loadMore = async () => {
     if (loadingMore) return;
@@ -143,10 +133,11 @@ export default function AdminHistoryScreen() {
         (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? lastDocRef.current;
       canLoadMoreRef.current = snap.docs.length >= 30;
 
+      // 👇 Usando fetchCustomerName
       const withNames = await Promise.all(
         base.map(async (it) => {
           if (it.customerName && it.customerName !== 'Cliente') return it;
-          const name = await resolveCustomerNameSafe(it.customerUid);
+          const name = await fetchCustomerName(it.customerUid);
           return { ...it, customerName: name };
         }),
       );
@@ -162,10 +153,14 @@ export default function AdminHistoryScreen() {
 
   const renderItem = ({ item }: { item: AdminAppointment }) => {
     const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory ? `Carro • ${item.carCategory}` : item.vehicleType;
+      item.vehicleType === 'Carro' && item.carCategory 
+        ? `Carro • ${item.carCategory}` 
+        : item.vehicleType;
 
     const statusLabel = item.status === 'done' ? 'Concluído' : 'Não realizado';
-    const statusColor = item.status === 'done' ? '#16A34A' : '#DC2626';
+    const statusColor = item.status === 'done' 
+      ? colors.status.success 
+      : colors.status.error;
 
     return (
       <View style={styles.card}>
@@ -174,14 +169,14 @@ export default function AdminHistoryScreen() {
           <Text style={styles.client}>👤 {item.customerName}</Text>
 
           <Text style={styles.sub}>
-            {subtitle} • {formatDatePtBR(item.startAtMs)} • {formatHour(item.startAtMs)}
+            {subtitle} • {dateUtils.formatDate(item.startAtMs)} • {dateUtils.formatHour(item.startAtMs)}
           </Text>
 
           <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.price}>+{formatCurrencyBRL(item.price)}</Text>
+          <Text style={styles.price}>+{formatUtils.currencyCompact(item.price)}</Text>
         </View>
       </View>
     );
@@ -202,31 +197,29 @@ export default function AdminHistoryScreen() {
 
   if (!user?.uid) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.main }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.primary.main} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'left', 'right']}>
-      {/* Header com botão voltar */}
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.main }} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <ArrowLeft size={24} color={colors.text} />
+          <ArrowLeft size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>Histórico Admin</Text>
         <View style={styles.headerRightPlaceholder} />
       </View>
 
       <View style={{ flex: 1, padding: spacing.lg }}>
-        {/* Filtros */}
         <View style={styles.filtersRow}>
           <FilterBtn id="all" label="Todos" />
           <FilterBtn id="done" label="Concluídos" />
@@ -235,7 +228,7 @@ export default function AdminHistoryScreen() {
 
         {loading ? (
           <View style={{ paddingTop: 30 }}>
-            <ActivityIndicator />
+            <ActivityIndicator color={colors.primary.main} />
           </View>
         ) : (
           <FlatList
@@ -249,12 +242,12 @@ export default function AdminHistoryScreen() {
             ListFooterComponent={
               loadingMore ? (
                 <View style={{ paddingVertical: 16 }}>
-                  <ActivityIndicator />
+                  <ActivityIndicator color={colors.primary.main} />
                 </View>
               ) : null
             }
             ListEmptyComponent={
-              <Text style={{ textAlign: 'center', color: '#6B7280', marginTop: 20 }}>
+              <Text style={{ textAlign: 'center', color: colors.text.disabled, marginTop: 20 }}>
                 Sem registros para o filtro selecionado.
               </Text>
             }
@@ -272,13 +265,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background.main,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: borders.default,
   },
   backButton: {
     padding: spacing.xs,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     backgroundColor: surfaces.card,
     width: 40,
     height: 40,
@@ -288,7 +281,7 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.text,
+    color: colors.text.primary,
     flex: 1,
     textAlign: 'center',
   },
@@ -303,49 +296,49 @@ const styles = StyleSheet.create({
   },
   filterBtn: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: borders.default,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 999,
     backgroundColor: surfaces.card,
   },
   filterBtnActive: { 
-    backgroundColor: colors.primary, 
-    borderColor: colors.primary 
+    backgroundColor: colors.primary.main, 
+    borderColor: colors.primary.main 
   },
   filterText: { 
-    color: colors.text, 
+    color: colors.text.primary, 
     fontWeight: '800',
     fontSize: 14,
   },
   filterTextActive: { 
-    color: colors.bg 
+    color: colors.text.white 
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: surfaces.card,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: borders.default,
     gap: 12,
   },
   title: { 
-    color: colors.text, 
+    color: colors.text.primary, 
     fontSize: 16, 
     fontWeight: '900', 
     marginBottom: 4 
   },
   client: { 
-    color: '#111827', 
+    color: colors.text.primary, 
     fontWeight: '900', 
     marginBottom: 6,
     fontSize: 14,
   },
   sub: { 
-    color: '#616E7C', 
+    color: colors.text.tertiary, 
     fontSize: 13, 
     fontWeight: '700', 
     marginBottom: 6 
@@ -355,7 +348,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   price: { 
-    color: colors.primary, 
+    color: colors.primary.main, 
     fontWeight: '900',
     fontSize: 16,
   },
