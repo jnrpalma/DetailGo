@@ -1,5 +1,5 @@
+// src/features/appointments/domain/hooks/useDashboardAppointments.ts
 import { useEffect, useRef, useState } from 'react';
-
 import {
   collection,
   getDocs,
@@ -13,40 +13,25 @@ import {
 } from '@react-native-firebase/firestore';
 
 import type { UserAppointment } from '../domain/appointment.types';
-
-import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
-
-import {
-  normalizeUserAppointmentFromSubcollection,
-  normalizeUserAppointmentFromGlobal,
-} from '../data/appointment.normalizers';
+import { normalizeUserAppointmentFromGlobal, normalizeUserAppointmentFromSubcollection } from '../data/appointment.normalizers';
+import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants'; // 👈 ADICIONE ESTA LINHA
 
 export type DashboardAppointment = UserAppointment;
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type Params = {
   uid: string;
   limitN?: number;
-  markNoShow?: (appointmentId: string, customerUid: string) => Promise<void>;
 };
 
 export function useDashboardAppointments({
   uid,
   limitN = 30,
-  markNoShow,
 }: Params) {
   const [items, setItems] = useState<DashboardAppointment[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const markedRef = useRef<Set<string>>(new Set());
   const fallbackOnceRef = useRef(false);
-
-  const markNoShowRef = useRef<typeof markNoShow>(markNoShow);
-  useEffect(() => {
-    markNoShowRef.current = markNoShow;
-  }, [markNoShow]);
 
   useEffect(() => {
     if (!uid) return;
@@ -68,35 +53,22 @@ export function useDashboardAppointments({
           .map((d: QDoc) => normalizeUserAppointmentFromSubcollection(d))
           .filter(Boolean) as DashboardAppointment[];
 
-        // se subcollection tem dados: usa ela
-        if (snap.docs.length > 0) {
-          setItems(arr);
-          setLoading(false);
-
-          const fn = markNoShowRef.current;
-          if (fn) {
-            const now = Date.now();
-            const shouldMark = arr.filter(
-              it =>
-                it.status === 'scheduled' &&
-                now > it.startAtMs + NO_SHOW_GRACE_MS &&
-                !markedRef.current.has(it.id),
-            );
-
-            if (shouldMark.length > 0) {
-              shouldMark.forEach(it => markedRef.current.add(it.id));
-              await Promise.all(
-                shouldMark.map(async it => {
-                  try {
-                    await fn(it.id, uid);
-                  } catch {
-                    markedRef.current.delete(it.id);
-                  }
-                }),
-              );
-            }
+        // 👇 ADICIONE ESTA LÓGICA AQUI TAMBÉM
+        const now = Date.now();
+        const updatedList = arr.map(item => {
+          if (item.status === 'scheduled' && 
+              now > item.startAtMs + NO_SHOW_GRACE_MS) {
+            return {
+              ...item,
+              status: 'no_show' as const
+            };
           }
+          return item;
+        });
 
+        if (snap.docs.length > 0) {
+          setItems(updatedList); // 👈 USA A LISTA ATUALIZADA
+          setLoading(false);
           return;
         }
 
@@ -122,7 +94,19 @@ export function useDashboardAppointments({
             .map((d: QDoc) => normalizeUserAppointmentFromGlobal(d))
             .filter(Boolean) as DashboardAppointment[];
 
-          setItems(fromGlobal);
+          // 👇 TAMBÉM ATUALIZA OS DADOS GLOBAIS
+          const updatedGlobal = fromGlobal.map(item => {
+            if (item.status === 'scheduled' && 
+                now > item.startAtMs + NO_SHOW_GRACE_MS) {
+              return {
+                ...item,
+                status: 'no_show' as const
+              };
+            }
+            return item;
+          });
+
+          setItems(updatedGlobal);
           setLoading(false);
         } catch {
           setItems([]);

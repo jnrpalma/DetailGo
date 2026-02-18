@@ -1,5 +1,5 @@
-import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
-import type { AppointmentStatus } from '../domain/appointment.types';
+import { NO_SHOW_GRACE_MS } from "../domain/appointment.constants";
+import { AppointmentStatus } from "../domain/appointment.types";
 
 export function isExpiredAppointment(
   startAtMs: number,
