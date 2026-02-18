@@ -359,134 +359,133 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  // Header Premium da Semana - Versão Compacta
-  // Substitua a função WeekHeaderPremium por esta versão melhorada
-const WeekHeaderPremium = () => {
-  const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
-  const startDate = new Date(weekStartMs);
-  const endDate = new Date(weekEndMs);
-  
-  const startDay = startDate.getDate();
-  const endDay = endDate.getDate();
-  
-  // Formatação inteligente do mês/ano
-  const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
-  const endMonth = endDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
-  const startYear = startDate.getFullYear();
-  const endYear = endDate.getFullYear();
-  
-  // Lógica para mostrar o período corretamente
-  let periodText = '';
-  if (startMonth === endMonth && startYear === endYear) {
-    // Mesmo mês e ano
-    periodText = `${startDay}–${endDay} ${startMonth} ${startYear}`;
-  } else if (startYear === endYear) {
-    // Mesmo ano, meses diferentes
-    periodText = `${startDay} ${startMonth} – ${endDay} ${endMonth} ${startYear}`;
-  } else {
-    // Anos diferentes
-    periodText = `${startDay} ${startMonth} ${startYear} – ${endDay} ${endMonth} ${endYear}`;
-  }
-  
-  const totalAppointments = appointmentsWeek.length;
+  // Header Premium da Semana - Versão Compacta com formatação inteligente
+  const WeekHeaderPremium = () => {
+    const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+    const startDate = new Date(weekStartMs);
+    const endDate = new Date(weekEndMs);
+    
+    const startDay = startDate.getDate();
+    const endDay = endDate.getDate();
+    
+    // Formatação inteligente do mês/ano
+    const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+    const endMonth = endDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+    
+    // Lógica para mostrar o período corretamente
+    let periodText = '';
+    if (startMonth === endMonth && startYear === endYear) {
+      // Mesmo mês e ano
+      periodText = `${startDay}–${endDay} ${startMonth} ${startYear}`;
+    } else if (startYear === endYear) {
+      // Mesmo ano, meses diferentes
+      periodText = `${startDay} ${startMonth} – ${endDay} ${endMonth} ${startYear}`;
+    } else {
+      // Anos diferentes
+      periodText = `${startDay} ${startMonth} ${startYear} – ${endDay} ${endMonth} ${endYear}`;
+    }
+    
+    const totalAppointments = appointmentsWeek.length;
 
-  return (
-    <View style={styles.premiumContainer}>
-      {/* Linha 1: Título e contador */}
-      <View style={styles.premiumHeader}>
-        <View style={styles.premiumTitleContainer}>
-          <Text style={styles.premiumSubtitle}>AGENDAMENTOS</Text>
-          <Text style={styles.premiumTitle}>
-            {periodText}
-          </Text>
+    return (
+      <View style={styles.premiumContainer}>
+        {/* Linha 1: Título e contador */}
+        <View style={styles.premiumHeader}>
+          <View style={styles.premiumTitleContainer}>
+            <Text style={styles.premiumSubtitle}>AGENDAMENTOS</Text>
+            <Text style={styles.premiumTitle}>
+              {periodText}
+            </Text>
+          </View>
+          <View style={styles.premiumCount}>
+            <Text style={styles.premiumCountText}>{totalAppointments}</Text>
+            <Text style={styles.premiumCountLabel}>agend.</Text>
+          </View>
         </View>
-        <View style={styles.premiumCount}>
-          <Text style={styles.premiumCountText}>{totalAppointments}</Text>
-          <Text style={styles.premiumCountLabel}>agend.</Text>
-        </View>
-      </View>
 
-      {/* Linha 2: Navegação */}
-      <View style={styles.premiumNav}>
-        <TouchableOpacity 
-          style={styles.premiumNavButton}
-          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
-          activeOpacity={0.7}
-        >
-          <ChevronLeft size={16} color={colors.primary.main} />
-          <Text style={styles.premiumNavText}>Anterior</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.premiumNavToday}
-          onPress={() => setWeekAnchor(new Date())}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.premiumNavTodayText}>Hoje</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.premiumNavButton}
-          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.premiumNavText}>Próxima</Text>
-          <ChevronRight size={16} color={colors.primary.main} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Linha 3: Barra de progresso */}
-      <View style={styles.premiumProgress}>
-        <View 
-          style={[
-            styles.premiumProgressBar, 
-            { width: `${(new Date().getDay() / 6) * 100}%` }
-          ]} 
-        />
-      </View>
-
-      {/* Linha 4: Dias da semana */}
-      <View style={styles.premiumDays}>
-        {weekDays.map((day, index) => {
-          const dayDate = dateUtils.addDays(startDate, index);
-          const dayNumber = dayDate.getDate();
-          const isToday = dateUtils.isCurrentWeek(weekAnchor) && 
-                         dayDate.getDate() === new Date().getDate() &&
-                         dayDate.getMonth() === new Date().getMonth() &&
-                         dayDate.getFullYear() === new Date().getFullYear();
+        {/* Linha 2: Navegação */}
+        <View style={styles.premiumNav}>
+          <TouchableOpacity 
+            style={styles.premiumNavButton}
+            onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
+            activeOpacity={0.7}
+          >
+            <ChevronLeft size={16} color={colors.primary.main} />
+            <Text style={styles.premiumNavText}>Anterior</Text>
+          </TouchableOpacity>
           
-          const dayAppointments = appointmentsWeek.filter(item => {
-            const itemDate = new Date(item.startAtMs);
-            return itemDate.getDate() === dayNumber &&
-                   itemDate.getMonth() === dayDate.getMonth() &&
-                   itemDate.getFullYear() === dayDate.getFullYear();
-          }).length;
+          <TouchableOpacity 
+            style={styles.premiumNavToday}
+            onPress={() => setWeekAnchor(new Date())}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.premiumNavTodayText}>Hoje</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.premiumNavButton}
+            onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.premiumNavText}>Próxima</Text>
+            <ChevronRight size={16} color={colors.primary.main} />
+          </TouchableOpacity>
+        </View>
 
-          return (
-            <TouchableOpacity 
-              key={day} 
-              style={[styles.premiumDay, isToday && styles.premiumDayToday]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.premiumDayName, isToday && styles.premiumDayTextToday]}>
-                {day}
-              </Text>
-              <Text style={[styles.premiumDayNumber, isToday && styles.premiumDayTextToday]}>
-                {dayNumber}
-              </Text>
-              <View 
-                style={[
-                  styles.premiumDayDot, 
-                  dayAppointments > 0 && styles.premiumDayDotActive
-                ]} 
-              />
-            </TouchableOpacity>
-          );
-        })}
+        {/* Linha 3: Barra de progresso */}
+        <View style={styles.premiumProgress}>
+          <View 
+            style={[
+              styles.premiumProgressBar, 
+              { width: `${(new Date().getDay() / 6) * 100}%` }
+            ]} 
+          />
+        </View>
+
+        {/* Linha 4: Dias da semana */}
+        <View style={styles.premiumDays}>
+          {weekDays.map((day, index) => {
+            const dayDate = dateUtils.addDays(startDate, index);
+            const dayNumber = dayDate.getDate();
+            const isToday = dateUtils.isCurrentWeek(weekAnchor) && 
+                           dayDate.getDate() === new Date().getDate() &&
+                           dayDate.getMonth() === new Date().getMonth() &&
+                           dayDate.getFullYear() === new Date().getFullYear();
+            
+            const dayAppointments = appointmentsWeek.filter(item => {
+              const itemDate = new Date(item.startAtMs);
+              return itemDate.getDate() === dayNumber &&
+                     itemDate.getMonth() === dayDate.getMonth() &&
+                     itemDate.getFullYear() === dayDate.getFullYear();
+            }).length;
+
+            return (
+              <TouchableOpacity 
+                key={day} 
+                style={[styles.premiumDay, isToday && styles.premiumDayToday]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.premiumDayName, isToday && styles.premiumDayTextToday]}>
+                  {day}
+                </Text>
+                <Text style={[styles.premiumDayNumber, isToday && styles.premiumDayTextToday]}>
+                  {dayNumber}
+                </Text>
+                <View 
+                  style={[
+                    styles.premiumDayDot, 
+                    dayAppointments > 0 && styles.premiumDayDotActive
+                  ]} 
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
 
   const renderAppointment = ({ item }: { item: AdminAppointment }) => {
     const subtitle =
@@ -687,37 +686,63 @@ const WeekHeaderPremium = () => {
           </View>
         </View>
 
-        {/* Menu lateral */}
+        {/* Menu lateral - Padronizado com o do usuário */}
         {menuVisible && (
           <>
             <Pressable style={styles.overlay} onPress={toggleMenu} />
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
+            <Animated.View
+              style={[
+                styles.drawer,
+                { transform: [{ translateX: slideAnim }] },
+              ]}
+            >
               <View style={styles.drawerHeader}>
-                <Text style={styles.drawerUserName}>{fullName}</Text>
-                <Text style={styles.drawerUserEmail}>{user.email}</Text>
+                <View style={styles.drawerUserInfo}>
+                  <Text style={styles.drawerUserName}>{fullName}</Text>
+                  <Text style={styles.drawerUserEmail}>{user.email}</Text>
+                  {profile.role === 'admin' && (
+                    <View style={styles.drawerAdminBadge}>
+                      <Text style={styles.drawerAdminBadgeText}>Administrador</Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
               <View style={styles.drawerContent}>
-                <TouchableOpacity style={styles.drawerItem} onPress={() => navigateFromMenu('AdminDashboard')}>
+                <TouchableOpacity
+                  style={styles.drawerItem}
+                  onPress={() => navigateFromMenu('AdminDashboard')}
+                >
                   <Calendar size={22} color={colors.primary.main} />
                   <Text style={styles.drawerItemText}>Dashboard</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.drawerItem} onPress={() => navigateFromMenu('AdminHistory')}>
+                <TouchableOpacity
+                  style={styles.drawerItem}
+                  onPress={() => navigateFromMenu('AdminHistory')}
+                >
                   <History size={22} color={colors.primary.main} />
                   <Text style={styles.drawerItemText}>Histórico</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.drawerItem} onPress={() => navigateFromMenu('AdminManage')}>
+                <TouchableOpacity
+                  style={styles.drawerItem}
+                  onPress={() => navigateFromMenu('AdminManage')}
+                >
                   <Settings size={22} color={colors.primary.main} />
                   <Text style={styles.drawerItemText}>Gerenciar</Text>
                 </TouchableOpacity>
 
                 <View style={styles.drawerDivider} />
 
-                <TouchableOpacity style={[styles.drawerItem, styles.drawerLogout]} onPress={handleSignOut}>
+                <TouchableOpacity
+                  style={[styles.drawerItem, styles.drawerLogout]}
+                  onPress={handleSignOut}
+                >
                   <LogOut size={22} color={colors.status.error} />
-                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
+                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>
+                    Sair
+                  </Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -1140,7 +1165,7 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'center',
   },
-  // Overlay and drawer
+  // Overlay and drawer - Padronizado com o usuário
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.overlay,
@@ -1150,43 +1175,62 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: MENU_W,
-    backgroundColor: surfaces.drawer,
-    paddingTop: 48,
-    paddingHorizontal: spacing.md,
+    width: UI.MENU_WIDTH,
+    backgroundColor: colors.background.main,
+    borderTopRightRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
+    shadowColor: colors.text.primary,
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    shadowOffset: { width: 2, height: 0 },
+    elevation: 8,
   },
   drawerHeader: {
-    paddingBottom: spacing.lg,
+    padding: spacing.lg,
+    paddingTop: 48,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.main,
-    marginBottom: spacing.lg,
+  },
+  drawerUserInfo: {
+    gap: spacing.xs,
   },
   drawerUserName: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text.white,
-    marginBottom: 2,
+    color: colors.text.primary,
   },
   drawerUserEmail: {
     fontSize: 14,
-    color: colors.text.disabled,
+    color: colors.text.tertiary,
+    marginBottom: spacing.xs,
+  },
+  drawerAdminBadge: {
+    backgroundColor: colors.primary.light,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+    alignSelf: 'flex-start',
+  },
+  drawerAdminBadgeText: {
+    color: colors.primary.main,
+    fontSize: 12,
+    fontWeight: '600',
   },
   drawerContent: {
-    flex: 1,
+    padding: spacing.md,
   },
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 14,
     paddingHorizontal: spacing.md,
     borderRadius: radii.md,
-    marginBottom: 4,
+    gap: 14,
   },
   drawerItemText: {
     fontSize: 16,
-    color: colors.text.white,
     fontWeight: '500',
+    color: colors.text.primary,
   },
   drawerDivider: {
     height: 1,
@@ -1195,9 +1239,9 @@ const styles = StyleSheet.create({
   },
   drawerLogout: {
     marginTop: 'auto',
-    marginBottom: spacing.xl,
   },
   drawerLogoutText: {
     color: colors.status.error,
+    fontWeight: '600',
   },
 });
