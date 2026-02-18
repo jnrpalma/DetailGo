@@ -12,8 +12,6 @@ import {
 } from '@react-native-firebase/firestore';
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
-
-
 const NO_SHOW_GRACE_MIN = 15;
 const NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN * 60 * 1000;
 

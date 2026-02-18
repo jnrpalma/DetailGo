@@ -1,4 +1,3 @@
-// src/features/appointments/domain/hooks/useDashboardAppointments.ts
 import { useEffect, useRef, useState } from 'react';
 import {
   collection,
@@ -14,7 +13,7 @@ import {
 
 import type { UserAppointment } from '../domain/appointment.types';
 import { normalizeUserAppointmentFromGlobal, normalizeUserAppointmentFromSubcollection } from '../data/appointment.normalizers';
-import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants'; // 👈 ADICIONE ESTA LINHA
+import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
 
 export type DashboardAppointment = UserAppointment;
 
@@ -42,7 +41,7 @@ export function useDashboardAppointments({
 
     const qUser = query(
       collection(db, 'users', uid, 'appointments'),
-      orderBy('whenMs', 'desc'),
+      orderBy('whenMs', 'asc'), 
       limit(limitN),
     );
 
@@ -53,8 +52,8 @@ export function useDashboardAppointments({
           .map((d: QDoc) => normalizeUserAppointmentFromSubcollection(d))
           .filter(Boolean) as DashboardAppointment[];
 
-        // 👇 ADICIONE ESTA LÓGICA AQUI TAMBÉM
         const now = Date.now();
+        
         const updatedList = arr.map(item => {
           if (item.status === 'scheduled' && 
               now > item.startAtMs + NO_SHOW_GRACE_MS) {
@@ -66,8 +65,12 @@ export function useDashboardAppointments({
           return item;
         });
 
+        const activeAppointments = updatedList.filter(
+          item => item.status === 'scheduled' || item.status === 'in_progress'
+        );
+
         if (snap.docs.length > 0) {
-          setItems(updatedList); // 👈 USA A LISTA ATUALIZADA
+          setItems(activeAppointments); 
           setLoading(false);
           return;
         }
@@ -81,10 +84,12 @@ export function useDashboardAppointments({
         fallbackOnceRef.current = true;
 
         try {
+         
           const qGlobal = query(
             collection(db, 'appointments'),
             where('customerUid', '==', uid),
-            orderBy('startAtMs', 'desc'),
+            where('status', 'in', ['scheduled', 'in_progress']), 
+            orderBy('startAtMs', 'asc'), 
             limit(limitN),
           );
 
@@ -94,7 +99,6 @@ export function useDashboardAppointments({
             .map((d: QDoc) => normalizeUserAppointmentFromGlobal(d))
             .filter(Boolean) as DashboardAppointment[];
 
-          // 👇 TAMBÉM ATUALIZA OS DADOS GLOBAIS
           const updatedGlobal = fromGlobal.map(item => {
             if (item.status === 'scheduled' && 
                 now > item.startAtMs + NO_SHOW_GRACE_MS) {
@@ -106,7 +110,12 @@ export function useDashboardAppointments({
             return item;
           });
 
-          setItems(updatedGlobal);
+        
+          const activeGlobal = updatedGlobal.filter(
+            item => item.status === 'scheduled' || item.status === 'in_progress'
+          );
+
+          setItems(activeGlobal);
           setLoading(false);
         } catch {
           setItems([]);

@@ -1,4 +1,3 @@
-// src/features/auth/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,38 +15,17 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { RootStackParamList } from '@app/types';
-import { useAuth } from '@features/auth';
-import { spacing } from '@shared/theme';
 
-// Paleta DetailGo
-const colors = {
-  primary: '#175676', // Baltic Blue
-  secondary: '#4BA3C3', // Turquoise Surf (para hover/focus)
-  error: '#D62839', // Classic Crimson (para validações)
-  errorLight: '#BA324F', // Rosewood (tom mais suave)
-  background: '#FFFFFF',
-  surface: '#F8FAFC',
-  border: '#E2E8F0',
-  text: {
-    primary: '#0F172A',
-    secondary: '#475569',
-    tertiary: '#64748B',
-    disabled: '#94A3B8',
-  },
-  input: {
-    background: '#F8FAFC',
-    border: '#E2E8F0',
-    placeholder: '#94A3B8',
-  }
-};
+import { colors, spacing, radii } from '@shared/theme';
+import type { RootStackParamList } from '@app/types';
+import { useAuth } from '@features/auth';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavProp>();
   const { signIn } = useAuth();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -59,33 +37,35 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!isValid) return;
-    
+
     setLoading(true);
     const result = await signIn(email, password);
     setLoading(false);
-    
+
     if (!result.ok) {
       Alert.alert(
         'Erro ao acessar',
         result.message || 'Email ou senha incorretos',
-        [{ text: 'Tentar novamente' }]
+        [{ text: 'Tentar novamente' }],
       );
     }
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView 
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.background.main}
+      />
+      <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Header com nome da marca */}
         <View style={styles.header}>
           <Text style={styles.brand}>DETAILGO</Text>
           <Text style={styles.tagline}>
@@ -93,16 +73,13 @@ export default function LoginScreen() {
             serviços de estética automotiva
           </Text>
         </View>
-
-        {/* Formulário */}
         <View style={styles.form}>
-          {/* Email */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>E-mail</Text>
             <TextInput
               style={[
                 styles.input,
-                email.length > 0 && !isValidEmail && styles.inputError
+                email.length > 0 && !isValidEmail && styles.inputError,
               ]}
               placeholder="seu@email.com"
               placeholderTextColor={colors.text.disabled}
@@ -121,27 +98,28 @@ export default function LoginScreen() {
             )}
           </View>
 
-          {/* Senha */}
           <View style={styles.inputGroup}>
             <View style={styles.passwordHeader}>
               <Text style={styles.label}>Senha</Text>
-              <TouchableOpacity 
-                onPress={() => Alert.alert(
-                  'Recuperar senha', 
-                  'Enviaremos um link de recuperação para seu e-mail.'
-                )}
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    'Recuperar senha',
+                    'Enviaremos um link de recuperação para seu e-mail.',
+                  )
+                }
                 activeOpacity={0.7}
               >
                 <Text style={styles.forgotLink}>Esqueceu?</Text>
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.passwordWrapper}>
               <TextInput
                 style={[
                   styles.input,
                   styles.passwordInput,
-                  password.length > 0 && !isValidPassword && styles.inputError
+                  password.length > 0 && !isValidPassword && styles.inputError,
                 ]}
                 placeholder="••••••••"
                 placeholderTextColor={colors.text.disabled}
@@ -156,7 +134,7 @@ export default function LoginScreen() {
                 onSubmitEditing={handleLogin}
                 editable={!loading}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setShowPassword(!showPassword)}
                 activeOpacity={0.7}
@@ -181,7 +159,7 @@ export default function LoginScreen() {
             activeOpacity={0.8}
           >
             {loading ? (
-              <ActivityIndicator color={colors.background} />
+              <ActivityIndicator color={colors.text.white} />
             ) : (
               <Text style={styles.buttonText}>Entrar</Text>
             )}
@@ -196,17 +174,17 @@ export default function LoginScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.divider} />
-          
+
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Não tem conta? </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => navigation.navigate('Register')}
               activeOpacity={0.7}
             >
               <Text style={styles.signupLink}>Criar conta</Text>
             </TouchableOpacity>
           </View>
-          
+
           <Text style={styles.copyright}>© 2026 DETAILGO</Text>
         </View>
       </ScrollView>
@@ -217,13 +195,13 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.main,
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.lg,
     paddingTop: 80,
-    paddingBottom: 24,
+    paddingBottom: spacing.lg,
   },
   header: {
     alignItems: 'center',
@@ -232,9 +210,9 @@ const styles = StyleSheet.create({
   brand: {
     fontSize: 32,
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.primary.main,
     letterSpacing: 2,
-    marginBottom: 16,
+    marginBottom: spacing.md,
     textTransform: 'uppercase',
   },
   tagline: {
@@ -247,45 +225,45 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   inputGroup: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.primary,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   input: {
     height: 52,
-    backgroundColor: colors.input.background,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
     fontSize: 16,
     color: colors.text.primary,
     borderWidth: 1,
-    borderColor: colors.input.border,
+    borderColor: colors.border.main,
   },
   inputError: {
-    borderColor: colors.error,
+    borderColor: colors.status.error,
     borderWidth: 1.5,
   },
   errorText: {
-    color: colors.error,
+    color: colors.status.error,
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 6,
+    marginTop: spacing.xs,
     marginLeft: 4,
   },
   passwordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   forgotLink: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   passwordWrapper: {
     position: 'relative',
@@ -295,18 +273,18 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     position: 'absolute',
-    right: 16,
+    right: spacing.md,
     top: 16,
     padding: 4,
   },
   button: {
     height: 52,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    shadowColor: colors.primary,
+    marginTop: spacing.xs,
+    shadowColor: colors.primary.main,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -318,7 +296,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   buttonText: {
-    color: colors.background,
+    color: colors.text.white,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -327,7 +305,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.tertiary,
     textAlign: 'center',
-    marginTop: 24,
+    marginTop: spacing.lg,
     lineHeight: 20,
   },
   footer: {
@@ -335,14 +313,14 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginBottom: 24,
+    backgroundColor: colors.border.main,
+    marginBottom: spacing.lg,
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   signupText: {
     fontSize: 15,
@@ -351,7 +329,7 @@ const styles = StyleSheet.create({
   signupLink: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   copyright: {
     fontSize: 13,

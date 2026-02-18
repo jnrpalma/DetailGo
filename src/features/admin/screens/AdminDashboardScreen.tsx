@@ -51,7 +51,12 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-import { colors, surfaces, radii, spacing } from '@shared/theme';
+
+// 👇 IMPORTS CORRETOS
+import { colors, spacing, radii, surfaces, borders } from '@shared/theme';
+import { dateUtils } from '@shared/utils/date.utils';
+import { formatUtils } from '@shared/utils/format.utils';
+import { useCustomerName } from '@shared/hooks/useFirestoreCache';
 
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
 import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
@@ -79,67 +84,8 @@ const COVER_H = 285;
 const AVATAR = 130;
 const MENU_W = 220;
 
-function startOfWeekMs(anchor: Date) {
-  const d = new Date(anchor);
-  const day = d.getDay();
-  const diffToMonday = (day + 6) % 7;
-  d.setDate(d.getDate() - diffToMonday);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-function endOfWeekMs(anchor: Date) {
-  const s = new Date(startOfWeekMs(anchor));
-  const e = new Date(s);
-  e.setDate(e.getDate() + 6);
-  e.setHours(23, 59, 59, 999);
-  return e.getTime();
-}
-function addDays(base: Date, days: number) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-function formatHour(ms: number) {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-function formatDate(ms: number) {
-  const d = new Date(ms);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-function formatCurrency(v: number | null) {
-  return typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : '--';
-}
-function formatWeekLabel(startMs: number, endMs: number) {
-  const s = new Date(startMs);
-  const e = new Date(endMs);
-
-  const ddS = String(s.getDate()).padStart(2, '0');
-  const ddE = String(e.getDate()).padStart(2, '0');
-
-  const monthS = s.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
-  const monthE = e.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
-
-  const yyyyS = s.getFullYear();
-  const yyyyE = e.getFullYear();
-
-  if (yyyyS === yyyyE && s.getMonth() === e.getMonth())
-    return `${ddS}–${ddE} ${monthS} ${yyyyS}`;
-  if (yyyyS === yyyyE) return `${ddS} ${monthS} – ${ddE} ${monthE} ${yyyyS}`;
-  return `${ddS} ${monthS} ${yyyyS} – ${ddE} ${monthE} ${yyyyE}`;
-}
-function isCurrentWeek(anchor: Date) {
-  return startOfWeekMs(anchor) === startOfWeekMs(new Date());
-}
-
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<Nav>();
-
   const auth = getAuth();
   const user = auth.currentUser;
   const db = getFirestore();
@@ -154,19 +100,30 @@ export default function AdminDashboardScreen() {
 
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const noShowMarkedRef = useRef<Set<string>>(new Set());
-  const nameCacheRef = useRef<Map<string, string>>(new Map());
 
   const [menuOpen, setMenuOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
-  const weekStartMs = useMemo(() => startOfWeekMs(weekAnchor), [weekAnchor]);
-  const weekEndMs = useMemo(() => endOfWeekMs(weekAnchor), [weekAnchor]);
+
+  const weekStartMs = useMemo(
+    () => dateUtils.startOfWeek(weekAnchor),
+    [weekAnchor],
+  );
+  const weekEndMs = useMemo(
+    () => dateUtils.endOfWeek(weekAnchor),
+    [weekAnchor],
+  );
   const weekLabel = useMemo(
-    () => formatWeekLabel(weekStartMs, weekEndMs),
+    () => dateUtils.formatWeekLabel(weekStartMs, weekEndMs),
     [weekStartMs, weekEndMs],
   );
-  const onCurrentWeek = useMemo(() => isCurrentWeek(weekAnchor), [weekAnchor]);
+  const onCurrentWeek = useMemo(
+    () => dateUtils.isCurrentWeek(weekAnchor),
+    [weekAnchor],
+  );
+
+  const { fetchCustomerName } = useCustomerName();
 
   const openMenu = () => {
     setMenuOpen(true);
@@ -177,7 +134,7 @@ export default function AdminDashboardScreen() {
       useNativeDriver: true,
     }).start();
   };
-  
+
   const closeMenu = () => {
     Animated.timing(anim, {
       toValue: 0,
@@ -235,7 +192,6 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  // ADICIONAR FUNÇÃO PARA SALVAR AVATAR
   const saveAvatar = async () => {
     try {
       const b64 = await pickAsBase64();
@@ -258,25 +214,6 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const resolveCustomerName = async (customerUid: string): Promise<string> => {
-    const cached = nameCacheRef.current.get(customerUid);
-    if (cached) return cached;
-
-    try {
-      const snap = await getDoc(doc(db, 'users', customerUid));
-      const data = (snap.data() ?? {}) as {
-        firstName?: string;
-        lastName?: string;
-      };
-      const name =
-        `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
-      nameCacheRef.current.set(customerUid, name);
-      return name;
-    } catch {
-      return 'Cliente';
-    }
-  };
-
   const fillMissingNamesAndUpdate = async (list: AdminAppointment[]) => {
     const updated: AdminAppointment[] = [];
     await Promise.all(
@@ -286,7 +223,7 @@ export default function AdminDashboardScreen() {
           return;
         }
 
-        const name = await resolveCustomerName(it.customerUid);
+        const name = await fetchCustomerName(it.customerUid);
         try {
           await updateDoc(doc(db, 'appointments', it.id), {
             customerName: name,
@@ -377,15 +314,17 @@ export default function AdminDashboardScreen() {
     );
 
     return () => unsub();
-  }, [db, user?.uid, weekStartMs, weekEndMs]);
+  }, [db, user?.uid, weekStartMs, weekEndMs, fetchCustomerName]);
 
   if (!user?.uid) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.background.main }}
+      >
         <View
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
         >
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.primary.main} />
         </View>
       </SafeAreaView>
     );
@@ -445,7 +384,7 @@ export default function AdminDashboardScreen() {
         ? `Carro • ${item.carCategory}`
         : item.vehicleType;
 
-    const expired = Date.now() > item.startAtMs + NO_SHOW_GRACE_MS;
+    const expired = dateUtils.isExpired(item.startAtMs, NO_SHOW_GRACE_MS);
     const isNoShow = item.status === 'scheduled' && expired;
 
     const displayStatus: AppointmentStatus = isNoShow ? 'no_show' : item.status;
@@ -461,12 +400,12 @@ export default function AdminDashboardScreen() {
 
     const statusColor =
       displayStatus === 'done'
-        ? '#16A34A'
+        ? colors.status.success
         : displayStatus === 'in_progress'
-        ? '#2563EB'
+        ? colors.status.warning
         : displayStatus === 'no_show'
-        ? '#DC2626'
-        : '#6B7280';
+        ? colors.status.error
+        : colors.text.disabled;
 
     const canPress = !isNoShow && updatingId !== item.id;
 
@@ -474,13 +413,13 @@ export default function AdminDashboardScreen() {
       displayStatus === 'scheduled'
         ? {
             label: 'Começar',
-            icon: <PlayCircle size={18} color={colors.bg} />,
+            icon: <PlayCircle size={18} color={colors.text.white} />,
             next: 'in_progress' as AppointmentStatus,
           }
         : displayStatus === 'in_progress'
         ? {
             label: 'Concluir',
-            icon: <CheckCircle2 size={18} color={colors.bg} />,
+            icon: <CheckCircle2 size={18} color={colors.text.white} />,
             next: 'done' as AppointmentStatus,
           }
         : null;
@@ -492,14 +431,16 @@ export default function AdminDashboardScreen() {
           <Text style={styles.cardClient}>👤 {item.customerName}</Text>
 
           <Text style={styles.cardSubtitle}>
-            {subtitle} • {formatDate(item.startAtMs)} •{' '}
-            {formatHour(item.startAtMs)}
+            {subtitle} • {dateUtils.formatDate(item.startAtMs)} •{' '}
+            {dateUtils.formatHour(item.startAtMs)}
           </Text>
 
           <Text style={[styles.statusText, { color: statusColor }]}>
             {statusLabel}
           </Text>
-          <Text style={styles.cardPrice}>+{formatCurrency(item.price)}</Text>
+          <Text style={styles.cardPrice}>
+            +{formatUtils.currencyCompact(item.price)}
+          </Text>
         </View>
 
         <View style={styles.actions}>
@@ -517,7 +458,7 @@ export default function AdminDashboardScreen() {
               disabled={!canPress || isNoShow}
             >
               {updatingId === item.id ? (
-                <ActivityIndicator color={colors.bg} />
+                <ActivityIndicator color={colors.text.white} />
               ) : (
                 <>
                   {action.icon}
@@ -558,10 +499,10 @@ export default function AdminDashboardScreen() {
       <View style={styles.weekNavRow}>
         <TouchableOpacity
           style={styles.weekNavBtn}
-          onPress={() => setWeekAnchor(prev => addDays(prev, -7))}
+          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
           activeOpacity={0.85}
         >
-          <ChevronLeft size={18} color={colors.bg} />
+          <ChevronLeft size={18} color={colors.text.white} />
           <Text style={styles.weekNavTxt}>Anterior</Text>
         </TouchableOpacity>
 
@@ -583,11 +524,11 @@ export default function AdminDashboardScreen() {
 
         <TouchableOpacity
           style={styles.weekNavBtn}
-          onPress={() => setWeekAnchor(prev => addDays(prev, 7))}
+          onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
           activeOpacity={0.85}
         >
           <Text style={styles.weekNavTxt}>Próxima</Text>
-          <ChevronRight size={18} color={colors.bg} />
+          <ChevronRight size={18} color={colors.text.white} />
         </TouchableOpacity>
       </View>
     </View>
@@ -607,7 +548,7 @@ export default function AdminDashboardScreen() {
               activeOpacity={0.8}
               onPress={openMenu}
             >
-              <Menu size={26} color={colors.white} />
+              <Menu size={26} color={colors.text.white} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -616,7 +557,7 @@ export default function AdminDashboardScreen() {
               activeOpacity={0.9}
             >
               {saving === 'cover' ? (
-                <ActivityIndicator color={colors.white} />
+                <ActivityIndicator color={colors.text.white} />
               ) : (
                 <Text style={styles.coverBtnTxt}>Trocar capa</Text>
               )}
@@ -624,7 +565,6 @@ export default function AdminDashboardScreen() {
           </ImageBackground>
         </View>
 
-        {/* CONTAINER DO AVATAR COM TOUCHABLE OPACITY */}
         <View style={styles.avatarContainer}>
           <TouchableOpacity onPress={saveAvatar} activeOpacity={0.9}>
             {avatarSource ? (
@@ -636,10 +576,9 @@ export default function AdminDashboardScreen() {
             )}
           </TouchableOpacity>
 
-          {/* INDICADOR DE LOADING PARA AVATAR */}
           {saving === 'avatar' && (
             <View style={styles.avatarLoading}>
-              <ActivityIndicator color={colors.white} />
+              <ActivityIndicator color={colors.text.white} />
             </View>
           )}
         </View>
@@ -647,7 +586,7 @@ export default function AdminDashboardScreen() {
         <View style={styles.body}>
           {loadingWeek ? (
             <View style={{ paddingTop: 18 }}>
-              <ActivityIndicator />
+              <ActivityIndicator color={colors.primary.main} />
             </View>
           ) : (
             <FlatList
@@ -659,7 +598,9 @@ export default function AdminDashboardScreen() {
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={<HeaderWeek />}
               ListEmptyComponent={
-                <Text style={{ textAlign: 'center', color: '#6B7280' }}>
+                <Text
+                  style={{ textAlign: 'center', color: colors.text.disabled }}
+                >
                   Nada marcado nessa semana.
                 </Text>
               }
@@ -686,7 +627,7 @@ export default function AdminDashboardScreen() {
                 onPress={() => Alert.alert('Meu Perfil', 'TODO')}
                 activeOpacity={0.8}
               >
-                <UserIcon size={30} color={colors.sand} />
+                <UserIcon size={30} color={colors.text.white} />
                 <Text style={styles.itemText}>Meu Perfil</Text>
               </TouchableOpacity>
 
@@ -695,7 +636,7 @@ export default function AdminDashboardScreen() {
                 onPress={() => navigation.navigate('AdminHistory')}
                 activeOpacity={0.8}
               >
-                <History size={30} color={colors.sand} />
+                <History size={30} color={colors.text.white} />
                 <Text style={styles.itemText}>Histórico</Text>
               </TouchableOpacity>
 
@@ -704,7 +645,7 @@ export default function AdminDashboardScreen() {
                 onPress={() => navigation.navigate('AdminManage')}
                 activeOpacity={0.8}
               >
-                <Calendar size={30} color={colors.sand} />
+                <Calendar size={30} color={colors.text.white} />
                 <Text style={styles.itemText}>Gerenciar</Text>
               </TouchableOpacity>
 
@@ -715,7 +656,7 @@ export default function AdminDashboardScreen() {
                 onPress={doSignOut}
                 activeOpacity={0.8}
               >
-                <LogOut size={30} color={colors.sand} />
+                <LogOut size={30} color={colors.text.white} />
                 <Text style={styles.itemText}>Sair</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -727,7 +668,7 @@ export default function AdminDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1, backgroundColor: colors.background.main },
   container: { flex: 1 },
 
   headerWrapper: {
@@ -735,7 +676,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radii.lg,
     borderBottomRightRadius: radii.lg,
     overflow: 'hidden',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.main,
   },
   header: { flex: 1, justifyContent: 'center' },
   headerImg: {
@@ -747,19 +688,19 @@ const styles = StyleSheet.create({
     left: 18,
     top: 18,
     padding: 6,
-    borderRadius: 8,
+    borderRadius: radii.sm,
     backgroundColor: 'rgba(0,0,0,0.15)',
   },
   coverBtn: {
     position: 'absolute',
     right: 12,
     top: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: 'rgba(0,0,0,0.35)',
-    borderRadius: 10,
+    borderRadius: radii.sm,
   },
-  coverBtnTxt: { color: colors.white, fontWeight: '700' },
+  coverBtnTxt: { color: colors.text.white, fontWeight: '700' },
 
   avatarContainer: {
     alignSelf: 'center',
@@ -767,10 +708,10 @@ const styles = StyleSheet.create({
     width: AVATAR + 12,
     height: AVATAR + 12,
     borderRadius: (AVATAR + 12) / 2,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background.card,
     padding: 6,
     elevation: 6,
-    shadowColor: '#000',
+    shadowColor: colors.text.primary,
     shadowOpacity: 0.2,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -779,11 +720,17 @@ const styles = StyleSheet.create({
     width: AVATAR,
     height: AVATAR,
     borderRadius: AVATAR / 2,
-    backgroundColor: colors.black,
+    backgroundColor: colors.background.drawer,
   },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarPlaceholder: { color: '#E6F6FF', fontSize: 16, fontWeight: '600' },
-  // ADICIONAR ESTILO PARA LOADING DO AVATAR
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPlaceholder: {
+    color: colors.text.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
   avatarLoading: {
     position: 'absolute',
     inset: 6,
@@ -797,7 +744,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.background.main,
   },
 
   sectionTitle: {
@@ -805,11 +752,15 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     marginBottom: 6,
-    color: colors.text,
+    color: colors.text.primary,
   },
 
   weekHeader: { marginBottom: 12, gap: 10, alignItems: 'center' },
-  weekRangeTitle: { fontSize: 16, fontWeight: '900', color: '#111827' },
+  weekRangeTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text.primary,
+  },
   weekNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -822,44 +773,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
     minWidth: 110,
     justifyContent: 'center',
   },
-  weekNavTxt: { color: colors.bg, fontWeight: '900' },
+  weekNavTxt: { color: colors.text.white, fontWeight: '900' },
 
   weekChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: borders.default,
     backgroundColor: surfaces.card,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
   },
-  weekChipTxt: { fontWeight: '900', color: colors.primary },
+  weekChipTxt: { fontWeight: '900', color: colors.primary.main },
   weekChipDisabled: { opacity: 0.6 },
-  weekChipTxtDisabled: { color: '#64748B' },
+  weekChipTxtDisabled: { color: colors.text.disabled },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: surfaces.card,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: borders.default,
     gap: 12,
   },
   cardLeft: { flex: 1 },
   cardTitle: {
-    color: colors.text,
+    color: colors.text.primary,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
@@ -867,17 +818,25 @@ const styles = StyleSheet.create({
   cardClient: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#111827',
+    color: colors.text.primary,
     marginBottom: 6,
   },
   cardSubtitle: {
-    color: '#616E7C',
+    color: colors.text.tertiary,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 6,
   },
-  statusText: { fontSize: 13, fontWeight: '900', marginBottom: 8 },
-  cardPrice: { color: colors.primary, fontSize: 14, fontWeight: '900' },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  cardPrice: {
+    color: colors.primary.main,
+    fontSize: 14,
+    fontWeight: '900',
+  },
 
   actions: { gap: 10 },
 
@@ -885,18 +844,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
-    backgroundColor: '#2563EB',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: colors.status.warning,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     minWidth: 130,
     justifyContent: 'center',
   },
-  primaryActionBtnAlt: { backgroundColor: colors.primary },
-  primaryActionText: { color: colors.bg, fontWeight: '900' },
+  primaryActionBtnAlt: {
+    backgroundColor: colors.primary.main,
+  },
+  primaryActionText: {
+    color: colors.text.white,
+    fontWeight: '900',
+  },
   disabledBtn: { opacity: 0.45 },
 
-  overlay: { backgroundColor: 'rgba(0,0,0,0.45)' },
+  overlay: { backgroundColor: colors.overlay },
   drawer: {
     position: 'absolute',
     left: 0,
@@ -907,14 +871,30 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
   },
-  drawerHeader: { minHeight: 56, gap: 2, marginBottom: 8 },
-  drawerWelcome: { color: colors.bg, fontWeight: '600', fontSize: 14 },
-  drawerTitle: { color: colors.sand, fontWeight: '800', fontSize: 20 },
+  drawerHeader: {
+    minHeight: 56,
+    gap: 2,
+    marginBottom: 8,
+  },
+  drawerWelcome: {
+    color: colors.text.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  drawerTitle: {
+    color: colors.text.white,
+    fontWeight: '800',
+    fontSize: 20,
+  },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 14,
   },
-  itemText: { fontSize: 20, color: colors.bg, fontWeight: '600' },
+  itemText: {
+    fontSize: 20,
+    color: colors.text.white,
+    fontWeight: '600',
+  },
 });

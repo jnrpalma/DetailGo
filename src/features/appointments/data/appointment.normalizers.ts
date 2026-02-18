@@ -1,5 +1,3 @@
-// src/features/appointments/data/appointment.normalizers.ts
-
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import type {
   AppointmentStatus,

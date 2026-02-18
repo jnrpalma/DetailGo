@@ -1,5 +1,4 @@
-// src/features/dashboard/screens/DashboardScreen.tsx
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,13 +17,24 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 
-import { launchImageLibrary, type ImageLibraryOptions, type Asset } from 'react-native-image-picker';
+import {
+  launchImageLibrary,
+  type ImageLibraryOptions,
+} from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
-import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/firestore';
+import {
+  doc,
+  getFirestore,
+  onSnapshot,
+  setDoc,
+} from '@react-native-firebase/firestore';
+
+import { colors, spacing, radii } from '@shared/theme';
+import { UI } from '@shared/constants/app.constants';
 
 import { useAuth } from '@features/auth';
 import { isAdminEmail } from '@features/auth/utils/roles';
-import { useDashboardAppointments, type DashboardAppointment } from '@features/appointments/hooks/useDashboardAppointments';
+import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
 import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
 import type { RootStackParamList } from '@app/types';
 
@@ -36,30 +46,8 @@ import {
   User,
   ChevronRight,
   Camera,
-  Clock,
+  Bell,
 } from 'lucide-react-native';
-
-// Paleta DetailGo
-const colors = {
-  primary: '#175676', // Baltic Blue
-  secondary: '#4BA3C3', // Turquoise Surf
-  error: '#D62839', // Classic Crimson
-  errorLight: '#BA324F', // Rosewood
-  background: '#FFFFFF',
-  surface: '#F8FAFC',
-  border: '#E2E8F0',
-  text: {
-    primary: '#0F172A',
-    secondary: '#475569',
-    tertiary: '#64748B',
-    disabled: '#94A3B8',
-    white: '#FFFFFF',
-  },
-  card: {
-    background: '#FFFFFF',
-    border: '#F1F5F9',
-  }
-};
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -72,7 +60,7 @@ type UserProfile = {
   photoB64?: string;
 };
 
-const AVATAR_SIZE = 96;
+const AVATAR_SIZE = UI.AVATAR_SIZE;
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NavProp>();
@@ -86,34 +74,24 @@ export default function DashboardScreen() {
   });
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-280)).current;
+  const slideAnim = useRef(new Animated.Value(-UI.MENU_WIDTH)).current;
 
   const isAdmin = isAdminEmail(user.email);
 
-  // 👇 REMOVIDO: markNoShow não é mais necessário
-  // const markNoShow = useCallback(async (appointmentId: string, customerUid: string) => {
-  //   await updateAppointmentStatus({
-  //     appointmentId,
-  //     customerUid,
-  //     status: 'no_show',
-  //   });
-  // }, []);
-
-  // 👇 CORRIGIDO: markNoShow removido dos parâmetros
-  const { loading: loadingAppointments, items: appointments } = useDashboardAppointments({
-    uid,
-    limitN: 30,
-    // markNoShow foi removido
-  });
+  const { loading: loadingAppointments, items: appointments } =
+    useDashboardAppointments({
+      uid,
+      limitN: 30,
+    });
 
   useEffect(() => {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
 
-    const unsubProfile = onSnapshot(userRef, (snap) => {
+    const unsubProfile = onSnapshot(userRef, snap => {
       const data = snap.data() as UserProfile | undefined;
       if (data) {
-        setProfile((p) => ({
+        setProfile(p => ({
           ...p,
           ...data,
           photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined,
@@ -150,8 +128,12 @@ export default function DashboardScreen() {
       if (!b64) return;
 
       setSaving('avatar');
-      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
-      setProfile((p) => ({ ...p, photoB64: b64 }));
+      await setDoc(
+        doc(getFirestore(), 'users', uid),
+        { photoB64: b64 },
+        { merge: true },
+      );
+      setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível atualizar a foto');
     } finally {
@@ -162,27 +144,25 @@ export default function DashboardScreen() {
   const toggleMenu = () => {
     if (menuVisible) {
       Animated.timing(slideAnim, {
-        toValue: -280,
-        duration: 250,
+        toValue: -UI.MENU_WIDTH,
+        duration: UI.DRAWER_ANIMATION_DURATION,
         useNativeDriver: true,
       }).start(() => setMenuVisible(false));
     } else {
       setMenuVisible(true);
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 250,
+        duration: UI.DRAWER_ANIMATION_DURATION,
         useNativeDriver: true,
       }).start();
     }
   };
 
-  // Navegação pelo menu lateral - FECHA o menu primeiro
   const navigateFromMenu = (route: keyof RootStackParamList, params?: any) => {
     toggleMenu();
     navigation.navigate(route, params);
   };
 
-  // Navegação direta - NÃO mexe no menu
   const navigateDirect = (route: keyof RootStackParamList, params?: any) => {
     navigation.navigate(route, params);
   };
@@ -194,6 +174,15 @@ export default function DashboardScreen() {
     } catch {
       Alert.alert('Erro', 'Falha ao sair da conta');
     }
+  };
+
+  // TODO AQUI
+  const handleNotifications = () => {
+    Alert.alert(
+      'Notificações',
+      'Em breve você receberá notificações sobre seus agendamentos!',
+      [{ text: 'OK' }],
+    );
   };
 
   const fullName = profile.firstName
@@ -210,56 +199,67 @@ export default function DashboardScreen() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={colors.primary.main}
+      />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.container}>
-          {/* Header com gradiente */}
           <LinearGradient
-            colors={[colors.primary, colors.secondary]}
+            colors={[colors.primary.main, colors.secondary.main]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.header}
           >
             <View style={styles.headerTop}>
-              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={toggleMenu}
+                style={styles.menuButton}
+                activeOpacity={0.7}
+              >
                 <View style={styles.menuIcon}>
                   <View style={styles.menuBar} />
                   <View style={[styles.menuBar, { width: 20 }]} />
                   <View style={[styles.menuBar, { width: 16 }]} />
                 </View>
               </TouchableOpacity>
-              
+
               <Text style={styles.brand}>DETAILGO</Text>
-              
-              <TouchableOpacity 
-                onPress={() => navigateDirect('MyAppointments')} 
+
+              {/* 👇 Substituído Clock por Bell */}
+              <TouchableOpacity
+                onPress={handleNotifications}
                 style={styles.notificationButton}
                 activeOpacity={0.7}
               >
-                <Clock size={22} color={colors.text.white} />
+                <Bell size={22} color={colors.text.white} />
               </TouchableOpacity>
             </View>
 
             {/* Perfil do usuário */}
             <View style={styles.profileSection}>
-              <TouchableOpacity onPress={saveAvatar} style={styles.avatarWrapper} activeOpacity={0.9}>
+              <TouchableOpacity
+                onPress={saveAvatar}
+                style={styles.avatarWrapper}
+                activeOpacity={0.9}
+              >
                 {avatarSource ? (
                   <Image source={avatarSource} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <User size={40} color={colors.primary} />
+                    <User size={40} color={colors.primary.main} />
                   </View>
                 )}
                 {saving === 'avatar' && (
                   <View style={styles.avatarLoading}>
-                    <ActivityIndicator color={colors.primary} />
+                    <ActivityIndicator color={colors.primary.main} />
                   </View>
                 )}
                 <View style={styles.cameraBadge}>
                   <Camera size={14} color={colors.text.white} />
                 </View>
               </TouchableOpacity>
-              
+
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{fullName}</Text>
                 <Text style={styles.userEmail}>{user.email}</Text>
@@ -276,7 +276,7 @@ export default function DashboardScreen() {
               activeOpacity={0.9}
             >
               <LinearGradient
-                colors={[colors.primary, colors.secondary]}
+                colors={[colors.primary.main, colors.secondary.main]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.bookingGradient}
@@ -287,12 +287,13 @@ export default function DashboardScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Seção de próximos serviços */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Próximos serviços</Text>
                 {appointments.length > 3 && (
-                  <TouchableOpacity onPress={() => navigateDirect('MyAppointments')}>
+                  <TouchableOpacity
+                    onPress={() => navigateDirect('MyAppointments')}
+                  >
                     <Text style={styles.sectionLink}>Ver todos</Text>
                   </TouchableOpacity>
                 )}
@@ -300,12 +301,12 @@ export default function DashboardScreen() {
 
               {loadingAppointments ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator color={colors.primary} />
+                  <ActivityIndicator color={colors.primary.main} />
                 </View>
               ) : recentAppointments.length > 0 ? (
                 <FlatList
                   data={recentAppointments}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={item => item.id}
                   renderItem={({ item }) => <AppointmentCard item={item} />}
                   ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
                   scrollEnabled={false}
@@ -314,7 +315,9 @@ export default function DashboardScreen() {
               ) : (
                 <View style={styles.emptyState}>
                   <Calendar size={48} color={colors.text.disabled} />
-                  <Text style={styles.emptyStateTitle}>Nenhum serviço agendado</Text>
+                  <Text style={styles.emptyStateTitle}>
+                    Nenhum serviço agendado
+                  </Text>
                   <Text style={styles.emptyStateText}>
                     Agende seu primeiro serviço de estética automotiva
                   </Text>
@@ -328,7 +331,12 @@ export default function DashboardScreen() {
         {menuVisible && (
           <>
             <Pressable style={styles.overlay} onPress={toggleMenu} />
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
+            <Animated.View
+              style={[
+                styles.drawer,
+                { transform: [{ translateX: slideAnim }] },
+              ]}
+            >
               <View style={styles.drawerHeader}>
                 <View style={styles.drawerUserInfo}>
                   <Text style={styles.drawerUserName}>{fullName}</Text>
@@ -337,40 +345,44 @@ export default function DashboardScreen() {
               </View>
 
               <View style={styles.drawerContent}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.drawerItem}
                   onPress={() => navigateFromMenu('MyAppointments')}
                 >
-                  <Calendar size={22} color={colors.primary} />
+                  <Calendar size={22} color={colors.primary.main} />
                   <Text style={styles.drawerItemText}>Meus agendamentos</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.drawerItem}
                   onPress={() => navigateFromMenu('History')}
                 >
-                  <History size={22} color={colors.primary} />
+                  <History size={22} color={colors.primary.main} />
                   <Text style={styles.drawerItemText}>Histórico</Text>
                 </TouchableOpacity>
 
                 {isAdmin && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.drawerItem}
                     onPress={() => navigateFromMenu('AdminDashboard')}
                   >
-                    <Settings size={22} color={colors.primary} />
+                    <Settings size={22} color={colors.primary.main} />
                     <Text style={styles.drawerItemText}>Painel Admin</Text>
                   </TouchableOpacity>
                 )}
 
                 <View style={styles.drawerDivider} />
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.drawerItem, styles.drawerLogout]}
                   onPress={handleSignOut}
                 >
-                  <LogOut size={22} color={colors.error} />
-                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
+                  <LogOut size={22} color={colors.status.error} />
+                  <Text
+                    style={[styles.drawerItemText, styles.drawerLogoutText]}
+                  >
+                    Sair
+                  </Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -384,26 +396,26 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.main,
   },
   container: {
     flex: 1,
   },
   header: {
-    paddingTop: 16,
-    paddingHorizontal: 20,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingBottom: 32,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   menuButton: {
-    padding: 8,
+    padding: spacing.xs,
   },
   menuIcon: {
     width: 24,
@@ -423,12 +435,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   notificationButton: {
-    padding: 8,
+    padding: spacing.xs,
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: spacing.md,
   },
   avatarWrapper: {
     position: 'relative',
@@ -463,7 +475,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primary.main,
     borderWidth: 2,
     borderColor: colors.text.white,
     alignItems: 'center',
@@ -484,14 +496,14 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   bookingButton: {
     marginBottom: 32,
-    borderRadius: 16,
+    borderRadius: radii.lg,
     overflow: 'hidden',
-    shadowColor: colors.primary,
+    shadowColor: colors.primary.main,
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -501,15 +513,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   bookingText: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.text.white,
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
   section: {
     marginBottom: 32,
@@ -518,7 +530,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
     fontSize: 18,
@@ -528,30 +540,30 @@ const styles = StyleSheet.create({
   sectionLink: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   loadingContainer: {
     paddingVertical: 32,
     alignItems: 'center',
   },
   appointmentsList: {
-    marginTop: 8,
+    marginTop: spacing.xs,
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 32,
-    paddingHorizontal: 24,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   emptyStateTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text.secondary,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   emptyStateText: {
     fontSize: 14,
@@ -561,31 +573,31 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay,
   },
   drawer: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: 280,
-    backgroundColor: colors.background,
-    borderTopRightRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
+    width: UI.MENU_WIDTH,
+    backgroundColor: colors.background.main,
+    borderTopRightRadius: radii.lg,
+    borderBottomRightRadius: radii.lg,
+    shadowColor: colors.text.primary,
     shadowOpacity: 0.1,
     shadowRadius: 20,
     shadowOffset: { width: 2, height: 0 },
     elevation: 8,
   },
   drawerHeader: {
-    padding: 24,
+    padding: spacing.lg,
     paddingTop: 48,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.main,
   },
   drawerUserInfo: {
-    gap: 4,
+    gap: spacing.xs,
   },
   drawerUserName: {
     fontSize: 18,
@@ -597,14 +609,14 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
   },
   drawerContent: {
-    padding: 16,
+    padding: spacing.md,
   },
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
     gap: 14,
   },
   drawerItemText: {
@@ -614,14 +626,14 @@ const styles = StyleSheet.create({
   },
   drawerDivider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 16,
+    backgroundColor: colors.border.main,
+    marginVertical: spacing.md,
   },
   drawerLogout: {
     marginTop: 'auto',
   },
   drawerLogoutText: {
-    color: colors.error,
+    color: colors.status.error,
     fontWeight: '600',
   },
 });
