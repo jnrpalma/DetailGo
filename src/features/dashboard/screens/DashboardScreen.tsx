@@ -347,6 +347,14 @@ export default function DashboardScreen() {
               <View style={styles.drawerContent}>
                 <TouchableOpacity
                   style={styles.drawerItem}
+                  onPress={() => navigateFromMenu('Profile')}
+                >
+                  <User size={22} color={colors.primary.main} />
+                  <Text style={styles.drawerItemText}>Perfil</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.drawerItem}
                   onPress={() => navigateFromMenu('MyAppointments')}
                 >
                   <Calendar size={22} color={colors.primary.main} />
