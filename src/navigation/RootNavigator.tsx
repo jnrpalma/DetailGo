@@ -1,3 +1,4 @@
+// src/navigation/RootNavigator.tsx
 import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
@@ -5,20 +6,16 @@ import { View, ActivityIndicator } from 'react-native';
 import type { RootStackParamList } from '@app/types';
 
 import { useAuth, LoginScreen, RegisterScreen } from '@features/auth';
-
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
 import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
-
 import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
-
+import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
+import ProfileScreen from '@features/profile/screens/ProfileScreen';
 
 import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
-
 import { isAdminEmail } from '@features/auth/utils/roles';
-
-import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 import { ensureShopSettings } from '@features/settings/services/shopSettings.service';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -93,6 +90,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Appointment" component={AppointmentScreen} />
             <Stack.Screen name="MyAppointments" component={MyAppointmentsScreen} />
             <Stack.Screen name="History" component={HistoryScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
           </Stack.Group>
         )
       ) : (

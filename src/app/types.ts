@@ -1,3 +1,4 @@
+// src/app/types.ts
 export type RootStackParamList = {
   // AUTH
   Login: undefined;
@@ -8,6 +9,7 @@ export type RootStackParamList = {
   Appointment: undefined;
   MyAppointments: undefined;
   History: undefined;
+  Profile: undefined; // 👈 ADICIONADO
 
   // ADMIN
   AdminDashboard: undefined;
