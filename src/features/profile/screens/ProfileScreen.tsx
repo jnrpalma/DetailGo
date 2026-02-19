@@ -48,7 +48,6 @@ export default function ProfileScreen() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testando, setTestando] = useState(false);
   const [checkingConfirm, setCheckingConfirm] = useState(false);
 
   const [profile, setProfile] = useState<UserProfile>({
@@ -79,12 +78,19 @@ export default function ProfileScreen() {
 
     const unsubscribe = userRef.onSnapshot((snap) => {
       const data = (snap.data() as UserProfile | undefined) ?? {};
+      
+      const authEmail = user.email || '';
+      const pendingFromFirestore = data.pendingEmail || '';
+      
+      const shouldClearPending = pendingFromFirestore && 
+                                 normalizeEmail(authEmail) === normalizeEmail(pendingFromFirestore);
+      
       setProfile({
         firstName: data.firstName || '',
         lastName: data.lastName || '',
         phone: data.phone || '',
-        email: user.email || data.email || '',
-        pendingEmail: data.pendingEmail || '',
+        email: authEmail || data.email || '',
+        pendingEmail: shouldClearPending ? '' : pendingFromFirestore,
       });
       setLoading(false);
     });
@@ -131,31 +137,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // ✅ TESTE: Email de verificação
-  const testarEmailSimples = async () => {
-    setTestando(true);
-    try {
-      const currentUser = auth().currentUser;
-
-      if (!currentUser?.email) {
-        Alert.alert('Erro', 'Usuário não está logado');
-        return;
-      }
-
-      await currentUser.sendEmailVerification();
-
-      Alert.alert(
-        '✅ Sucesso!',
-        `Email de verificação enviado para:\n${currentUser.email}\n\nConfira Caixa de Entrada e SPAM.`
-      );
-    } catch (error: any) {
-      console.error('❌ sendEmailVerification error:', error);
-      Alert.alert('❌ Erro ao enviar email', `${error?.code || ''}\n${error?.message || ''}`.trim());
-    } finally {
-      setTestando(false);
-    }
-  };
-
   // ✅ Alteração de email
   const handleEmailUpdate = async () => {
     const currentUser = auth().currentUser;
@@ -188,21 +169,17 @@ export default function ProfileScreen() {
 
     setUpdatingEmail(true);
     try {
-      // Pré-checagem: esse e-mail já está em uso?
       const methods = await auth().fetchSignInMethodsForEmail(nextEmail);
       if (methods.length > 0) {
         Alert.alert('Erro', 'Este e-mail já está em uso por outro usuário.');
         return;
       }
 
-      // Reautenticar
       const credential = auth.EmailAuthProvider.credential(currentUser.email, password);
       await currentUser.reauthenticateWithCredential(credential);
 
-      // Enviar link para novo email
       await currentUser.verifyBeforeUpdateEmail(nextEmail);
 
-      // Salvar pendência no Firestore
       await userRef.update({
         pendingEmail: nextEmail,
       });
@@ -244,7 +221,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // ✅ Verifica se o usuário confirmou o email (com tratamento de token expirado)
+  // ✅ Verifica se o usuário confirmou o email
   const checkEmailConfirmed = async () => {
     const currentUser = auth().currentUser;
     if (!currentUser?.email || !userRef) return;
@@ -268,6 +245,12 @@ export default function ProfileScreen() {
           pendingEmail: firestore.FieldValue.delete(),
         });
 
+        setProfile(prev => ({
+          ...prev,
+          email: updatedEmail || '',
+          pendingEmail: '',
+        }));
+
         Alert.alert(
           '✅ Email confirmado!',
           'Seu email foi atualizado com sucesso. Por favor, faça login novamente para continuar.',
@@ -289,7 +272,6 @@ export default function ProfileScreen() {
     } catch (error: any) {
       console.error('Erro ao verificar confirmação:', error);
       
-      // TRATAMENTO ESPECÍFICO PARA TOKEN EXPIRADO
       if (error.code === 'auth/user-token-expired') {
         Alert.alert(
           '✅ Sessão expirada',
@@ -347,40 +329,12 @@ export default function ProfileScreen() {
 
             <Text style={styles.headerTitle}>Meu Perfil</Text>
 
-            <TouchableOpacity
-              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={saving || editingEmail}
-              activeOpacity={0.7}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.text.white} />
-              ) : (
-                <>
-                  <Save size={18} color={colors.text.white} />
-                  <Text style={styles.saveButtonText}>Salvar</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {/* 👇 BOTÃO SALVAR REMOVIDO DO HEADER */}
+            <View style={styles.headerPlaceholder} />
           </View>
 
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.form}>
-              {/* Botão de teste */}
-              <TouchableOpacity
-                style={[styles.testButton, testando && styles.testButtonDisabled]}
-                onPress={testarEmailSimples}
-                disabled={testando}
-              >
-                {testando ? (
-                  <ActivityIndicator color={colors.text.white} />
-                ) : (
-                  <Text style={styles.testButtonText}>TESTAR ENVIO DE EMAIL</Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
               {/* Nome e Sobrenome */}
               <View style={styles.row}>
                 <View style={styles.col}>
@@ -526,6 +480,23 @@ export default function ProfileScreen() {
                 </View>
                 <Text style={styles.hintText}>Informe seu WhatsApp para receber notificações</Text>
               </View>
+
+              {/* 👇 BOTÃO SALVAR MOVIDO PARA CÁ */}
+              <TouchableOpacity
+                style={[styles.saveButtonBottom, saving && styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={saving || editingEmail}
+                activeOpacity={0.7}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color={colors.text.white} />
+                ) : (
+                  <>
+                    <Save size={18} color={colors.text.white} />
+                    <Text style={styles.saveButtonText}>Salvar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -560,18 +531,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.main,
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text.primary },
-
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    gap: 6,
-  },
-  saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: colors.text.white, fontSize: 14, fontWeight: '600' },
+  headerPlaceholder: { width: 40 }, // 👈 Placeholder para manter equilíbrio
 
   content: { padding: spacing.lg, paddingTop: spacing.xl },
   form: { gap: spacing.md },
@@ -629,16 +589,6 @@ const styles = StyleSheet.create({
   confirmButton: { backgroundColor: colors.primary.main },
   emailActionText: { color: colors.text.white, fontSize: 14, fontWeight: '600' },
 
-  testButton: {
-    backgroundColor: '#4CAF50',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  testButtonDisabled: { opacity: 0.6 },
-  testButtonText: { color: colors.text.white, fontSize: 16, fontWeight: '600' },
-
   divider: { height: 1, backgroundColor: colors.border.main, marginVertical: spacing.md },
 
   pendingBox: {
@@ -664,4 +614,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.main,
   },
   verifyButtonText: { color: colors.text.white, fontSize: 14, fontWeight: '700' },
+
+  // 👇 NOVO ESTILO PARA BOTÃO SALVAR NA PARTE INFERIOR
+  saveButtonBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary.main,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    gap: 8,
+    marginTop: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  saveButtonText: { color: colors.text.white, fontSize: 16, fontWeight: '600' },
+  saveButtonDisabled: { opacity: 0.6 },
 });
