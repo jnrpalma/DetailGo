@@ -54,21 +54,12 @@ dependencies {
         implementation jscFlavor
     }
 
-    // ---------------------------
-    // FIREBASE - BOM + LIBS (Exemplos)
-    // ---------------------------
-    // Importa Firebase BoM (gerencia versões)
+    // FIREBASE - BOM + LIBS
     implementation platform('com.google.firebase:firebase-bom:34.3.0')
-
-    // Exemplos de bibliotecas (sem versão quando usa BoM)
     implementation 'com.google.firebase:firebase-analytics'
-    // Se for usar Cloud Messaging:
-    // implementation 'com.google.firebase:firebase-messaging'
-    // Se for usar Firestore:
-    // implementation 'com.google.firebase:firebase-firestore'
-    // Se for usar Auth:
-    // implementation 'com.google.firebase:firebase-auth'
-    // ---------------------------
+    
+    // ✅ PLAY INTEGRITY (OBRIGATÓRIO PARA PHONE AUTH)
+    implementation 'com.google.android.play:integrity:1.4.0'
 }
 
 // Certifique-se de que o arquivo android/app/google-services.json exista
