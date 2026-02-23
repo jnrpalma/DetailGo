@@ -1,62 +1,112 @@
 @echo off
-echo ========================================
-echo Gerando APK completa com bundle incluso
-echo ========================================
+title Gerador Rápido de APK - DetailGo
+color 0A
+echo ======================================================
+echo         GERADOR RÁPIDO DE APK - DETAILGO
+echo ======================================================
 echo.
 
 cd /d C:\Users\jribe\Desktop\projetos\DetailGo
 
-echo 1. Removendo resources antigos para evitar conflitos...
-if exist android\app\src\main\res\drawable-* (
-    echo Removendo drawable-*...
-    rmdir /s /q android\app\src\main\res\drawable-*
-)
-if exist android\app\src\main\res\raw (
-    echo Removendo raw...
-    rmdir /s /q android\app\src\main\res\raw
-)
+REM ======================================================
+REM MENU SIMPLES
+REM ======================================================
+echo Escolha o tipo de build:
+echo 1) Debug (rápido, ideal para testes)
+echo 2) Release (otimizado, para compartilhar)
+echo ======================================================
+set /p BUILD_TYPE="Digite 1 ou 2: "
 
-echo 2. Limpando cache do React Native...
+if "%BUILD_TYPE%"=="2" (
+    set BUILD_MODE=release
+    set OUTPUT_NAME=DetailGo_App.apk
+) else (
+    set BUILD_MODE=debug
+    set OUTPUT_NAME=DetailGo_Debug.apk
+)
+echo.
+
+REM ======================================================
+REM LIMPEZA
+REM ======================================================
+echo 1. Limpando build anterior...
 cd android
 call ./gradlew clean
 cd ..
+echo ✅ Limpeza concluída!
+echo.
 
-echo 3. Criando pasta assets...
-if not exist android\app\src\main\assets mkdir android\app\src\main\assets
+REM ======================================================
+REM GERAR APK DIRETO
+REM ======================================================
+echo 2. Gerando APK %BUILD_MODE%...
+echo.
 
-echo 4. Gerando bundle JavaScript com reset de cache...
-call npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res --reset-cache
-
-echo 5. Gerando APK com suporte a múltiplas arquiteturas...
 cd android
-call ./gradlew assembleDebug -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
 
-echo 6. Verificando se o APK foi gerado...
-set APK_PATH=app\build\outputs\apk\debug\app-debug.apk
-if exist %APK_PATH% (
-    echo ✅ APK gerado com sucesso!
-    
-    echo 7. Instalando no celular conectado...
-    adb install -r %APK_PATH%
-    
-    echo.
-    echo ========================================
-    echo ✅ APK gerada e instalada com sucesso!
-    echo ========================================
-    
-    echo.
-    echo 8. Copiando APK para pasta compartilhada...
-    copy %APK_PATH% C:\Users\jribe\Desktop\DetailGo_App.apk /y
-    echo ✅ APK copiado para: C:\Users\jribe\Desktop\DetailGo_App.apk
-    echo.
-    echo Para enviar ao amigo, use o arquivo copiado para a área de trabalho.
-    echo.
-    echo 📱 Tamanho do APK:
-    dir C:\Users\jribe\Desktop\DetailGo_App.apk
+if "%BUILD_MODE%"=="debug" (
+    call ./gradlew assembleDebug
+    set "APK_PATH=app\build\outputs\apk\debug\app-debug.apk"
 ) else (
-    echo ❌ ERRO: APK não foi gerado!
-    echo Verifique se há erros no build acima.
+    call ./gradlew assembleRelease
+    set "APK_PATH=app\build\outputs\apk\release\app-release.apk"
+)
+
+if %errorlevel% neq 0 (
+    echo ❌ Erro na compilação!
+    cd ..
+    pause
+    exit /b
+)
+
+cd ..
+echo ✅ APK gerada com sucesso!
+echo.
+
+REM ======================================================
+REM COPIAR PARA ÁREA DE TRABALHO
+REM ======================================================
+echo 3. Copiando APK para área de trabalho...
+copy android\%APK_PATH% C:\Users\jribe\Desktop\%OUTPUT_NAME% /y
+
+if %errorlevel% equ 0 (
+    echo ✅ APK copiada com sucesso!
+    echo 📁 Local: C:\Users\jribe\Desktop\%OUTPUT_NAME%
+    
+    echo.
+    echo 📦 Tamanho da APK:
+    dir C:\Users\jribe\Desktop\%OUTPUT_NAME% | find "."
+) else (
+    echo ❌ Erro ao copiar APK!
+)
+echo.
+
+REM ======================================================
+REM INSTALAR (opcional)
+REM ======================================================
+echo Deseja instalar no celular agora?
+echo 1) Sim
+echo 2) Não (só gerar APK)
+set /p INSTALL_OPTION="Digite 1 ou 2: "
+
+if "%INSTALL_OPTION%"=="1" (
+    echo.
+    echo 4. Instalando no celular...
+    adb install -r android\%APK_PATH%
+    if %errorlevel% equ 0 (
+        echo ✅ App instalado com sucesso!
+    ) else (
+        echo ⚠️  Falha na instalação.
+        echo    Tente: adb uninstall com.testapp
+        echo    Depois execute este script novamente.
+    )
 )
 
 echo.
+echo ======================================================
+echo ✅ PROCESSO CONCLUÍDO!
+echo ======================================================
+echo 📱 APK pronta: C:\Users\jribe\Desktop\%OUTPUT_NAME%
+echo ======================================================
+
 pause
