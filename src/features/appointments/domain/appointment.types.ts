@@ -1,4 +1,5 @@
-export type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show';
+// src/features/appointments/domain/appointment.types.ts
+export type AppointmentStatus = 'scheduled' | 'in_progress' | 'done' | 'no_show' | 'cancelled';
 
 export type VehicleType = 'Carro' | 'Moto';
 

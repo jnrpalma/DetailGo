@@ -1,18 +1,17 @@
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  onAuthStateChanged,
-} from '@react-native-firebase/auth';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  serverTimestamp,
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  updateProfile, 
+  onAuthStateChanged 
+} from '@react-native-firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  serverTimestamp 
 } from '@react-native-firebase/firestore';
 
 export type RegisterInput = {
@@ -57,9 +56,9 @@ async function ensureUserDocument(
   data: Partial<RegisterInput> & { email: string },
 ) {
   const db = getFirestore();
-  const ref = doc(db, 'users', uid);
+  const userDocRef = doc(db, 'users', uid);
   await setDoc(
-    ref,
+    userDocRef,
     {
       uid,
       firstName: data.firstName ?? '',

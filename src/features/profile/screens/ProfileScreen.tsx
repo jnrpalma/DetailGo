@@ -1,4 +1,3 @@
-// src/features/profile/screens/ProfileScreen.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,15 +11,23 @@ import {
   TouchableOpacity,
   View,
   StatusBar,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, Mail, Phone, Save, Check, X, RefreshCw, Smartphone } from 'lucide-react-native';
+import { ArrowLeft, Mail, Phone, Save, Check, X, RefreshCw, Pencil } from 'lucide-react-native';
 
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
+// 👇 IMPORTS MODULARES
+import { getAuth } from '@react-native-firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  updateDoc,
+  deleteField,
+  onSnapshot,
+  collection
+} from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 
 import { colors, spacing, radii } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
@@ -31,11 +38,9 @@ type UserProfile = {
   firstName?: string;
   lastName?: string;
   email?: string;
-  phone?: string; // armazenado como digits (sem máscara) ou com máscara na UI
-  phoneVerified?: boolean;
+  phone?: string;
   photoURL?: string;
   pendingEmail?: string;
-  phoneE164?: string | null;
 };
 
 function normalizeEmail(value: string) {
@@ -54,100 +59,75 @@ function formatPhoneBR(text: string) {
   return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
 }
 
-function mapPhoneError(error: any) {
-  const code = error?.code || '';
-
-  if (code === 'auth/too-many-requests') return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
-  if (code === 'auth/invalid-phone-number') return 'Número de telefone inválido. Confira DDD e formato.';
-  if (code === 'auth/invalid-verification-code') return 'Código inválido. Confira e tente novamente.';
-  if (code === 'auth/code-expired') return 'Código expirado. Solicite um novo.';
-  if (code === 'auth/credential-already-in-use') return 'Este telefone já está vinculado a outra conta.';
-  if (code === 'auth/provider-already-linked') return 'Este telefone já está vinculado à sua conta.';
-
-  return error?.message || 'Não foi possível realizar a verificação. Tente novamente.';
-}
-
 export default function ProfileScreen() {
   const navigation = useNavigation<NavProp>();
-  const db = firestore();
+  // 👇 INSTÂNCIAS MODULARES
+  const db = getFirestore();
+  const authInstance = getAuth();
+  const user = authInstance.currentUser;
+
+  const uid = user?.uid ?? null;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [checkingConfirm, setCheckingConfirm] = useState(false);
-
-  // 📱 Verificação de telefone
-  const [verifyingPhone, setVerifyingPhone] = useState(false);
-  const [phoneCode, setPhoneCode] = useState('');
-  const [phoneVerificationId, setPhoneVerificationId] = useState<string>(''); // vem do verifyPhoneNumber
-  const [phoneModalVisible, setPhoneModalVisible] = useState(false);
-  const [newPhoneNumber, setNewPhoneNumber] = useState(''); // E164 exibido no modal
-
-  // Para controlar listener ativo e não vazar
-  const [phoneUnsubscribe, setPhoneUnsubscribe] = useState<null | (() => void)>(null);
-
-  const user = auth().currentUser;
-  const uid = user?.uid ?? null;
 
   const [profile, setProfile] = useState<UserProfile>({
     firstName: '',
     lastName: '',
     email: user?.email || '',
     phone: '',
-    phoneVerified: false,
     pendingEmail: '',
-    phoneE164: null,
   });
 
-  // Email edit
+  // Estados para edição de email
   const [editingEmail, setEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [updatingEmail, setUpdatingEmail] = useState(false);
 
+  // Estados para edição de telefone
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [newPhone, setNewPhone] = useState('');
+
   const userRef = useMemo(() => {
     if (!uid) return null;
-    return db.collection('users').doc(uid);
+    // 👇 VERSÃO MODULAR
+    return doc(db, 'users', uid);
   }, [db, uid]);
 
-  // Carrega perfil do Firestore
+  // Carrega os dados do perfil
   useEffect(() => {
-  if (!userRef) {
-    setLoading(false);
-    return;
-  }
+    if (!userRef || !user) {
+      setLoading(false);
+      return;
+    }
 
-  const unsubscribe = userRef.onSnapshot((snap) => {
-    const data = (snap.data() as UserProfile | undefined) ?? {};
-
-    // ✅ SEMPRE pega o email atual do Auth, não de uma variável antiga
-    const authEmail = auth().currentUser?.email || '';
-    const pendingFromFirestore = data.pendingEmail || '';
-
-    const shouldClearPending =
-      pendingFromFirestore && normalizeEmail(authEmail) === normalizeEmail(pendingFromFirestore);
-
-    setProfile({
-      firstName: data.firstName || '',
-      lastName: data.lastName || '',
-      phone: data.phone ? formatPhoneBR(data.phone) : '',
-      phoneVerified: !!data.phoneVerified,
-      email: authEmail || data.email || '',
-      pendingEmail: shouldClearPending ? '' : pendingFromFirestore,
-      phoneE164: data.phoneE164 ?? null,
+    // 👇 VERSÃO MODULAR
+    const unsubscribe = onSnapshot(userRef, (snap) => {
+      const data = (snap.data() as UserProfile | undefined) ?? {};
+      
+      const authEmail = user.email || '';
+      const pendingFromFirestore = data.pendingEmail || '';
+      
+      const shouldClearPending = pendingFromFirestore && 
+                                 normalizeEmail(authEmail) === normalizeEmail(pendingFromFirestore);
+      
+      setProfile({
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        phone: data.phone || '',
+        email: authEmail || data.email || '',
+        pendingEmail: shouldClearPending ? '' : pendingFromFirestore,
+      });
+      
+      // Inicializa o newPhone com o telefone atual
+      setNewPhone(data.phone || '');
+      setLoading(false);
     });
 
-    setLoading(false);
-  });
-
-  return () => unsubscribe();
-}, [userRef]); //
-
-  // Cleanup listener verifyPhoneNumber ao desmontar
-  useEffect(() => {
-    return () => {
-      if (phoneUnsubscribe) phoneUnsubscribe();
-    };
-  }, [phoneUnsubscribe]);
+    return () => unsubscribe();
+  }, [userRef, user]);
 
   const handleSave = async () => {
     if (!userRef) return;
@@ -157,18 +137,12 @@ export default function ProfileScreen() {
       return;
     }
 
-    const cleanPhone = toDigits(profile.phone || '');
-    if (profile.phone && cleanPhone.length < 10) {
-      Alert.alert('Atenção', 'Telefone inválido');
-      return;
-    }
-
     setSaving(true);
     try {
-      await userRef.update({
+      // 👇 VERSÃO MODULAR
+      await updateDoc(userRef, {
         firstName: profile.firstName.trim(),
         lastName: profile.lastName.trim(),
-        phone: cleanPhone,
       });
 
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
@@ -180,150 +154,42 @@ export default function ProfileScreen() {
     }
   };
 
-  // =========================================================
-  // 📱 VERIFICAÇÃO DE TELEFONE (CORRETA PARA LINKAR EM CONTA EXISTENTE)
-  // - NÃO usa signInWithPhoneNumber (isso pode trocar currentUser)
-  // - Usa verifyPhoneNumber -> pega verificationId -> linkWithCredential
-  // =========================================================
+  // ✅ Salvar telefone
+  const handlePhoneSave = async () => {
+    if (!userRef) return;
 
-  const clearPhoneVerificationState = () => {
-    setPhoneCode('');
-    setPhoneVerificationId('');
-    setPhoneModalVisible(false);
-    setNewPhoneNumber('');
-    if (phoneUnsubscribe) {
-      phoneUnsubscribe();
-      setPhoneUnsubscribe(null);
+    const cleanPhone = toDigits(newPhone || '');
+    if (newPhone && cleanPhone.length < 10) {
+      Alert.alert('Atenção', 'Telefone inválido');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 👇 VERSÃO MODULAR
+      await updateDoc(userRef, {
+        phone: cleanPhone,
+      });
+
+      setProfile(prev => ({ ...prev, phone: cleanPhone }));
+      setEditingPhone(false);
+      Alert.alert('Sucesso', 'Telefone atualizado com sucesso!');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Não foi possível atualizar o telefone');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const startPhoneVerification = async () => {
-  const cleanPhone = toDigits(profile.phone || '');
-
-  if (!cleanPhone || cleanPhone.length < 10) {
-    Alert.alert('Erro', 'Digite um telefone válido primeiro');
-    return;
-  }
-
-  const formattedPhone = `+55${cleanPhone}`;
-  setNewPhoneNumber(formattedPhone);
-
-  // Cancela listener anterior se existir
-  if (phoneUnsubscribe) {
-    phoneUnsubscribe();
-    setPhoneUnsubscribe(null);
-  }
-
-  setVerifyingPhone(true);
-
-  try {
-    // ✅ CORREÇÃO: O listener retorna uma função de unsubscribe
-    const unsubscribe = auth()
-      .verifyPhoneNumber(formattedPhone)
-      .on('state_changed', 
-        (snap) => {
-          try {
-            if (snap.state === auth.PhoneAuthState.CODE_SENT) {
-              setPhoneVerificationId(snap.verificationId);
-              setPhoneModalVisible(true);
-              setVerifyingPhone(false);
-              return;
-            }
-
-            if (snap.state === auth.PhoneAuthState.AUTO_VERIFIED) {
-              if (snap.code) setPhoneCode(String(snap.code));
-              setPhoneVerificationId(snap.verificationId);
-              setPhoneModalVisible(true);
-              setVerifyingPhone(false);
-              return;
-            }
-
-            if (snap.state === auth.PhoneAuthState.ERROR) {
-              setVerifyingPhone(false);
-              console.error('verifyPhoneNumber error:', snap.error);
-              Alert.alert('Erro', mapPhoneError(snap.error));
-              return;
-            }
-          } catch (e) {
-            setVerifyingPhone(false);
-            console.error('state_changed handler error:', e);
-          }
-        },
-        (error) => {
-          // ✅ Tratamento de erro do listener
-          setVerifyingPhone(false);
-          console.error('Listener error:', error);
-          Alert.alert('Erro', mapPhoneError(error));
-        }
-      );
-
-    // ✅ Guarda a função de unsubscribe
-    setPhoneUnsubscribe(() => unsubscribe);
-    
-  } catch (error: any) {
-    setVerifyingPhone(false);
-    console.error('Erro ao iniciar verificação:', error);
-    Alert.alert('Erro', mapPhoneError(error));
-  }
-};
-
-  const confirmPhoneCode = async () => {
-  if (!phoneCode || phoneCode.trim().length < 6) {
-    Alert.alert('Erro', 'Digite o código de 6 dígitos');
-    return;
-  }
-
-  if (!phoneVerificationId) {
-    Alert.alert('Erro', 'Verificação não iniciada. Tente novamente.');
-    return;
-  }
-
-  const currentUser = auth().currentUser;
-  if (!currentUser) {
-    Alert.alert('Erro', 'Você precisa estar logado para verificar o telefone.');
-    return;
-  }
-
-  setVerifyingPhone(true);
-
-  try {
-    const credential = auth.PhoneAuthProvider.credential(phoneVerificationId, phoneCode.trim());
-
-    await currentUser.linkWithCredential(credential);
-    await currentUser.reload();
-
-    const cleanPhone = toDigits(profile.phone || '');
-
-    await userRef?.update({
-      phone: cleanPhone,
-      phoneVerified: true,
-      phoneE164: currentUser.phoneNumber || newPhoneNumber || null,
-    });
-
-    setProfile((prev) => ({ ...prev, phoneVerified: true, phoneE164: currentUser.phoneNumber || null }));
-
-    Alert.alert('✅ Sucesso!', 'Telefone verificado com sucesso');
-
-    clearPhoneVerificationState();
-    
-  } catch (error: any) {
-    console.error('Erro ao confirmar código:', error);
-
-    if (error.code === 'auth/provider-already-linked') {
-      setProfile((prev) => ({ ...prev, phoneVerified: true }));
-      Alert.alert('Info', 'Seu telefone já estava vinculado a esta conta.');
-      clearPhoneVerificationState();
-    } else {
-      Alert.alert('Erro', mapPhoneError(error));
-    }
-  } finally {
-    setVerifyingPhone(false);
-  }
-};
+  const cancelPhoneEdit = () => {
+    setEditingPhone(false);
+    setNewPhone(profile.phone || '');
+  };
 
   // ✅ Alteração de email
   const handleEmailUpdate = async () => {
-    const currentUser = auth().currentUser;
+    const currentUser = authInstance.currentUser;
 
     if (!currentUser?.email) {
       Alert.alert('Erro', 'Usuário não está logado');
@@ -353,7 +219,7 @@ export default function ProfileScreen() {
 
     setUpdatingEmail(true);
     try {
-      const methods = await auth().fetchSignInMethodsForEmail(nextEmail);
+      const methods = await authInstance.fetchSignInMethodsForEmail(nextEmail);
       if (methods.length > 0) {
         Alert.alert('Erro', 'Este e-mail já está em uso por outro usuário.');
         return;
@@ -364,7 +230,8 @@ export default function ProfileScreen() {
 
       await currentUser.verifyBeforeUpdateEmail(nextEmail);
 
-      await userRef.update({
+      // 👇 VERSÃO MODULAR
+      await updateDoc(userRef, {
         pendingEmail: nextEmail,
       });
 
@@ -384,6 +251,7 @@ export default function ProfileScreen() {
       );
     } catch (error: any) {
       console.error('❌ verifyBeforeUpdateEmail error:', error);
+
       const code = error?.code;
 
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
@@ -394,6 +262,8 @@ export default function ProfileScreen() {
         Alert.alert('Erro', 'Faça login novamente para alterar seu e-mail.');
       } else if (code === 'auth/email-already-in-use') {
         Alert.alert('Erro', 'Email já em uso por outro usuário.');
+      } else if (code === 'auth/invalid-email') {
+        Alert.alert('Erro', 'Email inválido.');
       } else {
         Alert.alert('Erro', `Não foi possível alterar.\n${error?.message || ''}`.trim());
       }
@@ -404,7 +274,7 @@ export default function ProfileScreen() {
 
   // ✅ Verifica se o usuário confirmou o email
   const checkEmailConfirmed = async () => {
-    const currentUser = auth().currentUser;
+    const currentUser = authInstance.currentUser;
     if (!currentUser?.email || !userRef) return;
 
     setCheckingConfirm(true);
@@ -421,40 +291,52 @@ export default function ProfileScreen() {
       }
 
       if (authEmail === pending) {
-        await userRef.update({
+        // 👇 VERSÃO MODULAR
+        await updateDoc(userRef, {
           email: updatedEmail,
-          pendingEmail: firestore.FieldValue.delete(),
+          pendingEmail: deleteField(),
         });
 
-        setProfile((prev) => ({
+        setProfile(prev => ({
           ...prev,
           email: updatedEmail || '',
           pendingEmail: '',
         }));
 
-        Alert.alert('✅ Email confirmado!', 'Seu email foi atualizado. Faça login novamente para continuar.', [
-          {
-            text: 'OK',
-            onPress: () => {
-              auth().signOut();
+        Alert.alert(
+          '✅ Email confirmado!',
+          'Seu email foi atualizado com sucesso. Por favor, faça login novamente para continuar.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                authInstance.signOut();
+              },
             },
-          },
-        ]);
+          ],
+        );
       } else {
-        Alert.alert('Ainda não confirmado', 'Clique no link do novo e-mail e tente novamente.');
+        Alert.alert(
+          'Ainda não confirmado',
+          'Clique no link que enviamos para seu novo email e tente novamente.',
+        );
       }
     } catch (error: any) {
       console.error('Erro ao verificar confirmação:', error);
-
+      
       if (error.code === 'auth/user-token-expired') {
-        Alert.alert('✅ Sessão expirada', 'Seu email foi alterado! Faça login novamente.', [
-          {
-            text: 'OK',
-            onPress: () => {
-              auth().signOut();
+        Alert.alert(
+          '✅ Sessão expirada',
+          'Seu email foi alterado com sucesso! Por favor, faça login novamente.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                authInstance.signOut();
+              },
             },
-          },
-        ]);
+          ],
+        );
       } else {
         Alert.alert('Erro', 'Não foi possível verificar a confirmação agora.');
       }
@@ -483,13 +365,22 @@ export default function ProfileScreen() {
     <>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+            >
               <ArrowLeft size={22} color={colors.text.primary} />
             </TouchableOpacity>
+
             <Text style={styles.headerTitle}>Meu Perfil</Text>
+
             <View style={styles.headerPlaceholder} />
           </View>
 
@@ -505,7 +396,6 @@ export default function ProfileScreen() {
                     placeholderTextColor={colors.text.disabled}
                     value={profile.firstName || ''}
                     onChangeText={(text) => setProfile({ ...profile, firstName: text })}
-                    editable={!editingEmail && !phoneModalVisible}
                   />
                 </View>
 
@@ -517,12 +407,11 @@ export default function ProfileScreen() {
                     placeholderTextColor={colors.text.disabled}
                     value={profile.lastName || ''}
                     onChangeText={(text) => setProfile({ ...profile, lastName: text })}
-                    editable={!editingEmail && !phoneModalVisible}
                   />
                 </View>
               </View>
 
-              {/* Email */}
+              {/* Email - com ícone de lápis padronizado */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>E-mail</Text>
 
@@ -531,12 +420,15 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                       onPress={() => setEditingEmail(true)}
                       activeOpacity={0.7}
-                      disabled={saving || phoneModalVisible}
+                      disabled={saving}
                     >
                       <View style={[styles.inputWrapper, styles.inputEditable]}>
                         <Mail size={18} color={colors.text.tertiary} />
-                        <Text style={styles.emailText}>{profile.email || ''}</Text>
-                        <Text style={styles.editText}>Alterar</Text>
+                        <Text style={styles.valueText}>{profile.email || ''}</Text>
+                        <View style={styles.editBadge}>
+                          <Pencil size={14} color={colors.primary.main} />
+                          <Text style={styles.editText}>Alterar</Text>
+                        </View>
                       </View>
                     </TouchableOpacity>
 
@@ -548,7 +440,7 @@ export default function ProfileScreen() {
                         <TouchableOpacity
                           style={[styles.verifyButton, checkingConfirm && styles.saveButtonDisabled]}
                           onPress={checkEmailConfirmed}
-                          disabled={checkingConfirm || phoneModalVisible}
+                          disabled={checkingConfirm}
                           activeOpacity={0.7}
                         >
                           {checkingConfirm ? (
@@ -578,7 +470,6 @@ export default function ProfileScreen() {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
-                      editable={!phoneModalVisible}
                     />
 
                     <TextInput
@@ -588,99 +479,115 @@ export default function ProfileScreen() {
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry
-                      editable={!phoneModalVisible}
                     />
 
-                    <View style={styles.emailEditActions}>
+                    <View style={styles.editActions}>
                       <TouchableOpacity
-                        style={[styles.emailActionButton, styles.cancelButton]}
+                        style={[styles.actionButton, styles.cancelButton]}
                         onPress={cancelEmailEdit}
-                        disabled={updatingEmail || phoneModalVisible}
+                        disabled={updatingEmail}
                       >
                         <X size={16} color={colors.text.white} />
-                        <Text style={styles.emailActionText}>Cancelar</Text>
+                        <Text style={styles.actionText}>Cancelar</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.emailActionButton, styles.confirmButton]}
+                        style={[styles.actionButton, styles.confirmButton]}
                         onPress={handleEmailUpdate}
-                        disabled={updatingEmail || phoneModalVisible}
+                        disabled={updatingEmail}
                       >
                         {updatingEmail ? (
                           <ActivityIndicator size="small" color={colors.text.white} />
                         ) : (
                           <>
                             <Check size={16} color={colors.text.white} />
-                            <Text style={styles.emailActionText}>Confirmar</Text>
+                            <Text style={styles.actionText}>Confirmar</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={styles.hintText}>
+                      Dica: se o novo e-mail já existir em outro usuário, o Firebase pode não enviar o link.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Telefone - com ícone de lápis padronizado */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Telefone</Text>
+
+                {!editingPhone ? (
+                  <TouchableOpacity
+                    onPress={() => setEditingPhone(true)}
+                    activeOpacity={0.7}
+                    disabled={saving}
+                  >
+                    <View style={[styles.inputWrapper, styles.inputEditable]}>
+                      <Phone size={18} color={colors.text.tertiary} />
+                      <Text style={styles.valueText}>
+                        {profile.phone ? formatPhoneBR(profile.phone) : 'Não informado'}
+                      </Text>
+                      <View style={styles.editBadge}>
+                        <Pencil size={14} color={colors.primary.main} />
+                        <Text style={styles.editText}>Alterar</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.phoneEditContainer}>
+                    <View style={styles.inputWrapper}>
+                      <Phone size={18} color={colors.text.tertiary} />
+                      <TextInput
+                        style={styles.inputField}
+                        placeholder="(11) 91234-5678"
+                        placeholderTextColor={colors.text.disabled}
+                        value={newPhone}
+                        onChangeText={setNewPhone}
+                        keyboardType="phone-pad"
+                        maxLength={15}
+                      />
+                    </View>
+
+                    <View style={styles.editActions}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.cancelButton]}
+                        onPress={cancelPhoneEdit}
+                        disabled={saving}
+                      >
+                        <X size={16} color={colors.text.white} />
+                        <Text style={styles.actionText}>Cancelar</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.confirmButton]}
+                        onPress={handlePhoneSave}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <ActivityIndicator size="small" color={colors.text.white} />
+                        ) : (
+                          <>
+                            <Check size={16} color={colors.text.white} />
+                            <Text style={styles.actionText}>Salvar</Text>
                           </>
                         )}
                       </TouchableOpacity>
                     </View>
                   </View>
                 )}
-              </View>
-
-              {/* Telefone com verificação */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Telefone</Text>
-
-                <View style={styles.phoneContainer}>
-                  <View style={[styles.inputWrapper, { flex: 1 }]}>
-                    <Phone size={18} color={colors.text.tertiary} />
-                    <TextInput
-                      style={styles.inputField}
-                      placeholder="(11) 91234-5678"
-                      placeholderTextColor={colors.text.disabled}
-                      value={profile.phone || ''}
-                      onChangeText={(text) => {
-                        setProfile({
-                          ...profile,
-                          phone: formatPhoneBR(text),
-                          phoneVerified: false, // ao editar, perde verificação
-                        });
-                      }}
-                      keyboardType="phone-pad"
-                      maxLength={15}
-                      editable={!editingEmail && !phoneModalVisible}
-                    />
-                  </View>
-
-                  {profile.phoneVerified ? (
-                    <View style={styles.verifiedBadge}>
-                      <Check size={16} color={colors.status.success} />
-                      <Text style={styles.verifiedText}>Verificado</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.verifyPhoneButton,
-                        (!profile.phone || profile.phone.length < 14) && styles.verifyPhoneButtonDisabled,
-                      ]}
-                      onPress={startPhoneVerification}
-                      disabled={!profile.phone || profile.phone.length < 14 || verifyingPhone || editingEmail}
-                    >
-                      {verifyingPhone ? (
-                        <ActivityIndicator size="small" color={colors.text.white} />
-                      ) : (
-                        <>
-                          <Smartphone size={16} color={colors.text.white} />
-                          <Text style={styles.verifyPhoneText}>Verificar</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
 
                 <Text style={styles.hintText}>
-                  {profile.phoneVerified ? '✅ Telefone verificado' : 'Verifique seu telefone para receber notificações por SMS'}
+                  Informe seu WhatsApp para receber notificações
                 </Text>
               </View>
 
-              {/* Botão Salvar */}
+              {/* Botão Salvar (apenas para nome/sobrenome) */}
               <TouchableOpacity
                 style={[styles.saveButtonBottom, saving && styles.saveButtonDisabled]}
                 onPress={handleSave}
-                disabled={saving || editingEmail || phoneModalVisible}
+                disabled={saving || editingEmail || editingPhone}
                 activeOpacity={0.7}
               >
                 {saving ? (
@@ -696,72 +603,6 @@ export default function ProfileScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-
-      {/* Modal para código SMS */}
-      <Modal
-        visible={phoneModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          clearPhoneVerificationState();
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Verificar Telefone</Text>
-            <Text style={styles.modalSubtitle}>Enviamos um código SMS para:</Text>
-            <Text style={styles.modalPhone}>{newPhoneNumber}</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Digite o código de 6 dígitos"
-              placeholderTextColor={colors.text.disabled}
-              value={phoneCode}
-              onChangeText={setPhoneCode}
-              keyboardType="number-pad"
-              maxLength={6}
-              autoFocus
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => {
-                  clearPhoneVerificationState();
-                }}
-                disabled={verifyingPhone}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonConfirm]}
-                onPress={confirmPhoneCode}
-                disabled={verifyingPhone || phoneCode.trim().length < 6}
-              >
-                {verifyingPhone ? (
-                  <ActivityIndicator size="small" color={colors.text.white} />
-                ) : (
-                  <Text style={styles.modalButtonText}>Confirmar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalResend}
-              onPress={() => {
-                // limpa code antigo e reenviar
-                setPhoneCode('');
-                setPhoneVerificationId('');
-                startPhoneVerification();
-              }}
-              disabled={verifyingPhone}
-            >
-              <Text style={styles.modalResendText}>Reenviar código</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 }
@@ -812,7 +653,6 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     borderWidth: 1,
     borderColor: colors.border.main,
-    marginBottom: spacing.sm,
   },
 
   inputWrapper: {
@@ -830,14 +670,24 @@ const styles = StyleSheet.create({
 
   inputField: { flex: 1, fontSize: 16, color: colors.text.primary, paddingVertical: 12 },
 
-  emailText: { flex: 1, fontSize: 16, color: colors.text.primary },
-  editText: { fontSize: 14, fontWeight: '600', color: colors.primary.main, paddingHorizontal: spacing.sm },
+  valueText: { flex: 1, fontSize: 16, color: colors.text.primary },
+  
+  editBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+  },
+  editText: { fontSize: 14, fontWeight: '600', color: colors.primary.main },
 
   hintText: { fontSize: 12, color: colors.text.tertiary, marginTop: spacing.xs, marginLeft: 4 },
 
   emailEditContainer: { gap: spacing.sm },
-  emailEditActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  emailActionButton: {
+  phoneEditContainer: { gap: spacing.sm },
+
+  editActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+
+  actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -846,9 +696,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
   },
+  actionText: { color: colors.text.white, fontSize: 14, fontWeight: '600' },
+
   cancelButton: { backgroundColor: colors.text.disabled },
   confirmButton: { backgroundColor: colors.primary.main },
-  emailActionText: { color: colors.text.white, fontSize: 14, fontWeight: '600' },
 
   pendingBox: {
     marginTop: spacing.sm,
@@ -873,124 +724,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.main,
   },
   verifyButtonText: { color: colors.text.white, fontSize: 14, fontWeight: '700' },
-
-  phoneContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
-  },
-  verifyPhoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    gap: 6,
-    minWidth: 100,
-  },
-  verifyPhoneButtonDisabled: {
-    backgroundColor: colors.text.disabled,
-  },
-  verifyPhoneText: {
-    color: colors.text.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.status.success + '20',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    gap: 6,
-    minWidth: 100,
-    justifyContent: 'center',
-  },
-  verifiedText: {
-    color: colors.status.success,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: colors.background.main,
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-    width: '85%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  modalPhone: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary.main,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalInput: {
-    height: 52,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    fontSize: 18,
-    color: colors.text.primary,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
-    letterSpacing: 4,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: colors.text.disabled,
-  },
-  modalButtonConfirm: {
-    backgroundColor: colors.primary.main,
-  },
-  modalButtonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalResend: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  modalResendText: {
-    color: colors.primary.main,
-    fontSize: 14,
-    fontWeight: '600',
-  },
 
   saveButtonBottom: {
     flexDirection: 'row',

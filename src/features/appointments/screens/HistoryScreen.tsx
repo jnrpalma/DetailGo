@@ -1,3 +1,4 @@
+// src/features/appointments/screens/HistoryScreen.tsx
 import React from 'react';
 import {
   ActivityIndicator,
@@ -14,11 +15,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   ArrowLeft,
-  History,
   Calendar,
   Clock,
   CheckCircle,
   XCircle,
+  History,
+  Ban, // 👈 Ícone para cancelado
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
@@ -28,25 +30,7 @@ import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
 import type { UserAppointment } from '../domain/appointment.types';
-
-// Paleta DetailGo
-const colors = {
-  primary: '#175676',
-  secondary: '#4BA3C3',
-  error: '#D62839',
-  errorLight: '#BA324F',
-  success: '#16A34A',
-  background: '#FFFFFF',
-  surface: '#F8FAFC',
-  border: '#E2E8F0',
-  text: {
-    primary: '#0F172A',
-    secondary: '#475569',
-    tertiary: '#64748B',
-    disabled: '#94A3B8',
-    white: '#FFFFFF',
-  },
-};
+import { colors } from '@shared/theme/colors';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -61,16 +45,43 @@ export default function HistoryScreen() {
     limitN: 50,
   });
 
+  const getStatusConfig = (status: UserAppointment['status']) => {
+    switch (status) {
+      case 'done':
+        return {
+          label: 'Concluído',
+          color: colors.status.success,
+          icon: CheckCircle,
+        };
+      case 'no_show':
+        return {
+          label: 'Não realizado',
+          color: colors.status.error,
+          icon: XCircle,
+        };
+      case 'cancelled':
+        return {
+          label: 'Cancelado',
+          color: colors.text.disabled,
+          icon: Ban,
+        };
+      default:
+        return {
+          label: 'Desconhecido',
+          color: colors.text.disabled,
+          icon: XCircle,
+        };
+    }
+  };
+
   const renderItem = ({ item }: { item: UserAppointment }) => {
     const subtitle =
       item.vehicleType === 'Carro' && item.carCategory
         ? `${item.vehicleType} • ${item.carCategory}`
         : item.vehicleType;
 
-    const isDone = item.status === 'done';
-    const statusLabel = isDone ? 'Concluído' : 'Não realizado';
-    const statusColor = isDone ? colors.success : colors.error;
-    const StatusIcon = isDone ? CheckCircle : XCircle;
+    const statusConfig = getStatusConfig(item.status);
+    const StatusIcon = statusConfig.icon;
 
     return (
       <View style={styles.card}>
@@ -82,16 +93,15 @@ export default function HistoryScreen() {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: `${statusColor}10` },
+                { backgroundColor: `${statusConfig.color}10` },
               ]}
             >
-              <StatusIcon size={14} color={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {statusLabel}
+              <StatusIcon size={14} color={statusConfig.color} />
+              <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                {statusConfig.label}
               </Text>
             </View>
           </View>
-          {/* 👇 USANDO formatUtils */}
           <Text style={styles.price}>{formatUtils.currency(item.price)}</Text>
         </View>
 
@@ -100,14 +110,12 @@ export default function HistoryScreen() {
         <View style={styles.cardFooter}>
           <View style={styles.infoRow}>
             <Calendar size={16} color={colors.text.tertiary} />
-            {/* 👇 USANDO dateUtils */}
             <Text style={styles.infoText}>
               {dateUtils.formatDate(item.startAtMs)}
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Clock size={16} color={colors.text.tertiary} />
-            {/* 👇 USANDO dateUtils */}
             <Text style={styles.infoText}>
               {dateUtils.formatHour(item.startAtMs)}
             </Text>
@@ -124,7 +132,7 @@ export default function HistoryScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary.main} />
         </View>
       </SafeAreaView>
     );
@@ -132,7 +140,7 @@ export default function HistoryScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -142,17 +150,16 @@ export default function HistoryScreen() {
           >
             <ArrowLeft size={22} color={colors.text.primary} />
           </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <History size={22} color={colors.primary} />
-            <Text style={styles.headerTitle}>Histórico</Text>
-          </View>
+          
+          <Text style={styles.headerTitle}>Histórico</Text>
+          
           <View style={styles.headerRight} />
         </View>
 
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <ActivityIndicator size="large" color={colors.primary.main} />
             </View>
           ) : (
             <FlatList
@@ -169,7 +176,7 @@ export default function HistoryScreen() {
                   </View>
                   <Text style={styles.emptyStateTitle}>Nenhum histórico</Text>
                   <Text style={styles.emptyStateText}>
-                    Seus serviços concluídos e não realizados{'\n'}
+                    Seus serviços concluídos, cancelados e não realizados{'\n'}
                     aparecerão aqui
                   </Text>
                 </View>
@@ -185,7 +192,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.main,
   },
   header: {
     flexDirection: 'row',
@@ -193,9 +200,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.main,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.main,
   },
   backButton: {
     width: 40,
@@ -203,19 +210,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    borderColor: colors.border.main,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: colors.text.primary,
+    flex: 1,
+    textAlign: 'center',
   },
   headerRight: {
     width: 40,
@@ -234,11 +238,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   card: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.card,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
     shadowColor: colors.text.primary,
     shadowOpacity: 0.02,
     shadowRadius: 8,
@@ -276,11 +280,11 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: colors.border.main,
     marginBottom: 12,
   },
   cardFooter: {
@@ -300,12 +304,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   vehicleBadge: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   vehicleText: {
     fontSize: 13,
@@ -322,12 +326,12 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   emptyStateTitle: {
     fontSize: 18,
