@@ -1,4 +1,5 @@
-import React from 'react';
+// src/features/appointments/screens/MyAppointmentsScreen.tsx
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,12 +20,15 @@ import {
   Clock,
   CalendarCheck,
   Car,
+  XCircle,
+  CalendarRange,
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';
+import { cancelAppointment, getAppointmentRules } from '../services/appointment.service';
 
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
@@ -37,11 +41,108 @@ export default function MyAppointmentsScreen() {
   const auth = getAuth();
   const uid = auth.currentUser?.uid;
 
-  const { loading, items } = useUserAppointments({
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+
+  const { loading, items, mutate } = useUserAppointments({
     uid,
     statusIn: ACTIVE_APPOINTMENT_SET,
     limitN: 50,
   });
+
+  const handleCancel = (item: UserAppointment) => {
+    const rules = getAppointmentRules(item);
+    
+    if (!rules.canCancel) {
+      Alert.alert('Não é possível cancelar', rules.message || 'Cancelamento não permitido.');
+      return;
+    }
+
+    Alert.alert(
+      'Cancelar agendamento',
+      'Tem certeza que deseja cancelar este agendamento?',
+      [
+        { text: 'Não', style: 'cancel' },
+        { 
+          text: 'Sim, cancelar', 
+          style: 'destructive',
+          onPress: () => executeCancel(item)
+        }
+      ]
+    );
+  };
+
+  const handleReschedule = (item: UserAppointment) => {
+    const rules = getAppointmentRules(item);
+    
+    if (!rules.canReschedule) {
+      Alert.alert('Não é possível reagendar', rules.message || 'Reagendamento não permitido.');
+      return;
+    }
+
+    let message = '';
+    if (item.status === 'no_show') {
+      message = 'Você não compareceu a este agendamento. Deseja criar um novo agendamento?';
+    } else if (rules.isExpired) {
+      message = 'Este agendamento já passou do horário. Deseja criar um novo agendamento baseado neste?';
+    } else {
+      message = 'Ao reagendar, o agendamento atual será cancelado e você poderá escolher um novo horário. Deseja continuar?';
+    }
+
+    Alert.alert(
+      'Reagendar',
+      message,
+      [
+        { text: 'Não', style: 'cancel' },
+        { 
+          text: 'Sim, continuar', 
+          onPress: () => executeReschedule(item, rules.isExpired)
+        }
+      ]
+    );
+  };
+
+  const executeReschedule = async (item: UserAppointment, isExpired: boolean) => {
+    setReschedulingId(item.id);
+    
+    // Se NÃO passou do horário, cancela o agendamento atual
+    if (!isExpired) {
+      const cancelResult = await cancelAppointment(item.id, uid!);
+      
+      if (!cancelResult.ok) {
+        Alert.alert('Erro', cancelResult.message || 'Não foi possível cancelar o agendamento atual.');
+        setReschedulingId(null);
+        return;
+      }
+    }
+    
+    // Navega para tela de agendamento com os dados do item original
+    navigation.navigate('Appointment', {
+      mode: 'reschedule',
+      originalAppointmentId: item.id,
+      vehicleType: item.vehicleType,
+      carCategory: item.carCategory,
+      serviceLabel: item.serviceLabel,
+      isExpired,
+    });
+    
+    setReschedulingId(null);
+  };
+
+  const executeCancel = async (item: UserAppointment) => {
+    setCancellingId(item.id);
+    
+    const result = await cancelAppointment(item.id, uid!);
+    
+    if (result.ok) {
+      Alert.alert('Sucesso', result.message);
+      mutate(); // Força atualização da lista
+    } else {
+      Alert.alert('Erro', result.message);
+    }
+    
+    setCancellingId(null);
+  };
 
   const renderItem = ({ item }: { item: UserAppointment }) => {
     const subtitle =
@@ -50,12 +151,17 @@ export default function MyAppointmentsScreen() {
         : item.vehicleType;
 
     const isInProgress = item.status === 'in_progress';
-    const statusLabel = isInProgress ? 'Em andamento' : 'Agendado';
-
-    const statusColor = isInProgress
-      ? colors.status.warning
-      : colors.text.tertiary;
+    const statusLabel = isInProgress ? 'Em andamento' : 
+                        item.status === 'cancelled' ? 'Cancelado' : 'Agendado';
+    const statusColor = isInProgress ? colors.status.warning : 
+                        item.status === 'cancelled' ? colors.text.disabled : colors.text.tertiary;
     const StatusIcon = isInProgress ? CalendarCheck : Calendar;
+
+    const isCancelling = cancellingId === item.id;
+    const isRescheduling = reschedulingId === item.id;
+    const isLoading = isCancelling || isRescheduling;
+
+    const rules = getAppointmentRules(item);
 
     return (
       <View style={styles.card}>
@@ -103,26 +209,55 @@ export default function MyAppointmentsScreen() {
         {/* Ações do agendamento */}
         <View style={styles.cardActions}>
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => Alert.alert('Reagendar', 'Em breve')}
+            style={[
+              styles.actionButton,
+              (!rules.canReschedule || isLoading) && styles.actionButtonDisabled
+            ]}
+            onPress={() => handleReschedule(item)}
+            disabled={!rules.canReschedule || isLoading}
             activeOpacity={0.7}
           >
-            <Text style={styles.actionButtonText}>Reagendar</Text>
+            {isRescheduling ? (
+              <ActivityIndicator size="small" color={colors.text.secondary} />
+            ) : (
+              <>
+                <CalendarRange size={16} color={colors.text.secondary} />
+                <Text style={styles.actionButtonText}>Reagendar</Text>
+              </>
+            )}
           </TouchableOpacity>
+          
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonCancel]}
-            onPress={() =>
-              Alert.alert('Cancelar', 'Deseja cancelar este agendamento?')
-            }
+            style={[
+              styles.actionButton, 
+              styles.actionButtonCancel,
+              (!rules.canCancel || isLoading) && styles.actionButtonDisabled
+            ]}
+            onPress={() => handleCancel(item)}
+            disabled={!rules.canCancel || isLoading}
             activeOpacity={0.7}
           >
-            <Text
-              style={[styles.actionButtonText, styles.actionButtonTextCancel]}
-            >
-              Cancelar
-            </Text>
+            {isCancelling ? (
+              <ActivityIndicator size="small" color={colors.status.error} />
+            ) : (
+              <>
+                <XCircle size={16} color={colors.status.error} />
+                <Text style={[styles.actionButtonText, styles.actionButtonTextCancel]}>
+                  Cancelar
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
+
+        {/* Mensagens de status */}
+        {rules.isExpired && item.status === 'scheduled' && (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              ⏰ Horário já passou. Você pode reagendar, mas não cancelar.
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -153,10 +288,7 @@ export default function MyAppointmentsScreen() {
           >
             <ArrowLeft size={22} color={colors.text.primary} />
           </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Calendar size={22} color={colors.primary.main} />
-            <Text style={styles.headerTitle}>Meus agendamentos</Text>
-          </View>
+          <Text style={styles.headerTitle}>Meus agendamentos</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -188,7 +320,7 @@ export default function MyAppointmentsScreen() {
                   </Text>
                   <TouchableOpacity
                     style={styles.emptyStateButton}
-                    onPress={() => navigation.navigate('Appointment')}
+                    onPress={() => navigation.navigate('Appointment', {})}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.emptyStateButtonText}>
@@ -230,15 +362,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.main,
   },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: colors.text.primary,
+    flex: 1,
+    textAlign: 'center',
   },
   headerRight: {
     width: 40,
@@ -348,16 +477,22 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     backgroundColor: colors.background.surface,
     borderRadius: 12,
     paddingVertical: 12,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border.main,
   },
   actionButtonCancel: {
     backgroundColor: colors.background.main,
     borderColor: colors.status.error,
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
   },
   actionButtonText: {
     fontSize: 14,
@@ -366,6 +501,19 @@ const styles = StyleSheet.create({
   },
   actionButtonTextCancel: {
     color: colors.status.error,
+  },
+  warningBox: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: colors.status.warning + '10',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.status.warning,
+  },
+  warningText: {
+    fontSize: 12,
+    color: colors.status.warning,
+    textAlign: 'center',
   },
   emptyState: {
     alignItems: 'center',

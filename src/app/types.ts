@@ -6,10 +6,17 @@ export type RootStackParamList = {
 
   // USER
   Dashboard: undefined;
-  Appointment: undefined;
+  Appointment: {
+    mode?: 'reschedule';
+    originalAppointmentId?: string;
+    vehicleType?: 'Carro' | 'Moto';
+    carCategory?: 'Hatch' | 'Sedan' | 'SUV' | 'Picape cabine dupla' | null;
+    serviceLabel?: string | null;
+    isExpired?: boolean;
+  } | undefined;
   MyAppointments: undefined;
   History: undefined;
-  Profile: undefined; // 👈 ADICIONADO
+  Profile: undefined;
 
   // ADMIN
   AdminDashboard: undefined;
