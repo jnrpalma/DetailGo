@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+// src/features/auth/screens/RegisterScreen.tsx
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,89 +8,135 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react-native';
+import { Mail, Lock, User, Phone } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
 import type { RegisterInput } from '@features/auth/services/auth.service';
 import { colors, radii, spacing } from '@shared/theme';
+import { useForm } from '@shared/hooks/useForm';
+import { Input } from '@shared/components/Input';
+import { validationUtils, validationMessages } from '@shared/utils/validation.utils';
+import { formatUtils } from '@shared/utils/format.utils';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-const phoneDigits = (v: string) => v.replace(/\D/g, '');
+type RegisterForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+};
 
 export default function RegisterScreen() {
   const navigation = useNavigation<NavProp>();
   const { register } = useAuth();
 
-  const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirm: '',
-  });
+  // Estado para exibição do telefone com máscara
+  const [displayPhone, setDisplayPhone] = React.useState('');
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const updateForm = (key: keyof typeof form, value: string) => {
-    setForm(prev => ({ ...prev, [key]: value }));
+  // 👇 EXTRAIR VALIDAÇÕES PARA FORA DO useForm PARA EVITAR REFERÊNCIA CIRCULAR
+  const validationRules = {
+    firstName: [
+      { validate: (v: string) => validationUtils.name(v), message: validationMessages.name },
+      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+    ],
+    lastName: [
+      { validate: (v: string) => validationUtils.name(v), message: validationMessages.lastName },
+      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+    ],
+    email: [
+      { validate: (v: string) => validationUtils.email(v), message: validationMessages.email },
+      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+    ],
+    phone: [
+      { validate: (v: string) => validationUtils.phone(v), message: validationMessages.phone },
+    ],
+    password: [
+      { validate: (v: string) => validationUtils.password(v), message: validationMessages.password },
+      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+    ],
+    confirmPassword: [] as { validate: (v: string) => boolean; message: string }[], // Inicializa vazio
   };
 
-  const emailValid = useMemo(
-    () => emailRegex.test(form.email.trim()),
-    [form.email],
-  );
-  const phoneValid = useMemo(
-    () => phoneDigits(form.phone).length >= 10,
-    [form.phone],
-  );
-  const passwordValid = useMemo(
-    () => form.password.length >= 6,
-    [form.password],
-  );
-  const confirmValid = useMemo(
-    () => form.confirm === form.password && form.confirm.length > 0,
-    [form.confirm, form.password],
-  );
-  const namesValid = useMemo(
-    () => form.firstName.trim().length > 1 && form.lastName.trim().length > 1,
-    [form.firstName, form.lastName],
+  // Configuração do formulário com useForm
+  const {
+    values,
+    errors,
+    touched,
+    isSubmitting,
+    setIsSubmitting,
+    handleChange,
+    handleBlur,
+    validateForm,
+    reset,
+  } = useForm<RegisterForm>(
+    {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      password: '',
+      confirmPassword: '',
+    },
+    validationRules
   );
 
-  const canSubmit =
-    namesValid &&
-    emailValid &&
-    phoneValid &&
-    passwordValid &&
-    confirmValid &&
-    !submitting;
+  // 👇 ADICIONA VALIDAÇÃO DE CONFIRMAÇÃO DE SENHA DEPOIS QUE O FORM ESTÁ INICIALIZADO
+  // Isso evita a referência circular
+  React.useEffect(() => {
+    if (validationRules.confirmPassword.length === 0) {
+      validationRules.confirmPassword.push({
+        validate: (v: string) => validationUtils.confirmPassword(values.password, v),
+        message: validationMessages.confirmPassword
+      });
+    }
+  }, [values.password]);
+
+  const canSubmit = useMemo(() => {
+    return (
+      Object.keys(errors).length === 0 &&
+      values.firstName &&
+      values.lastName &&
+      values.email &&
+      values.password &&
+      values.confirmPassword &&
+      !isSubmitting
+    );
+  }, [errors, values, isSubmitting]);
+
+  const handlePhoneChange = (text: string) => {
+    // Aplica máscara para exibição
+    const masked = formatUtils.phoneMask(text);
+    setDisplayPhone(masked);
+    
+    // Armazena apenas dígitos no estado
+    const digits = formatUtils.phoneDigits(text);
+    handleChange('phone', digits);
+  };
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!validateForm()) return;
 
-    setSubmitting(true);
+    setIsSubmitting(true);
     const data: RegisterInput = {
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      email: form.email.trim(),
-      phone: phoneDigits(form.phone),
-      password: form.password,
+      firstName: values.firstName.trim(),
+      lastName: values.lastName.trim(),
+      email: values.email.trim(),
+      phone: values.phone,
+      password: values.password,
     };
 
     const res = await register(data);
-    setSubmitting(false);
+    setIsSubmitting(false);
 
     if (!res.ok) {
       Alert.alert('Erro', res.message ?? 'Falha ao cadastrar');
@@ -99,6 +146,9 @@ export default function RegisterScreen() {
     Alert.alert('Conta criada!', 'Seu cadastro foi realizado com sucesso.', [
       { text: 'Fazer login', onPress: () => navigation.navigate('Login') },
     ]);
+    
+    reset();
+    setDisplayPhone('');
   };
 
   return (
@@ -127,174 +177,114 @@ export default function RegisterScreen() {
 
         <View style={styles.form}>
           <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Nome</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  form.firstName.length > 1 &&
-                    form.firstName.trim().length < 2 &&
-                    styles.inputError,
-                ]}
-                placeholder="Seu nome"
-                placeholderTextColor={colors.text.disabled}
-                value={form.firstName}
-                onChangeText={v => updateForm('firstName', v)}
-                returnKeyType="next"
-                editable={!submitting}
-              />
-              {form.firstName.length > 0 &&
-                form.firstName.trim().length < 2 && (
-                  <Text style={styles.errorText}>Nome muito curto</Text>
-                )}
-            </View>
+            <Input
+              label="Nome"
+              value={values.firstName}
+              onChangeText={(v) => handleChange('firstName', v)}
+              onBlur={() => handleBlur('firstName')}
+              error={errors.firstName}
+              touched={touched.firstName}
+              leftIcon={<User size={20} color={colors.text.tertiary} />}
+              placeholder="Seu nome"
+              editable={!isSubmitting}
+              returnKeyType="next"
+              containerStyle={styles.col}
+            />
 
-            <View style={styles.col}>
-              <Text style={styles.label}>Sobrenome</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  form.lastName.length > 1 &&
-                    form.lastName.trim().length < 2 &&
-                    styles.inputError,
-                ]}
-                placeholder="Seu sobrenome"
-                placeholderTextColor={colors.text.disabled}
-                value={form.lastName}
-                onChangeText={v => updateForm('lastName', v)}
-                returnKeyType="next"
-                editable={!submitting}
-              />
-              {form.lastName.length > 0 && form.lastName.trim().length < 2 && (
-                <Text style={styles.errorText}>Sobrenome muito curto</Text>
-              )}
-            </View>
+            <Input
+              label="Sobrenome"
+              value={values.lastName}
+              onChangeText={(v) => handleChange('lastName', v)}
+              onBlur={() => handleBlur('lastName')}
+              error={errors.lastName}
+              touched={touched.lastName}
+              leftIcon={<User size={20} color={colors.text.tertiary} />}
+              placeholder="Seu sobrenome"
+              editable={!isSubmitting}
+              returnKeyType="next"
+              containerStyle={styles.col}
+            />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-mail</Text>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color={colors.text.tertiary} />
-              <TextInput
-                style={styles.inputField}
-                placeholder="seu@email.com"
-                placeholderTextColor={colors.text.disabled}
-                value={form.email}
-                onChangeText={v => updateForm('email', v)}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                autoComplete="email"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                editable={!submitting}
-              />
-            </View>
-            {form.email.length > 0 && !emailValid && (
-              <Text style={styles.errorText}>E-mail inválido</Text>
-            )}
-          </View>
+          <Input
+            label="E-mail"
+            value={values.email}
+            onChangeText={(v) => handleChange('email', v)}
+            onBlur={() => handleBlur('email')}
+            error={errors.email}
+            touched={touched.email}
+            leftIcon={<Mail size={20} color={colors.text.tertiary} />}
+            placeholder="seu@email.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            editable={!isSubmitting}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Telefone</Text>
-            <View style={styles.inputWrapper}>
-              <Phone size={20} color={colors.text.tertiary} />
-              <TextInput
-                style={styles.inputField}
-                placeholder="(11) 91234-5678"
-                placeholderTextColor={colors.text.disabled}
-                value={form.phone}
-                onChangeText={v => updateForm('phone', v)}
-                keyboardType="phone-pad"
-                autoComplete="tel"
-                textContentType="telephoneNumber"
-                returnKeyType="next"
-                editable={!submitting}
-              />
-            </View>
-            {form.phone.length > 0 && !phoneValid && (
-              <Text style={styles.errorText}>
-                Telefone com DDD e 8-9 dígitos
-              </Text>
-            )}
-          </View>
+          <Input
+            label="Telefone"
+            value={displayPhone}
+            onChangeText={handlePhoneChange}
+            onBlur={() => handleBlur('phone')}
+            error={errors.phone}
+            touched={touched.phone}
+            leftIcon={<Phone size={20} color={colors.text.tertiary} />}
+            placeholder="(11) 91234-5678"
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+            returnKeyType="next"
+            editable={!isSubmitting}
+            maxLength={15}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Senha</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color={colors.text.tertiary} />
-              <TextInput
-                style={styles.inputField}
-                placeholder="mínimo 6 caracteres"
-                placeholderTextColor={colors.text.disabled}
-                value={form.password}
-                onChangeText={v => updateForm('password', v)}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="new-password"
-                textContentType="newPassword"
-                returnKeyType="next"
-                editable={!submitting}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <EyeOff size={20} color={colors.text.tertiary} />
-                ) : (
-                  <Eye size={20} color={colors.text.tertiary} />
-                )}
-              </TouchableOpacity>
-            </View>
-            {form.password.length > 0 && !passwordValid && (
-              <Text style={styles.errorText}>Mínimo de 6 caracteres</Text>
-            )}
-          </View>
+          <Input
+            label="Senha"
+            value={values.password}
+            onChangeText={(v) => handleChange('password', v)}
+            onBlur={() => handleBlur('password')}
+            error={errors.password}
+            touched={touched.password}
+            leftIcon={<Lock size={20} color={colors.text.tertiary} />}
+            placeholder="mínimo 6 caracteres"
+            isPassword
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+            editable={!isSubmitting}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirmar senha</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color={colors.text.tertiary} />
-              <TextInput
-                style={styles.inputField}
-                placeholder="repita a senha"
-                placeholderTextColor={colors.text.disabled}
-                value={form.confirm}
-                onChangeText={v => updateForm('confirm', v)}
-                secureTextEntry={!showConfirm}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="new-password"
-                textContentType="newPassword"
-                returnKeyType="go"
-                onSubmitEditing={handleSubmit}
-                editable={!submitting}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowConfirm(!showConfirm)}
-              >
-                {showConfirm ? (
-                  <EyeOff size={20} color={colors.text.tertiary} />
-                ) : (
-                  <Eye size={20} color={colors.text.tertiary} />
-                )}
-              </TouchableOpacity>
-            </View>
-            {form.confirm.length > 0 && !confirmValid && (
-              <Text style={styles.errorText}>As senhas não conferem</Text>
-            )}
-          </View>
+          <Input
+            label="Confirmar senha"
+            value={values.confirmPassword}
+            onChangeText={(v) => handleChange('confirmPassword', v)}
+            onBlur={() => handleBlur('confirmPassword')}
+            error={errors.confirmPassword}
+            touched={touched.confirmPassword}
+            leftIcon={<Lock size={20} color={colors.text.tertiary} />}
+            placeholder="repita a senha"
+            isPassword
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="go"
+            onSubmitEditing={handleSubmit}
+            editable={!isSubmitting}
+          />
 
           <TouchableOpacity
             style={[styles.button, !canSubmit && styles.buttonDisabled]}
             onPress={handleSubmit}
-            disabled={!canSubmit || submitting}
+            disabled={!canSubmit || isSubmitting}
             activeOpacity={0.8}
           >
-            {submitting ? (
+            {isSubmitting ? (
               <ActivityIndicator color={colors.text.white} />
             ) : (
               <Text style={styles.buttonText}>Criar conta</Text>
@@ -359,60 +349,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: 0,
   },
   col: {
     flex: 1,
-  },
-  inputGroup: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 52,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    paddingHorizontal: spacing.md,
-    gap: 12,
-  },
-  inputField: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text.primary,
-    paddingVertical: 12,
-  },
-  input: {
-    height: 52,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    fontSize: 16,
-    color: colors.text.primary,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-  },
-  inputError: {
-    borderColor: colors.status.error,
-    borderWidth: 1.5,
-  },
-  errorText: {
-    color: colors.status.error,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: spacing.xs,
-    marginLeft: 4,
-  },
-  eyeButton: {
-    padding: 4,
   },
   button: {
     height: 52,

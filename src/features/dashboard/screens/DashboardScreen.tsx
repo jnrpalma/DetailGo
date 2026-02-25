@@ -226,7 +226,6 @@ export default function DashboardScreen() {
 
               <Text style={styles.brand}>DETAILGO</Text>
 
-              {/* 👇 Substituído Clock por Bell */}
               <TouchableOpacity
                 onPress={handleNotifications}
                 style={styles.notificationButton}

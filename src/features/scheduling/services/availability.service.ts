@@ -1,3 +1,4 @@
+// src/features/scheduling/services/availability.service.ts
 import {
   collection,
   getDocs,
@@ -20,6 +21,7 @@ import type {
   CarCategory,
   AppointmentStatus,
 } from '@features/appointments/domain/appointment.types';
+import { APPOINTMENT } from '@features/appointments/domain/appointment.constants';
 
 type QDoc =
   FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
@@ -27,6 +29,7 @@ type QDoc =
 export type Slot = {
   startAtMs: number;
   endAtMs: number;
+  durationMin: number; 
 };
 
 export type AppointmentCreateInput = {
@@ -86,6 +89,39 @@ function overlaps(
   return aStart < bEnd && bStart < aEnd;
 }
 
+/**
+ * 👇 NOVA FUNÇÃO: Valida se o horário está dentro do horário comercial
+ */
+function isWithinBusinessHours(slot: Slot, settings: ShopSettings): boolean {
+  const slotStartHour = new Date(slot.startAtMs).getHours();
+  const slotEndHour = new Date(slot.endAtMs).getHours();
+  const slotEndMinutes = new Date(slot.endAtMs).getMinutes();
+  
+  // Converte para minutos desde meia-noite para comparação mais precisa
+  const slotStartMinutes = slotStartHour * 60 + new Date(slot.startAtMs).getMinutes();
+  const slotEndMinutesTotal = slotEndHour * 60 + slotEndMinutes;
+  
+  const openMinutes = settings.openHour * 60;
+  const closeMinutes = settings.closeHour * 60;
+
+  return slotStartMinutes >= openMinutes && slotEndMinutesTotal <= closeMinutes;
+}
+
+/**
+ * 👇 NOVA FUNÇÃO: Valida se o slot não está no passado
+ */
+function isNotInPast(slot: Slot): boolean {
+  return slot.startAtMs > Date.now();
+}
+
+/**
+ * 👇 NOVA FUNÇÃO: Valida duração mínima do serviço
+ */
+function hasValidDuration(slot: Slot, requiredDuration: number): boolean {
+  const actualDuration = (slot.endAtMs - slot.startAtMs) / (60 * 1000);
+  return Math.abs(actualDuration - requiredDuration) < 1; // tolerância de 1 minuto
+}
+
 async function getScheduledAppointmentsForDay(
   dayKey: string,
   dayStart: number,
@@ -105,6 +141,7 @@ async function getScheduledAppointmentsForDay(
     return snapByDayKey.docs.map((d: QDoc) => d.data() as AppointmentDoc);
   }
 
+  // Fallback para consulta por range (dados antigos sem dayKey)
   const qRange = query(
     collection(db, 'appointments'),
     where('status', '==', 'scheduled'),
@@ -133,11 +170,14 @@ function generateSlots(
 
   const slots: Slot[] = [];
   for (let t = open.getTime(); t + durationMs <= close.getTime(); t += stepMs) {
-    slots.push({ startAtMs: t, endAtMs: t + durationMs });
+    slots.push({ 
+      startAtMs: t, 
+      endAtMs: t + durationMs,
+      durationMin, // 👈 Adiciona duração
+    });
   }
 
-  const now = Date.now();
-  return slots.filter(s => s.startAtMs > now);
+  return slots;
 }
 
 function filterAvailableSlots(
@@ -173,10 +213,27 @@ export async function getAvailableSlotsForDay(
     dayStart,
     dayEnd,
   );
+  
+  // Gera todos os slots possíveis
   const allSlots = generateSlots(day, settings, durationMin);
 
+  // 👇 APLICA TODAS AS VALIDAÇÕES
+  const validSlots = allSlots.filter(slot => {
+    // 1. Não pode estar no passado
+    if (!isNotInPast(slot)) return false;
+    
+    // 2. Deve estar dentro do horário comercial
+    if (!isWithinBusinessHours(slot, settings)) return false;
+    
+    // 3. Deve ter a duração correta
+    if (!hasValidDuration(slot, durationMin)) return false;
+    
+    return true;
+  });
+
+  // Filtra por disponibilidade (capacidade)
   return filterAvailableSlots(
-    allSlots,
+    validSlots,
     appointments,
     settings.parallelCapacity,
   );
@@ -189,9 +246,12 @@ async function getCustomerName(customerUid: string): Promise<string> {
     firstName?: string;
     lastName?: string;
   };
-  return (
-    `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim() || 'Cliente'
-  );
+  
+  const firstName = userData.firstName || '';
+  const lastName = userData.lastName || '';
+  const fullName = `${firstName} ${lastName}`.trim();
+  
+  return fullName || 'Cliente';
 }
 
 export async function createAppointmentWithCapacityCheck(
@@ -201,6 +261,29 @@ export async function createAppointmentWithCapacityCheck(
   const settings = await getShopSettings();
   const customerName = await getCustomerName(input.customerUid);
   const dayKey = toDayKey(input.startAtMs);
+
+  // 👇 VALIDAÇÕES ADICIONAIS ANTES DA TRANSAÇÃO
+  const slot: Slot = {
+    startAtMs: input.startAtMs,
+    endAtMs: input.endAtMs,
+    durationMin: input.durationMin,
+  };
+
+  // Verifica se não está no passado
+  if (!isNotInPast(slot)) {
+    throw new AvailabilityError(
+      'Não é possível agendar para horários passados',
+      'PAST_DATE'
+    );
+  }
+
+  // Verifica horário comercial
+  if (!isWithinBusinessHours(slot, settings)) {
+    throw new AvailabilityError(
+      'Horário fora do expediente',
+      'OUTSIDE_BUSINESS_HOURS'
+    );
+  }
 
   return runTransaction(db, async tx => {
     const qy = query(
@@ -264,4 +347,55 @@ export async function createAppointmentWithCapacityCheck(
 
     return { id: apptRef.id };
   });
+}
+
+/**
+ * 👇 NOVA FUNÇÃO: Verifica disponibilidade de um horário específico
+ * Útil para validação em tempo real
+ */
+export async function checkSlotAvailability(
+  startAtMs: number,
+  durationMin: number,
+): Promise<{
+  available: boolean;
+  reason?: string;
+}> {
+  const settings = await getShopSettings();
+  const dayKey = toDayKey(startAtMs);
+  const endAtMs = startAtMs + durationMin * 60 * 1000;
+  
+  const slot: Slot = { startAtMs, endAtMs, durationMin };
+
+  // Validações básicas
+  if (!isNotInPast(slot)) {
+    return { available: false, reason: 'Horário no passado' };
+  }
+
+  if (!isWithinBusinessHours(slot, settings)) {
+    return { available: false, reason: 'Fora do horário comercial' };
+  }
+
+  // Verifica capacidade
+  const db = getFirestore();
+  const qy = query(
+    collection(db, 'appointments'),
+    where('status', '==', 'scheduled'),
+    where('dayKey', '==', dayKey),
+  );
+
+  const snap = await getDocs(qy);
+  let concurrent = 0;
+
+  snap.docs.forEach((d: QDoc) => {
+    const appt = d.data() as AppointmentDoc;
+    if (overlaps(appt.startAtMs, appt.endAtMs, startAtMs, endAtMs)) {
+      concurrent += 1;
+    }
+  });
+
+  if (concurrent >= settings.parallelCapacity) {
+    return { available: false, reason: 'Capacidade esgotada' };
+  }
+
+  return { available: true };
 }

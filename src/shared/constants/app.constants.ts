@@ -1,38 +1,35 @@
-export const APPOINTMENT = {
-  NO_SHOW_GRACE_MIN: 15,
-  NO_SHOW_GRACE_MS: 15 * 60 * 1000,
-  DEFAULT_LIMIT: 50,
-  MAX_CAPACITY: 10,
-} as const;
-
-export const FIREBASE_PATHS = {
-  SETTINGS: 'settings/shop',
-  APPOINTMENTS: 'appointments',
-  USERS: 'users',
-} as const;
-
-export const STATUS = {
-  ACTIVE: ['scheduled', 'in_progress'] as const,
-  HISTORY: ['done', 'no_show'] as const,
-} as const;
-
-export const APPOINTMENT_STATUS = {
-  ACTIVE: ['scheduled', 'in_progress'] as const,
-  HISTORY: ['done', 'no_show'] as const,
-} as const;
-
-export const CAR_CATEGORIES = [
-  'Hatch',
-  'Sedan',
-  'SUV',
-  'Picape cabine dupla',
-] as const;
-
-export const VEHICLE_TYPES = ['Carro', 'Moto'] as const;
-
+/**
+ * Configurações de UI
+ */
 export const UI = {
+  // Tamanhos de avatar
   AVATAR_SIZE: 96,
+
+  // Alturas
   COVER_HEIGHT: 285,
+
+  // Menu/Drawer
   MENU_WIDTH: 280,
   DRAWER_ANIMATION_DURATION: 250,
+
+  // Espaçamentos padrão (caso não use o theme)
+  PADDING: {
+    SMALL: 8,
+    MEDIUM: 16,
+    LARGE: 24,
+  },
+} as const;
+
+/**
+ * Configurações de cache
+ */
+export const CACHE = {
+  USER_NAME_TTL: 5 * 60 * 1000, // 5 minutos
+} as const;
+
+/**
+ * Firebase paths (apenas os que não estão em outros lugares)
+ */
+export const FIREBASE_PATHS = {
+  SETTINGS: 'settings/shop',
 } as const;

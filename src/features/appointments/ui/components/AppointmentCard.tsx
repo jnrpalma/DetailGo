@@ -1,10 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@shared/theme/colors';
+import { colors, spacing, radii } from '@shared/theme';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
-import type { UserAppointment } from '../../domain/appointment.types';
+import { getAppointmentStatusConfig } from '@features/appointments/domain/appointment.helpers';
+import { UserAppointment } from '@features/appointments/domain/appointment.types';
 
 type Props = {
   item: UserAppointment;
@@ -16,31 +17,17 @@ export default function AppointmentCard({ item }: Props) {
       ? `Carro • ${item.carCategory}`
       : item.vehicleType;
 
-  const statusLabel =
-    item.status === 'scheduled'
-      ? 'Agendado'
-      : item.status === 'in_progress'
-      ? 'Em andamento'
-      : item.status === 'done'
-      ? 'Concluído'
-      : 'Não realizado';
-
-  const statusColor =
-    item.status === 'done'
-      ? colors.status.success
-      : item.status === 'in_progress'
-      ? colors.status.warning
-      : item.status === 'no_show'
-      ? colors.status.error
-      : colors.text.disabled;
+  const statusConfig = getAppointmentStatusConfig(item.status);
 
   return (
     <View style={styles.card}>
       <View style={styles.cardLeft}>
-        <Text style={styles.cardTitle}>{item.serviceLabel ?? 'Serviço'}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {item.serviceLabel ?? 'Serviço'}
+        </Text>
         <Text style={styles.cardSubtitle}>{subtitle}</Text>
-        <Text style={[styles.status, { color: statusColor }]}>
-          {statusLabel}
+        <Text style={[styles.status, { color: statusConfig.color }]}>
+          {statusConfig.label}
         </Text>
       </View>
 
@@ -62,38 +49,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background.card,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border.main,
   },
-  cardLeft: { flex: 1 },
-  cardRight: { alignItems: 'flex-end' },
+  cardLeft: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  cardRight: {
+    alignItems: 'flex-end',
+  },
 
   cardTitle: {
     color: colors.text.primary,
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
   },
   cardSubtitle: {
     color: colors.text.tertiary,
-    fontSize: 15,
+    fontSize: 14,
+    marginBottom: spacing.xs,
   },
   status: {
-    fontWeight: '900',
-    marginTop: 6,
+    fontWeight: '600',
+    fontSize: 13,
   },
 
   cardPrice: {
     color: colors.primary.main,
     fontSize: 16,
-    fontWeight: '900',
-    marginBottom: 6,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
   },
   cardDate: {
     color: colors.text.tertiary,
-    fontSize: 15,
+    fontSize: 13,
   },
 });

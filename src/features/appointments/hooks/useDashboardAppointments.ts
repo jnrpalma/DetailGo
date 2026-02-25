@@ -12,22 +12,26 @@ import {
 } from '@react-native-firebase/firestore';
 
 import type { UserAppointment } from '../domain/appointment.types';
-import { normalizeUserAppointmentFromGlobal, normalizeUserAppointmentFromSubcollection } from '../data/appointment.normalizers';
-import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
+import {
+  normalizeUserAppointmentFromGlobal,
+  normalizeUserAppointmentFromSubcollection,
+} from '../data/appointment.normalizers';
+import {
+  getEffectiveStatus,
+  filterActiveAppointments,
+} from '../domain/appointment.helpers';
 
 export type DashboardAppointment = UserAppointment;
 
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type Params = {
   uid: string;
   limitN?: number;
 };
 
-export function useDashboardAppointments({
-  uid,
-  limitN = 30,
-}: Params) {
+export function useDashboardAppointments({ uid, limitN = 30 }: Params) {
   const [items, setItems] = useState<DashboardAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const fallbackOnceRef = useRef(false);
@@ -41,7 +45,7 @@ export function useDashboardAppointments({
 
     const qUser = query(
       collection(db, 'users', uid, 'appointments'),
-      orderBy('whenMs', 'asc'), 
+      orderBy('whenMs', 'asc'),
       limit(limitN),
     );
 
@@ -52,25 +56,16 @@ export function useDashboardAppointments({
           .map((d: QDoc) => normalizeUserAppointmentFromSubcollection(d))
           .filter(Boolean) as DashboardAppointment[];
 
-        const now = Date.now();
-        
-        const updatedList = arr.map(item => {
-          if (item.status === 'scheduled' && 
-              now > item.startAtMs + NO_SHOW_GRACE_MS) {
-            return {
-              ...item,
-              status: 'no_show' as const
-            };
-          }
-          return item;
-        });
+        const withEffectiveStatus = arr.map(item => ({
+          ...item,
+          status: getEffectiveStatus(item.status, item.startAtMs),
+        }));
 
-        const activeAppointments = updatedList.filter(
-          item => item.status === 'scheduled' || item.status === 'in_progress'
-        );
+        const activeAppointments =
+          filterActiveAppointments(withEffectiveStatus);
 
         if (snap.docs.length > 0) {
-          setItems(activeAppointments); 
+          setItems(activeAppointments);
           setLoading(false);
           return;
         }
@@ -84,12 +79,11 @@ export function useDashboardAppointments({
         fallbackOnceRef.current = true;
 
         try {
-         
           const qGlobal = query(
             collection(db, 'appointments'),
             where('customerUid', '==', uid),
-            where('status', 'in', ['scheduled', 'in_progress']), 
-            orderBy('startAtMs', 'asc'), 
+            where('status', 'in', ['scheduled', 'in_progress']),
+            orderBy('startAtMs', 'asc'),
             limit(limitN),
           );
 
@@ -99,21 +93,12 @@ export function useDashboardAppointments({
             .map((d: QDoc) => normalizeUserAppointmentFromGlobal(d))
             .filter(Boolean) as DashboardAppointment[];
 
-          const updatedGlobal = fromGlobal.map(item => {
-            if (item.status === 'scheduled' && 
-                now > item.startAtMs + NO_SHOW_GRACE_MS) {
-              return {
-                ...item,
-                status: 'no_show' as const
-              };
-            }
-            return item;
-          });
+          const withEffectiveGlobal = fromGlobal.map(item => ({
+            ...item,
+            status: getEffectiveStatus(item.status, item.startAtMs),
+          }));
 
-        
-          const activeGlobal = updatedGlobal.filter(
-            item => item.status === 'scheduled' || item.status === 'in_progress'
-          );
+          const activeGlobal = filterActiveAppointments(withEffectiveGlobal);
 
           setItems(activeGlobal);
           setLoading(false);

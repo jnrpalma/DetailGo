@@ -1,13 +1,12 @@
-// src/features/admin/screens/AdminHistoryScreen.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { 
-  ActivityIndicator, 
-  Alert, 
-  FlatList, 
-  StyleSheet, 
-  Text, 
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
   View,
-  TouchableOpacity 
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -16,8 +15,6 @@ import { ArrowLeft } from 'lucide-react-native';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   getFirestore,
   limit,
@@ -29,17 +26,18 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-// 👇 IMPORTS CORRETOS
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
-import { colors, spacing, radii, surfaces, borders } from '@shared/theme'; // 👈 TODOS os exports
+import { colors, spacing, radii, borders } from '@shared/theme';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
+import { getAppointmentStatusConfig } from '@features/appointments/domain/appointment.helpers';
 
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
-type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc =
+  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 export default function AdminHistoryScreen() {
   const navigation = useNavigation();
@@ -52,11 +50,9 @@ export default function AdminHistoryScreen() {
   const [filter, setFilter] = useState<'all' | 'done' | 'no_show'>('all');
 
   const [loadingMore, setLoadingMore] = useState(false);
-  // 👈 CORRIGIDO: useRef em vez de useState
   const lastDocRef = useRef<QDoc | null>(null);
   const canLoadMoreRef = useRef(true);
 
-  // 👇 Usando o hook de cache
   const { fetchCustomerName } = useCustomerName();
 
   const statusSet = useMemo(() => {
@@ -81,17 +77,17 @@ export default function AdminHistoryScreen() {
 
     const unsub = onSnapshot(
       qy,
-      async (snap) => {
+      async snap => {
         const base = snap.docs
           .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
           .filter(Boolean) as AdminAppointment[];
 
-        lastDocRef.current = (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? null;
+        lastDocRef.current =
+          (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? null;
         canLoadMoreRef.current = snap.docs.length >= 30;
 
-        // 👇 Usando fetchCustomerName
         const withNames = await Promise.all(
-          base.map(async (it) => {
+          base.map(async it => {
             if (it.customerName && it.customerName !== 'Cliente') return it;
             const name = await fetchCustomerName(it.customerUid);
             return { ...it, customerName: name };
@@ -130,19 +126,19 @@ export default function AdminHistoryScreen() {
         .filter(Boolean) as AdminAppointment[];
 
       lastDocRef.current =
-        (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ?? lastDocRef.current;
+        (snap.docs?.[snap.docs.length - 1] as QDoc | undefined) ??
+        lastDocRef.current;
       canLoadMoreRef.current = snap.docs.length >= 30;
 
-      // 👇 Usando fetchCustomerName
       const withNames = await Promise.all(
-        base.map(async (it) => {
+        base.map(async it => {
           if (it.customerName && it.customerName !== 'Cliente') return it;
           const name = await fetchCustomerName(it.customerUid);
           return { ...it, customerName: name };
         }),
       );
 
-      setItems((prev) => [...prev, ...withNames]);
+      setItems(prev => [...prev, ...withNames]);
     } catch (e) {
       console.error(e);
       Alert.alert('Erro', 'Falha ao carregar mais itens.');
@@ -153,14 +149,11 @@ export default function AdminHistoryScreen() {
 
   const renderItem = ({ item }: { item: AdminAppointment }) => {
     const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory 
-        ? `Carro • ${item.carCategory}` 
+      item.vehicleType === 'Carro' && item.carCategory
+        ? `Carro • ${item.carCategory}`
         : item.vehicleType;
 
-    const statusLabel = item.status === 'done' ? 'Concluído' : 'Não realizado';
-    const statusColor = item.status === 'done' 
-      ? colors.status.success 
-      : colors.status.error;
+    const statusConfig = getAppointmentStatusConfig(item.status);
 
     return (
       <View style={styles.card}>
@@ -169,36 +162,53 @@ export default function AdminHistoryScreen() {
           <Text style={styles.client}>👤 {item.customerName}</Text>
 
           <Text style={styles.sub}>
-            {subtitle} • {dateUtils.formatDate(item.startAtMs)} • {dateUtils.formatHour(item.startAtMs)}
+            {subtitle} • {dateUtils.formatDate(item.startAtMs)} •{' '}
+            {dateUtils.formatHour(item.startAtMs)}
           </Text>
 
-          <Text style={[styles.status, { color: statusColor }]}>{statusLabel}</Text>
+          <Text style={[styles.status, { color: statusConfig.color }]}>
+            {statusConfig.label}
+          </Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.price}>+{formatUtils.currencyCompact(item.price)}</Text>
+          <Text style={styles.price}>
+            +{formatUtils.currencyCompact(item.price)}
+          </Text>
         </View>
       </View>
     );
   };
 
-  const FilterBtn = ({ id, label }: { id: 'all' | 'done' | 'no_show'; label: string }) => {
+  const FilterBtn = ({
+    id,
+    label,
+  }: {
+    id: 'all' | 'done' | 'no_show';
+    label: string;
+  }) => {
     const active = filter === id;
     return (
-      <TouchableOpacity 
-        onPress={() => setFilter(id)} 
+      <TouchableOpacity
+        onPress={() => setFilter(id)}
         style={[styles.filterBtn, active && styles.filterBtnActive]}
         activeOpacity={0.7}
       >
-        <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+        <Text style={[styles.filterText, active && styles.filterTextActive]}>
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   };
 
   if (!user?.uid) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.main }}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.background.main }}
+      >
+        <View
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        >
           <ActivityIndicator color={colors.primary.main} />
         </View>
       </SafeAreaView>
@@ -206,7 +216,10 @@ export default function AdminHistoryScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.main }} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background.main }}
+      edges={['top', 'left', 'right']}
+    >
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -233,21 +246,29 @@ export default function AdminHistoryScreen() {
         ) : (
           <FlatList
             data={items}
-            keyExtractor={(it) => it.id}
+            keyExtractor={it => it.id}
             renderItem={renderItem}
-            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            ItemSeparatorComponent={() => (
+              <View style={{ height: spacing.md }} />
+            )}
+            contentContainerStyle={{ paddingBottom: spacing.xl }}
             onEndReachedThreshold={0.4}
             onEndReached={loadMore}
             ListFooterComponent={
               loadingMore ? (
-                <View style={{ paddingVertical: 16 }}>
+                <View style={{ paddingVertical: spacing.lg }}>
                   <ActivityIndicator color={colors.primary.main} />
                 </View>
               ) : null
             }
             ListEmptyComponent={
-              <Text style={{ textAlign: 'center', color: colors.text.disabled, marginTop: 20 }}>
+              <Text
+                style={{
+                  textAlign: 'center',
+                  color: colors.text.disabled,
+                  marginTop: spacing.lg,
+                }}
+              >
                 Sem registros para o filtro selecionado.
               </Text>
             }
@@ -267,12 +288,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     backgroundColor: colors.background.main,
     borderBottomWidth: 1,
-    borderBottomColor: borders.default,
+    borderBottomColor: colors.border.main,
   },
   backButton: {
     padding: spacing.xs,
     borderRadius: radii.sm,
-    backgroundColor: surfaces.card,
+    backgroundColor: colors.background.surface,
     width: 40,
     height: 40,
     alignItems: 'center',
@@ -288,67 +309,67 @@ const styles = StyleSheet.create({
   headerRightPlaceholder: {
     width: 40,
   },
-  filtersRow: { 
-    flexDirection: 'row', 
-    gap: 10, 
-    justifyContent: 'center', 
-    marginBottom: spacing.lg 
+  filtersRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
   },
   filterBtn: {
     borderWidth: 1,
-    borderColor: borders.default,
+    borderColor: colors.border.main,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 999,
-    backgroundColor: surfaces.card,
+    backgroundColor: colors.background.surface,
   },
-  filterBtnActive: { 
-    backgroundColor: colors.primary.main, 
-    borderColor: colors.primary.main 
+  filterBtnActive: {
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
   },
-  filterText: { 
-    color: colors.text.primary, 
+  filterText: {
+    color: colors.text.primary,
     fontWeight: '800',
     fontSize: 14,
   },
-  filterTextActive: { 
-    color: colors.text.white 
+  filterTextActive: {
+    color: colors.text.white,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: surfaces.card,
+    backgroundColor: colors.background.card,
     borderRadius: radii.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: borders.default,
-    gap: 12,
+    borderColor: colors.border.main,
+    gap: spacing.md,
   },
-  title: { 
-    color: colors.text.primary, 
-    fontSize: 16, 
-    fontWeight: '900', 
-    marginBottom: 4 
+  title: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: spacing.xs,
   },
-  client: { 
-    color: colors.text.primary, 
-    fontWeight: '900', 
-    marginBottom: 6,
+  client: {
+    color: colors.text.primary,
+    fontWeight: '900',
+    marginBottom: spacing.xs,
     fontSize: 14,
   },
-  sub: { 
-    color: colors.text.tertiary, 
-    fontSize: 13, 
-    fontWeight: '700', 
-    marginBottom: 6 
+  sub: {
+    color: colors.text.tertiary,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
   },
-  status: { 
+  status: {
     fontWeight: '900',
     fontSize: 14,
   },
-  price: { 
-    color: colors.primary.main, 
+  price: {
+    color: colors.primary.main,
     fontWeight: '900',
     fontSize: 16,
   },

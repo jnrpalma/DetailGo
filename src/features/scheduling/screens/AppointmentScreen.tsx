@@ -1,3 +1,4 @@
+// src/features/appointments/screens/AppointmentScreen.tsx
 import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   Text,
@@ -50,31 +51,11 @@ import type {
   CarCategory,
 } from '@features/appointments/domain/appointment.types';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
+import { colors, spacing, radii, borders } from '@shared/theme';
+import { formatUtils } from '@shared/utils/format.utils';
+import { dateUtils } from '@shared/utils/date.utils';
 
 const { width, height } = Dimensions.get('window');
-
-const colors = {
-  primary: '#0A4D68',
-  primaryLight: '#E6F3F5',
-  secondary: '#05BFDB',
-  accent: '#FFB703',
-  success: '#10B981',
-  error: '#EF4444',
-  warning: '#F59E0B',
-  background: '#FFFFFF',
-  surface: '#F9FAFB',
-  surfaceHover: '#F3F4F6',
-  border: '#E5E7EB',
-  borderFocus: '#0A4D68',
-  text: {
-    primary: '#111827',
-    secondary: '#4B5563',
-    tertiary: '#6B7280',
-    disabled: '#9CA3AF',
-    white: '#FFFFFF',
-  },
-  overlay: 'rgba(0,0,0,0.5)',
-} as const;
 
 const SERVICE_ICONS = {
   'Lavagem simples': Droplets,
@@ -200,24 +181,6 @@ const SERVICE_DETAILS: Record<
   },
 };
 
-const formatHour = (ms: number) => {
-  return new Date(ms).toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-const formatDayBR = (d: Date) => {
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-};
-
-const formatCurrencyBRL = (v: number) => {
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-};
-
 function ServiceDetailsModal({
   visible,
   serviceLabel,
@@ -287,7 +250,7 @@ function ServiceDetailsModal({
           >
             <View style={styles.detailsHeader}>
               <View style={styles.detailsIconContainer}>
-                <Icon size={28} color={colors.primary} />
+                <Icon size={28} color={colors.primary.main} />
               </View>
               <View style={styles.detailsTitleContainer}>
                 <Text style={styles.detailsTitle}>{details.title}</Text>
@@ -304,7 +267,7 @@ function ServiceDetailsModal({
               <View style={styles.priceBadge}>
                 <Text style={styles.priceBadgeLabel}>Valor</Text>
                 <Text style={styles.priceBadgeValue}>
-                  {formatCurrencyBRL(price)}
+                  {formatUtils.currency(price)}
                 </Text>
               </View>
               <View style={styles.durationBadge}>
@@ -318,10 +281,10 @@ function ServiceDetailsModal({
                 <View
                   style={[
                     styles.sectionIcon,
-                    { backgroundColor: colors.success + '20' },
+                    { backgroundColor: colors.status.success + '20' },
                   ]}
                 >
-                  <Check size={14} color={colors.success} />
+                  <Check size={14} color={colors.status.success} />
                 </View>
                 <Text style={styles.sectionHeaderTitle}>Inclui</Text>
               </View>
@@ -333,10 +296,10 @@ function ServiceDetailsModal({
                       <View
                         style={[
                           styles.itemIcon,
-                          { backgroundColor: colors.success + '10' },
+                          { backgroundColor: colors.status.success + '10' },
                         ]}
                       >
-                        <ItemIcon size={12} color={colors.success} />
+                        <ItemIcon size={12} color={colors.status.success} />
                       </View>
                       <Text style={styles.includedItemText}>{item.text}</Text>
                     </View>
@@ -351,10 +314,10 @@ function ServiceDetailsModal({
                   <View
                     style={[
                       styles.sectionIcon,
-                      { backgroundColor: colors.error + '20' },
+                      { backgroundColor: colors.status.error + '20' },
                     ]}
                   >
-                    <AlertCircle size={14} color={colors.error} />
+                    <AlertCircle size={14} color={colors.status.error} />
                   </View>
                   <Text style={styles.sectionHeaderTitle}>Não inclui</Text>
                 </View>
@@ -366,10 +329,10 @@ function ServiceDetailsModal({
                         <View
                           style={[
                             styles.itemIcon,
-                            { backgroundColor: colors.error + '10' },
+                            { backgroundColor: colors.status.error + '10' },
                           ]}
                         >
-                          <ItemIcon size={12} color={colors.error} />
+                          <ItemIcon size={12} color={colors.status.error} />
                         </View>
                         <Text style={styles.excludedItemText}>{item.text}</Text>
                       </View>
@@ -385,10 +348,10 @@ function ServiceDetailsModal({
                   <View
                     style={[
                       styles.sectionIcon,
-                      { backgroundColor: colors.primary + '20' },
+                      { backgroundColor: colors.primary.main + '20' },
                     ]}
                   >
-                    <Sparkles size={14} color={colors.primary} />
+                    <Sparkles size={14} color={colors.primary.main} />
                   </View>
                   <Text style={styles.sectionHeaderTitle}>Recomendado</Text>
                 </View>
@@ -478,7 +441,7 @@ function SelectModal<T extends string>({
                   </Text>
                   {isSelected && (
                     <View style={styles.modalItemCheck}>
-                      <Check size={14} color={colors.primary} />
+                      <Check size={14} color={colors.primary.main} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -638,9 +601,12 @@ export default function AppointmentScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.background.main}
+      />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        {/* Header minimalista */}
+        {/* Header sem ícone de calendário */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -649,12 +615,7 @@ export default function AppointmentScreen() {
             <ArrowLeft size={18} color={colors.text.primary} />
           </TouchableOpacity>
 
-          <View style={styles.headerTitleContainer}>
-            <View style={styles.headerIcon}>
-              <Calendar size={16} color={colors.primary} />
-            </View>
-            <Text style={styles.headerTitle}>Agendar</Text>
-          </View>
+          <Text style={styles.headerTitle}>Agendar</Text>
 
           <View style={styles.headerRight} />
         </View>
@@ -689,7 +650,6 @@ export default function AppointmentScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Data */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>DATA</Text>
             <TouchableOpacity
@@ -697,8 +657,10 @@ export default function AppointmentScreen() {
               onPress={() => setShowDayPicker(true)}
             >
               <View style={styles.dateSelectorContent}>
-                <Calendar size={18} color={colors.primary} />
-                <Text style={styles.dateSelectorText}>{formatDayBR(day)}</Text>
+                <Calendar size={18} color={colors.primary.main} />
+                <Text style={styles.dateSelectorText}>
+                  {dateUtils.formatDate(day.getTime())}
+                </Text>
               </View>
               <ChevronRight size={16} color={colors.text.tertiary} />
             </TouchableOpacity>
@@ -714,7 +676,6 @@ export default function AppointmentScreen() {
             />
           )}
 
-          {/* Veículo - CARDS SUPER COMPACTOS */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>VEÍCULO</Text>
             <View style={styles.vehicleGrid}>
@@ -732,7 +693,7 @@ export default function AppointmentScreen() {
                   size={16}
                   color={
                     vehicleType === 'Carro'
-                      ? colors.primary
+                      ? colors.primary.main
                       : colors.text.tertiary
                   }
                 />
@@ -760,7 +721,7 @@ export default function AppointmentScreen() {
                   size={16}
                   color={
                     vehicleType === 'Moto'
-                      ? colors.primary
+                      ? colors.primary.main
                       : colors.text.tertiary
                   }
                 />
@@ -776,7 +737,6 @@ export default function AppointmentScreen() {
             </View>
           </View>
 
-          {/* Categoria */}
           {vehicleType === 'Carro' && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>CATEGORIA</Text>
@@ -800,7 +760,6 @@ export default function AppointmentScreen() {
             </View>
           )}
 
-          {/* Serviço */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>SERVIÇO</Text>
 
@@ -811,13 +770,16 @@ export default function AppointmentScreen() {
               >
                 <View style={styles.serviceCardLeft}>
                   <View style={styles.serviceIconContainer}>
-                    <SelectedServiceIcon size={18} color={colors.primary} />
+                    <SelectedServiceIcon
+                      size={18}
+                      color={colors.primary.main}
+                    />
                   </View>
                   <View style={styles.serviceInfo}>
                     <Text style={styles.serviceName}>{serviceLabel}</Text>
                     <Text style={styles.serviceDuration}>
                       {selectedService?.durationMin}min •{' '}
-                      {formatCurrencyBRL(finalPrice)}
+                      {formatUtils.currency(finalPrice)}
                     </Text>
                   </View>
                 </View>
@@ -826,7 +788,7 @@ export default function AppointmentScreen() {
                   style={styles.detailsBadge}
                   onPress={() => setServiceDetailsOpen(true)}
                 >
-                  <Info size={11} color={colors.primary} />
+                  <Info size={11} color={colors.primary.main} />
                   <Text style={styles.detailsBadgeText}>Detalhes</Text>
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -846,7 +808,6 @@ export default function AppointmentScreen() {
             )}
           </View>
 
-          {/* Horários */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionLabel}>HORÁRIOS</Text>
@@ -864,7 +825,7 @@ export default function AppointmentScreen() {
               </View>
             ) : loadingSlots ? (
               <View style={styles.loadingState}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.primary.main} />
                 <Text style={styles.loadingText}>Carregando...</Text>
               </View>
             ) : slots.length === 0 ? (
@@ -895,7 +856,7 @@ export default function AppointmentScreen() {
                           isSelected && styles.slotTimeSelected,
                         ]}
                       >
-                        {formatHour(item.startAtMs)}
+                        {dateUtils.formatHour(item.startAtMs)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -904,17 +865,15 @@ export default function AppointmentScreen() {
             )}
           </View>
 
-          {/* Total - Compacto */}
           {canConfirm && (
             <View style={styles.totalCard}>
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalValue}>
-                {formatCurrencyBRL(finalPrice)}
+                {formatUtils.currency(finalPrice)}
               </Text>
             </View>
           )}
 
-          {/* Botão confirmar */}
           <TouchableOpacity
             style={[
               styles.confirmButton,
@@ -932,7 +891,7 @@ export default function AppointmentScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={{ height: 20 }} />
+          <View style={{ height: spacing.lg }} />
         </ScrollView>
       </SafeAreaView>
     </>
@@ -942,46 +901,35 @@ export default function AppointmentScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.main,
   },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.background.main,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.main,
   },
   backButton: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: colors.border.main,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text.primary,
+    textAlign: 'center',
+    flex: 1,
   },
   headerRight: {
     width: 36,
@@ -991,23 +939,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: colors.text.tertiary,
-    marginBottom: 6,
+    marginBottom: spacing.xs,
     letterSpacing: 0.8,
   },
 
@@ -1016,16 +964,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 44,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
+    borderColor: colors.border.main,
+    paddingHorizontal: spacing.md,
   },
   dateSelectorContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
   },
   dateSelectorText: {
     fontSize: 15,
@@ -1035,24 +983,24 @@ const styles = StyleSheet.create({
 
   vehicleGrid: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   vehicleCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: spacing.xs,
     height: 44,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
+    borderColor: colors.border.main,
+    paddingHorizontal: spacing.md,
   },
   vehicleCardSelected: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary.light,
+    borderColor: colors.primary.main,
   },
   vehicleLabel: {
     fontSize: 14,
@@ -1060,7 +1008,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   vehicleLabelSelected: {
-    color: colors.primary,
+    color: colors.primary.main,
   },
 
   selector: {
@@ -1068,16 +1016,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 44,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
+    borderColor: colors.border.main,
+    paddingHorizontal: spacing.md,
   },
   selectorContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
   },
   selectorText: {
     fontSize: 15,
@@ -1093,23 +1041,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: 10,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
+    borderColor: colors.border.main,
+    padding: spacing.md,
   },
   serviceCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
     flex: 1,
   },
   serviceIconContainer: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: colors.primaryLight,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primary.light,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1130,32 +1078,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: colors.primaryLight,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primary.light,
     borderRadius: 16,
   },
   detailsBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.main,
   },
 
   slotsList: {
-    gap: 8,
+    gap: spacing.xs,
     paddingVertical: 4,
   },
   slotCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   slotCardSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
   },
   slotTime: {
     fontSize: 14,
@@ -1166,27 +1114,27 @@ const styles = StyleSheet.create({
     color: colors.text.white,
   },
   slotCountBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 2,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary.light,
     borderRadius: 12,
   },
   slotCountText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.main,
   },
 
   emptyState: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   emptyStateTitle: {
     fontSize: 14,
@@ -1197,12 +1145,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   loadingText: {
     fontSize: 14,
@@ -1213,30 +1161,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 10,
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 16,
+    backgroundColor: colors.primary.light,
+    borderRadius: radii.sm,
+    padding: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
   totalLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   totalValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.primary.main,
   },
 
   confirmButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    shadowColor: colors.primary,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.md,
+    paddingVertical: spacing.lg,
+    shadowColor: colors.primary.main,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -1258,21 +1206,21 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    backgroundColor: colors.background.main,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 32 : spacing.lg,
     maxHeight: '70%',
   },
   modalCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border.main,
   },
   modalTitle: {
     fontSize: 16,
@@ -1283,14 +1231,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.lg,
     marginVertical: 2,
-    borderRadius: 10,
+    borderRadius: radii.sm,
   },
   modalItemSelected: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary.light,
   },
   modalItemText: {
     fontSize: 15,
@@ -1298,50 +1246,50 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   modalItemTextSelected: {
-    color: colors.primary,
+    color: colors.primary.main,
     fontWeight: '600',
   },
   modalItemCheck: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary.light,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   detailsModal: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingHorizontal: 16,
+    backgroundColor: colors.background.main,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
     maxHeight: '85%',
   },
   modalHandle: {
     width: 36,
     height: 4,
-    backgroundColor: colors.border,
+    backgroundColor: colors.border.main,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   modalScrollContent: {
-    paddingBottom: 24,
+    paddingBottom: spacing.xl,
   },
   detailsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   detailsIconContainer: {
     width: 52,
     height: 52,
-    borderRadius: 16,
-    backgroundColor: colors.primaryLight,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primary.light,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   detailsTitleContainer: {
     flex: 1,
@@ -1360,26 +1308,26 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   priceDurationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 24,
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
   },
   priceBadge: {
     flex: 1,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: colors.primary.light,
+    borderRadius: radii.md,
+    padding: spacing.md,
   },
   priceBadgeLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.primary.main,
     marginBottom: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1387,18 +1335,18 @@ const styles = StyleSheet.create({
   priceBadgeValue: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.primary,
+    color: colors.primary.main,
   },
   durationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    gap: spacing.xs,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   durationBadgeText: {
     fontSize: 13,
@@ -1406,13 +1354,13 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   detailsSection: {
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   sectionHeaderTitle: {
     fontSize: 15,
@@ -1422,31 +1370,31 @@ const styles = StyleSheet.create({
   sectionIcon: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   itemsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: spacing.sm,
   },
   includedItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xs,
     width: '48%',
   },
   excludedItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xs,
     width: '48%',
   },
   itemIcon: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1464,15 +1412,15 @@ const styles = StyleSheet.create({
   recommendedTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: spacing.xs,
   },
   recommendedTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.border.main,
   },
   recommendedTagText: {
     fontSize: 12,
@@ -1482,11 +1430,11 @@ const styles = StyleSheet.create({
   noteContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
+    gap: spacing.sm,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
   noteText: {
     flex: 1,
@@ -1495,9 +1443,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   detailsActionButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
   detailsActionButtonText: {
