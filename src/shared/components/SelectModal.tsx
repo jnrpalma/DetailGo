@@ -1,3 +1,4 @@
+// src/shared/components/SelectModal.tsx
 import React from 'react';
 import {
   Modal,
@@ -7,6 +8,7 @@ import {
   StyleSheet,
   FlatList,
 } from 'react-native';
+import { colors, spacing, radii } from '@shared/theme';
 
 type Option<T extends string> = { label: string; value: T };
 
@@ -47,8 +49,8 @@ export default function SelectModal<T extends string>({
           <FlatList
             data={options}
             keyExtractor={(it) => it.value}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-            contentContainerStyle={{ paddingBottom: 16 }}
+            ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+            contentContainerStyle={{ paddingBottom: spacing.lg }}
             renderItem={({ item }) => {
               const selected = item.value === value;
               return (
@@ -81,36 +83,52 @@ export default function SelectModal<T extends string>({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
+    backgroundColor: colors.background.main,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
     maxHeight: '72%',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  title: { fontSize: 16, fontWeight: '900', color: '#111827' },
-  close: { fontSize: 14, fontWeight: '900', color: '#0F766E' },
+  title: { 
+    fontSize: 16, 
+    fontWeight: '900', 
+    color: colors.text.primary 
+  },
+  close: { 
+    fontSize: 14, 
+    fontWeight: '900', 
+    color: colors.primary.main 
+  },
 
   item: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFF',
+    borderColor: colors.border.main,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.background.card,
   },
-  itemSelected: { backgroundColor: '#0F766E', borderColor: '#0F766E' },
-  itemText: { color: '#111827', fontWeight: '800' },
-  itemTextSelected: { color: '#FFF' },
+  itemSelected: { 
+    backgroundColor: colors.primary.main, 
+    borderColor: colors.primary.main 
+  },
+  itemText: { 
+    color: colors.text.primary, 
+    fontWeight: '800' 
+  },
+  itemTextSelected: { 
+    color: colors.text.white 
+  },
 });

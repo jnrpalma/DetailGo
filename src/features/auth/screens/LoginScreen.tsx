@@ -1,3 +1,4 @@
+// src/features/auth/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,18 +8,18 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Mail, Lock } from 'lucide-react-native';
 
 import { colors, spacing, radii } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
+import { Input } from '@shared/components/Input';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -28,8 +29,8 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   const isValidEmail = email.includes('@') && email.includes('.');
   const isValidPassword = password.length >= 6;
@@ -49,6 +50,10 @@ export default function LoginScreen() {
         [{ text: 'Tentar novamente' }],
       );
     }
+  };
+
+  const handleBlur = (field: 'email' | 'password') => {
+    setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   return (
@@ -73,85 +78,53 @@ export default function LoginScreen() {
             serviços de estética automotiva
           </Text>
         </View>
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-mail</Text>
-            <TextInput
-              style={[
-                styles.input,
-                email.length > 0 && !isValidEmail && styles.inputError,
-              ]}
-              placeholder="seu@email.com"
-              placeholderTextColor={colors.text.disabled}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-              returnKeyType="next"
-              editable={!loading}
-            />
-            {email.length > 0 && !isValidEmail && (
-              <Text style={styles.errorText}>E-mail inválido</Text>
-            )}
-          </View>
 
-          <View style={styles.inputGroup}>
-            <View style={styles.passwordHeader}>
-              <Text style={styles.label}>Senha</Text>
+        <View style={styles.form}>
+          <Input
+            label="E-mail"
+            value={email}
+            onChangeText={setEmail}
+            onBlur={() => handleBlur('email')}
+            error={touched.email && !isValidEmail ? 'E-mail inválido' : undefined}
+            touched={touched.email}
+            leftIcon={<Mail size={20} color={colors.text.tertiary} />}
+            placeholder="seu@email.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            editable={!loading}
+          />
+
+          {/* 👇 AGORA USA O LABEL DO PRÓPRIO INPUT */}
+          <Input
+            label="Senha"
+            value={password}
+            onChangeText={setPassword}
+            onBlur={() => handleBlur('password')}
+            error={touched.password && !isValidPassword ? 'Mínimo de 6 caracteres' : undefined}
+            touched={touched.password}
+            leftIcon={<Lock size={20} color={colors.text.tertiary} />}
+            placeholder="••••••••"
+            isPassword
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="password"
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
+            editable={!loading}
+            rightIcon={
               <TouchableOpacity
-                onPress={() =>
-                  Alert.alert(
-                    'Recuperar senha',
-                    'Enviaremos um link de recuperação para seu e-mail.',
-                  )
-                }
-                activeOpacity={0.7}
+                onPress={() => Alert.alert('Recuperar senha', 'Enviaremos um link de recuperação para seu e-mail.')}
               >
                 <Text style={styles.forgotLink}>Esqueceu?</Text>
               </TouchableOpacity>
-            </View>
+            }
+          />
 
-            <View style={styles.passwordWrapper}>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.passwordInput,
-                  password.length > 0 && !isValidPassword && styles.inputError,
-                ]}
-                placeholder="••••••••"
-                placeholderTextColor={colors.text.disabled}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="password"
-                textContentType="password"
-                returnKeyType="go"
-                onSubmitEditing={handleLogin}
-                editable={!loading}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-                activeOpacity={0.7}
-              >
-                {showPassword ? (
-                  <EyeOff size={20} color={colors.text.tertiary} />
-                ) : (
-                  <Eye size={20} color={colors.text.tertiary} />
-                )}
-              </TouchableOpacity>
-            </View>
-            {password.length > 0 && !isValidPassword && (
-              <Text style={styles.errorText}>Mínimo de 6 caracteres</Text>
-            )}
-          </View>
-
-          {/* Botão de entrada */}
           <TouchableOpacity
             style={[styles.button, !isValid && styles.buttonDisabled]}
             onPress={handleLogin}
@@ -165,13 +138,11 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Termos */}
           <Text style={styles.terms}>
             Ao entrar, você acessa seus agendamentos e histórico.
           </Text>
         </View>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.divider} />
 
@@ -224,57 +195,10 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: 40,
   },
-  inputGroup: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  input: {
-    height: 52,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    fontSize: 16,
-    color: colors.text.primary,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-  },
-  inputError: {
-    borderColor: colors.status.error,
-    borderWidth: 1.5,
-  },
-  errorText: {
-    color: colors.status.error,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: spacing.xs,
-    marginLeft: 4,
-  },
-  passwordHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
   forgotLink: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary.main,
-  },
-  passwordWrapper: {
-    position: 'relative',
-  },
-  passwordInput: {
-    paddingRight: 50,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: spacing.md,
-    top: 16,
     padding: 4,
   },
   button: {
@@ -283,7 +207,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
     shadowColor: colors.primary.main,
     shadowOpacity: 0.1,
     shadowRadius: 8,

@@ -1,12 +1,11 @@
-// src/features/appointments/hooks/useUserAppointments.ts
 import { useEffect, useMemo, useState, useCallback } from 'react';
 
-import {
+import type {
   AppointmentStatus,
   UserAppointment,
 } from '../domain/appointment.types';
 import { watchUserAppointmentsWithFallback } from '../data/appointmentsRepo';
-import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
+import { getEffectiveStatus } from '../domain/appointment.helpers';
 
 type Params = {
   uid?: string | null;
@@ -43,34 +42,16 @@ export function useUserAppointments(params: Params) {
       uid,
       limitN,
       onChange: list => {
-        const now = Date.now();
-
-        const updatedList = list.map(item => {
-          // Se já foi cancelado pelo app, mantém como cancelled
-          if (item.status === 'cancelled') {
-            return item;
-          }
-          
-          // Se passou do horário + 15min e ainda está scheduled, vira no_show (não compareceu)
-          if (
-            item.status === 'scheduled' &&
-            now > item.startAtMs + NO_SHOW_GRACE_MS
-          ) {
-            return {
-              ...item,
-              status: 'no_show' as const,
-            };
-          }
-          
-          return item;
-        });
+        const withEffectiveStatus = list.map(item => ({
+          ...item,
+          status: getEffectiveStatus(item.status, item.startAtMs),
+        }));
 
         const filtered =
           statusIn && statusIn.length > 0
-            ? updatedList.filter(it => statusSet.has(it.status))
-            : updatedList;
+            ? withEffectiveStatus.filter(it => statusSet.has(it.status))
+            : withEffectiveStatus;
 
-        // 👇 ORDENAÇÃO CORRIGIDA: mais recentes primeiro (decrescente)
         const sorted = [...filtered].sort((a, b) => b.startAtMs - a.startAtMs);
 
         setItems(sorted);

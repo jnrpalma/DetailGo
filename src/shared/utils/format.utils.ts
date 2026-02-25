@@ -24,6 +24,21 @@ export const formatUtils = {
     return phone;
   },
 
+  // 👇 NOVA FUNÇÃO: Máscara de telefone para input
+  phoneMask: (text: string): string => {
+    const numbers = text.replace(/\D/g, '');
+    
+    if (numbers.length <= 10) {
+      return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    }
+    return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  },
+
+  // 👇 NOVA FUNÇÃO: Extrai apenas dígitos do telefone
+  phoneDigits: (phone: string): string => {
+    return phone.replace(/\D/g, '');
+  },
+
   capitalize: (text: string): string => {
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   },

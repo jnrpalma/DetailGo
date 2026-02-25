@@ -7,10 +7,26 @@ import type {
 type QDoc =
   FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
+const VALID_STATUSES: AppointmentStatus[] = [
+  'scheduled',
+  'in_progress',
+  'done',
+  'no_show',
+  'cancelled',
+];
+
+function validateStatus(status: any): AppointmentStatus {
+  if (VALID_STATUSES.includes(status)) {
+    return status as AppointmentStatus;
+  }
+  return 'scheduled';
+}
+
 export function normalizeUserAppointmentFromSubcollection(
   d: QDoc,
 ): UserAppointment | null {
   const v = d.data() as any;
+
   if (typeof v?.whenMs !== 'number') return null;
 
   return {
@@ -20,7 +36,7 @@ export function normalizeUserAppointmentFromSubcollection(
     serviceLabel: v.serviceLabel ?? null,
     price: typeof v.price === 'number' ? v.price : null,
     startAtMs: v.whenMs,
-    status: (v.status ?? 'scheduled') as AppointmentStatus,
+    status: validateStatus(v.status),
     dayKey: v.dayKey,
   };
 }
@@ -40,7 +56,7 @@ export function normalizeUserAppointmentFromGlobal(
     serviceLabel: v.serviceLabel ?? null,
     price: typeof v.price === 'number' ? v.price : null,
     startAtMs,
-    status: (v.status ?? 'scheduled') as AppointmentStatus,
+    status: validateStatus(v.status),
     dayKey: v.dayKey,
   };
 }

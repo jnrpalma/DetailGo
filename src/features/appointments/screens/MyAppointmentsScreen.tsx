@@ -1,4 +1,3 @@
-// src/features/appointments/screens/MyAppointmentsScreen.tsx
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -28,7 +27,10 @@ import type { RootStackParamList } from '@app/types';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';
-import { cancelAppointment, getAppointmentRules } from '../services/appointment.service';
+import {
+  cancelAppointment,
+  getAppointmentRules,
+} from '../services/appointment.service';
 
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
@@ -52,9 +54,12 @@ export default function MyAppointmentsScreen() {
 
   const handleCancel = (item: UserAppointment) => {
     const rules = getAppointmentRules(item);
-    
+
     if (!rules.canCancel) {
-      Alert.alert('Não é possível cancelar', rules.message || 'Cancelamento não permitido.');
+      Alert.alert(
+        'Não é possível cancelar',
+        rules.message || 'Cancelamento não permitido.',
+      );
       return;
     }
 
@@ -63,60 +68,67 @@ export default function MyAppointmentsScreen() {
       'Tem certeza que deseja cancelar este agendamento?',
       [
         { text: 'Não', style: 'cancel' },
-        { 
-          text: 'Sim, cancelar', 
+        {
+          text: 'Sim, cancelar',
           style: 'destructive',
-          onPress: () => executeCancel(item)
-        }
-      ]
+          onPress: () => executeCancel(item),
+        },
+      ],
     );
   };
 
   const handleReschedule = (item: UserAppointment) => {
     const rules = getAppointmentRules(item);
-    
+
     if (!rules.canReschedule) {
-      Alert.alert('Não é possível reagendar', rules.message || 'Reagendamento não permitido.');
+      Alert.alert(
+        'Não é possível reagendar',
+        rules.message || 'Reagendamento não permitido.',
+      );
       return;
     }
 
     let message = '';
     if (item.status === 'no_show') {
-      message = 'Você não compareceu a este agendamento. Deseja criar um novo agendamento?';
+      message =
+        'Você não compareceu a este agendamento. Deseja criar um novo agendamento?';
     } else if (rules.isExpired) {
-      message = 'Este agendamento já passou do horário. Deseja criar um novo agendamento baseado neste?';
+      message =
+        'Este agendamento já passou do horário. Deseja criar um novo agendamento baseado neste?';
     } else {
-      message = 'Ao reagendar, o agendamento atual será cancelado e você poderá escolher um novo horário. Deseja continuar?';
+      message =
+        'Ao reagendar, o agendamento atual será cancelado e você poderá escolher um novo horário. Deseja continuar?';
     }
 
-    Alert.alert(
-      'Reagendar',
-      message,
-      [
-        { text: 'Não', style: 'cancel' },
-        { 
-          text: 'Sim, continuar', 
-          onPress: () => executeReschedule(item, rules.isExpired)
-        }
-      ]
-    );
+    Alert.alert('Reagendar', message, [
+      { text: 'Não', style: 'cancel' },
+      {
+        text: 'Sim, continuar',
+        onPress: () => executeReschedule(item, rules.isExpired),
+      },
+    ]);
   };
 
-  const executeReschedule = async (item: UserAppointment, isExpired: boolean) => {
+  const executeReschedule = async (
+    item: UserAppointment,
+    isExpired: boolean,
+  ) => {
     setReschedulingId(item.id);
-    
-    // Se NÃO passou do horário, cancela o agendamento atual
+
     if (!isExpired) {
       const cancelResult = await cancelAppointment(item.id, uid!);
-      
+
       if (!cancelResult.ok) {
-        Alert.alert('Erro', cancelResult.message || 'Não foi possível cancelar o agendamento atual.');
+        Alert.alert(
+          'Erro',
+          cancelResult.message ||
+            'Não foi possível cancelar o agendamento atual.',
+        );
         setReschedulingId(null);
         return;
       }
     }
-    
-    // Navega para tela de agendamento com os dados do item original
+
     navigation.navigate('Appointment', {
       mode: 'reschedule',
       originalAppointmentId: item.id,
@@ -125,22 +137,22 @@ export default function MyAppointmentsScreen() {
       serviceLabel: item.serviceLabel,
       isExpired,
     });
-    
+
     setReschedulingId(null);
   };
 
   const executeCancel = async (item: UserAppointment) => {
     setCancellingId(item.id);
-    
+
     const result = await cancelAppointment(item.id, uid!);
-    
+
     if (result.ok) {
       Alert.alert('Sucesso', result.message);
-      mutate(); // Força atualização da lista
+      mutate();
     } else {
       Alert.alert('Erro', result.message);
     }
-    
+
     setCancellingId(null);
   };
 
@@ -151,10 +163,16 @@ export default function MyAppointmentsScreen() {
         : item.vehicleType;
 
     const isInProgress = item.status === 'in_progress';
-    const statusLabel = isInProgress ? 'Em andamento' : 
-                        item.status === 'cancelled' ? 'Cancelado' : 'Agendado';
-    const statusColor = isInProgress ? colors.status.warning : 
-                        item.status === 'cancelled' ? colors.text.disabled : colors.text.tertiary;
+    const statusLabel = isInProgress
+      ? 'Em andamento'
+      : item.status === 'cancelled'
+      ? 'Cancelado'
+      : 'Agendado';
+    const statusColor = isInProgress
+      ? colors.status.warning
+      : item.status === 'cancelled'
+      ? colors.text.disabled
+      : colors.text.tertiary;
     const StatusIcon = isInProgress ? CalendarCheck : Calendar;
 
     const isCancelling = cancellingId === item.id;
@@ -211,7 +229,8 @@ export default function MyAppointmentsScreen() {
           <TouchableOpacity
             style={[
               styles.actionButton,
-              (!rules.canReschedule || isLoading) && styles.actionButtonDisabled
+              (!rules.canReschedule || isLoading) &&
+                styles.actionButtonDisabled,
             ]}
             onPress={() => handleReschedule(item)}
             disabled={!rules.canReschedule || isLoading}
@@ -226,12 +245,12 @@ export default function MyAppointmentsScreen() {
               </>
             )}
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
-              styles.actionButton, 
+              styles.actionButton,
               styles.actionButtonCancel,
-              (!rules.canCancel || isLoading) && styles.actionButtonDisabled
+              (!rules.canCancel || isLoading) && styles.actionButtonDisabled,
             ]}
             onPress={() => handleCancel(item)}
             disabled={!rules.canCancel || isLoading}
@@ -242,7 +261,12 @@ export default function MyAppointmentsScreen() {
             ) : (
               <>
                 <XCircle size={16} color={colors.status.error} />
-                <Text style={[styles.actionButtonText, styles.actionButtonTextCancel]}>
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    styles.actionButtonTextCancel,
+                  ]}
+                >
                   Cancelar
                 </Text>
               </>

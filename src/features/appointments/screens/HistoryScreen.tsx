@@ -1,4 +1,3 @@
-// src/features/appointments/screens/HistoryScreen.tsx
 import React from 'react';
 import {
   ActivityIndicator,
@@ -20,7 +19,7 @@ import {
   CheckCircle,
   XCircle,
   History,
-  Ban, // 👈 Ícone para cancelado
+  Ban,
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
@@ -140,7 +139,10 @@ export default function HistoryScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.background.main}
+      />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -150,9 +152,9 @@ export default function HistoryScreen() {
           >
             <ArrowLeft size={22} color={colors.text.primary} />
           </TouchableOpacity>
-          
+
           <Text style={styles.headerTitle}>Histórico</Text>
-          
+
           <View style={styles.headerRight} />
         </View>
 
