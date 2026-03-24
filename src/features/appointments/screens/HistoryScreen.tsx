@@ -1,3 +1,4 @@
+// src/features/appointments/screens/HistoryScreen.tsx
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,8 +31,7 @@ import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
 import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
-import { colors } from '@shared/theme/colors';
-import { spacing, radii } from '@shared/theme';
+import { colors, spacing, radii } from '@shared/theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 type FilterId = 'all' | 'done' | 'no_show' | 'cancelled';
@@ -49,8 +49,6 @@ const STATUS_CONFIG: Partial<Record<AppointmentStatus, {
   done:      { label: 'Concluído',     color: colors.status.success, icon: CheckCircle2 },
   no_show:   { label: 'Não realizado', color: colors.status.error,   icon: XCircle      },
   cancelled: { label: 'Cancelado',     color: colors.text.disabled,  icon: Ban          },
-  scheduled: { label: 'Agendado',      color: colors.text.tertiary,  icon: Calendar     },
-  in_progress: { label: 'Em andamento', color: colors.status.warning, icon: Clock       },
 };
 
 export default function HistoryScreen() {
@@ -77,7 +75,7 @@ export default function HistoryScreen() {
   const renderItem = ({ item }: { item: UserAppointment }) => {
     const subtitle =
       item.vehicleType === 'Carro' && item.carCategory
-        ? `${item.vehicleType} • ${item.carCategory}`
+        ? `Carro • ${item.carCategory}`
         : item.vehicleType;
 
     const cfg        = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
@@ -93,7 +91,7 @@ export default function HistoryScreen() {
             styles.cardPrice,
             item.status !== 'done' && styles.cardPriceMuted,
           ]}>
-            {formatUtils.currency(item.price)}
+            {formatUtils.currencyCompact(item.price)}
           </Text>
         </View>
 
@@ -173,7 +171,7 @@ export default function HistoryScreen() {
           </View>
         )}
 
-        {/* Filtros em ScrollView horizontal — nunca quebra linha */}
+        {/* Filtros em ScrollView horizontal */}
         <View style={styles.filtersWrapper}>
           <ScrollView
             horizontal
@@ -209,7 +207,7 @@ export default function HistoryScreen() {
               data={filteredItems}
               keyExtractor={item => item.id}
               renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+              ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
@@ -242,21 +240,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.background.main,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.main,
   },
   backButton: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.background.surface,
-    borderWidth: 1, borderColor: colors.border.main,
+    borderWidth: 1,
+    borderColor: colors.border.main,
   },
   headerTitle: {
-    fontSize: 20, fontWeight: '700',
-    color: colors.text.primary, flex: 1, textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text.primary,
+    flex: 1,
+    textAlign: 'center',
   },
   headerRight: { width: 40 },
 
@@ -264,12 +269,12 @@ const styles = StyleSheet.create({
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 16,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     backgroundColor: colors.primary.light,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: `${colors.primary.main}20`,
   },
@@ -277,33 +282,39 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xs,
     flexWrap: 'wrap',
   },
   summaryDivider: {
-    width: 1, height: 28,
+    width: 1,
+    height: 28,
     backgroundColor: `${colors.primary.main}30`,
-    marginHorizontal: 12,
+    marginHorizontal: spacing.md,
   },
   summaryValue: {
-    fontSize: 16, fontWeight: '800', color: colors.primary.main,
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary.main,
   },
   summaryLabel: {
-    fontSize: 12, color: colors.primary.main, fontWeight: '500', opacity: 0.7,
+    fontSize: 12,
+    color: colors.primary.main,
+    fontWeight: '500',
+    opacity: 0.7,
   },
 
   // ─── Filtros ─────────────────────────────────────────────────────────────
   filtersWrapper: {
-    marginTop: 16,
+    marginTop: spacing.lg,
   },
   filtersContent: {
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
     flexDirection: 'row',
   },
   filterPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 9,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 999,
     borderWidth: 1.5,
     borderColor: colors.border.main,
@@ -326,16 +337,16 @@ const styles = StyleSheet.create({
   // ─── Content / Lista ─────────────────────────────────────────────────────
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
-  listContent: { paddingBottom: 32 },
+  listContent: { paddingBottom: spacing.xl },
 
   // ─── Card ────────────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.background.card,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border.main,
     borderLeftWidth: 4,
@@ -349,15 +360,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   cardService: {
-    fontSize: 16, fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.text.primary,
-    flex: 1, marginRight: 8,
+    flex: 1,
+    marginRight: spacing.xs,
   },
   cardPrice: {
-    fontSize: 17, fontWeight: '800', color: colors.primary.main,
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary.main,
   },
   cardPriceMuted: { color: colors.text.tertiary },
   statusBadge: {
@@ -365,55 +380,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
     borderRadius: 999,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   statusLabel: { fontSize: 12, fontWeight: '700' },
   cardDivider: {
     height: 1,
     backgroundColor: colors.border.main,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   cardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.md,
   },
   metaItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   metaText: {
-    fontSize: 13, color: colors.text.secondary, fontWeight: '500',
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontWeight: '500',
   },
   vehicleChip: {
     backgroundColor: colors.background.surface,
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderRadius: 10, borderWidth: 1, borderColor: colors.border.main,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border.main,
   },
   vehicleChipText: {
-    fontSize: 12, color: colors.text.tertiary, fontWeight: '500',
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '500',
   },
 
   // ─── Empty ───────────────────────────────────────────────────────────────
   emptyState: {
-    alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24,
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: spacing.xl,
   },
   emptyIconWrap: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: colors.background.surface,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1, borderColor: colors.border.main,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.main,
   },
   emptyTitle: {
-    fontSize: 18, fontWeight: '700',
-    color: colors.text.primary, marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
   emptyText: {
-    fontSize: 14, color: colors.text.tertiary,
-    textAlign: 'center', lineHeight: 22,
+    fontSize: 14,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
