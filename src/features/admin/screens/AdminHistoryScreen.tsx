@@ -1,3 +1,4 @@
+// src/features/admin/screens/AdminHistoryScreen.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -40,7 +41,7 @@ import {
 
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
-import { colors, spacing } from '@shared/theme';
+import { colors, spacing, radii } from '@shared/theme';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
 
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
@@ -49,6 +50,10 @@ import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.no
 
 type QDoc =
   FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+
+interface FirebaseError extends Error {
+  code?: string;
+}
 
 const ALL_HISTORY_STATUSES: AppointmentStatus[] = ['done', 'no_show', 'cancelled'];
 
@@ -82,6 +87,9 @@ export default function AdminHistoryScreen() {
   const [filter,      setFilter]      = useState<FilterId>('all');
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // 👈 ARMAZENA OS TOTAIS DO ÚLTIMO CARREGAMENTO COMPLETO
+  const [totals, setTotals] = useState({ done: 0, revenue: 0 });
+
   const lastDocRef     = useRef<QDoc | null>(null);
   const canLoadMoreRef = useRef(true);
 
@@ -94,10 +102,15 @@ export default function AdminHistoryScreen() {
     return ALL_HISTORY_STATUSES;
   }, [filter]);
 
-  const totalDone    = items.filter(i => i.status === 'done').length;
-  const totalRevenue = items
-    .filter(i => i.status === 'done')
-    .reduce((acc, i) => acc + (i.price ?? 0), 0);
+  // 👈 ATUALIZA OS TOTAIS SEMPRE QUE ITEMS MUDAR
+  useEffect(() => {
+    const doneCount = items.filter(i => i.status === 'done').length;
+    const revenue = items
+      .filter(i => i.status === 'done')
+      .reduce((acc, i) => acc + (i.price ?? 0), 0);
+    
+    setTotals({ done: doneCount, revenue });
+  }, [items]);
 
   const enrichWithNames = async (
     list: AdminAppointment[],
@@ -139,8 +152,17 @@ export default function AdminHistoryScreen() {
         setItems(withNames);
         setLoading(false);
       },
-      err => {
-        console.error('AdminHistory snapshot error:', err);
+      (error: FirebaseError) => {
+        console.error('AdminHistory snapshot error:', error);
+        
+        if (error.code === 'failed-precondition') {
+          Alert.alert(
+            '⚠️ Índice necessário',
+            'O Firestore precisa de um índice para esta consulta. Acesse o console do Firebase e crie um índice composto com status (ascendente) e startAtMs (descendente).'
+          );
+        } else {
+          Alert.alert('Erro', 'Falha ao carregar histórico.');
+        }
         setLoading(false);
       },
     );
@@ -175,6 +197,11 @@ export default function AdminHistoryScreen() {
     } finally {
       setLoadingMore(false);
     }
+  };
+
+  const handleFilterChange = (newFilter: FilterId) => {
+    if (newFilter === filter) return;
+    setFilter(newFilter);
   };
 
   const renderItem = ({ item }: { item: AdminAppointment }) => {
@@ -240,6 +267,14 @@ export default function AdminHistoryScreen() {
     );
   }
 
+  // 👈 FILTRA OS ITENS PARA EXIBIÇÃO NA LISTA
+  const displayItems = filter === 'all'
+    ? items
+    : items.filter(item => item.status === filter);
+
+  // 👈 RESUMO SEMPRE VISÍVEL, usando totals (que são persistentes)
+  const showSummary = totals.done > 0;
+
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
@@ -258,23 +293,23 @@ export default function AdminHistoryScreen() {
           <View style={styles.headerRight} />
         </View>
 
-        {/* Resumo */}
-        {!loading && totalDone > 0 && (
+        {/* Resumo - SEMPRE VISÍVEL, nunca some */}
+        {showSummary && (
           <View style={styles.summary}>
             <View style={styles.summaryItem}>
               <TrendingUp size={15} color={colors.primary.main} />
-              <Text style={styles.summaryValue}>{totalDone}</Text>
+              <Text style={styles.summaryValue}>{totals.done}</Text>
               <Text style={styles.summaryLabel}>concluídos</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{formatUtils.currency(totalRevenue)}</Text>
+              <Text style={styles.summaryValue}>{formatUtils.currency(totals.revenue)}</Text>
               <Text style={styles.summaryLabel}>faturados</Text>
             </View>
           </View>
         )}
 
-        {/* Filtros em ScrollView horizontal — nunca quebra linha */}
+        {/* Filtros em ScrollView horizontal */}
         <View style={styles.filtersWrapper}>
           <ScrollView
             horizontal
@@ -286,7 +321,7 @@ export default function AdminHistoryScreen() {
               return (
                 <TouchableOpacity
                   key={opt.id}
-                  onPress={() => setFilter(opt.id)}
+                  onPress={() => handleFilterChange(opt.id)}
                   style={[styles.filterPill, active && styles.filterPillActive]}
                   activeOpacity={0.7}
                 >
@@ -301,16 +336,16 @@ export default function AdminHistoryScreen() {
 
         {/* Lista */}
         <View style={styles.content}>
-          {loading ? (
+          {loading && displayItems.length === 0 ? (
             <View style={styles.centered}>
               <ActivityIndicator color={colors.primary.main} />
             </View>
           ) : (
             <FlatList
-              data={items}
+              data={displayItems}
               keyExtractor={it => it.id}
               renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+              ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               onEndReachedThreshold={0.4}
@@ -352,21 +387,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     backgroundColor: colors.background.main,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.main,
   },
   backButton: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.background.surface,
-    borderWidth: 1, borderColor: colors.border.main,
+    borderWidth: 1,
+    borderColor: colors.border.main,
   },
   headerTitle: {
-    fontSize: 20, fontWeight: '800',
-    color: colors.text.primary, flex: 1, textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text.primary,
+    flex: 1,
+    textAlign: 'center',
   },
   headerRight: { width: 40 },
 
@@ -374,39 +416,52 @@ const styles = StyleSheet.create({
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 16,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     backgroundColor: colors.primary.light,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: `${colors.primary.main}20`,
   },
   summaryItem: {
-    flex: 1, flexDirection: 'row',
-    alignItems: 'center', gap: 6, flexWrap: 'wrap',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
   },
   summaryDivider: {
-    width: 1, height: 28,
+    width: 1,
+    height: 28,
     backgroundColor: `${colors.primary.main}30`,
-    marginHorizontal: 12,
+    marginHorizontal: spacing.md,
   },
-  summaryValue: { fontSize: 16, fontWeight: '800', color: colors.primary.main },
-  summaryLabel: { fontSize: 12, color: colors.primary.main, fontWeight: '500', opacity: 0.7 },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary.main,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: colors.primary.main,
+    fontWeight: '500',
+    opacity: 0.7,
+  },
 
   // ─── Filtros ─────────────────────────────────────────────────────────────
   filtersWrapper: {
-    marginTop: 16,
+    marginTop: spacing.lg,
   },
   filtersContent: {
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
     flexDirection: 'row',
   },
   filterPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 9,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 999,
     borderWidth: 1.5,
     borderColor: colors.border.main,
@@ -427,15 +482,19 @@ const styles = StyleSheet.create({
   },
 
   // ─── Content / Lista ─────────────────────────────────────────────────────
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  listContent: { paddingBottom: 32 },
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  listContent: { paddingBottom: spacing.xl },
   footerLoading: { paddingVertical: spacing.lg, alignItems: 'center' },
 
   // ─── Card ────────────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.background.card,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border.main,
     borderLeftWidth: 4,
@@ -449,46 +508,106 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   cardService: {
-    fontSize: 16, fontWeight: '700',
-    color: colors.text.primary, flex: 1, marginRight: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    flex: 1,
+    marginRight: spacing.xs,
   },
-  cardPrice: { fontSize: 16, fontWeight: '800', color: colors.primary.main },
+  cardPrice: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.primary.main,
+  },
   cardPriceMuted: { color: colors.text.tertiary },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
     borderRadius: 999,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   statusLabel: { fontSize: 12, fontWeight: '700' },
-  cardDivider: { height: 1, backgroundColor: colors.border.main, marginBottom: 10 },
-  clientRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  clientName: { fontSize: 14, fontWeight: '600', color: colors.text.secondary, flex: 1 },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.border.main,
+    marginBottom: spacing.md,
+  },
+  clientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  clientName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    flex: 1,
+  },
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
   vehicleChip: {
     backgroundColor: colors.background.surface,
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderRadius: 10, borderWidth: 1, borderColor: colors.border.main,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border.main,
   },
-  vehicleChipText: { fontSize: 12, color: colors.text.tertiary, fontWeight: '500' },
+  vehicleChipText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '500',
+  },
 
   // ─── Empty ───────────────────────────────────────────────────────────────
-  emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 },
-  emptyIconWrap: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: colors.background.surface,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 20, borderWidth: 1, borderColor: colors.border.main,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: spacing.xl,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text.primary, marginBottom: 8 },
-  emptyText: { fontSize: 14, color: colors.text.tertiary, textAlign: 'center', lineHeight: 22 },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.background.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });
