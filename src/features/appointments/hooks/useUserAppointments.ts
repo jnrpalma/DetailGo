@@ -9,12 +9,13 @@ import { getEffectiveStatus } from '../domain/appointment.helpers';
 
 type Params = {
   uid?: string | null;
+  shopId?: string | null;
   statusIn?: readonly AppointmentStatus[];
   limitN?: number;
 };
 
 export function useUserAppointments(params: Params) {
-  const { uid, statusIn, limitN = 50 } = params;
+  const { uid, shopId, statusIn, limitN = 50 } = params;
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<UserAppointment[]>([]);
@@ -30,7 +31,7 @@ export function useUserAppointments(params: Params) {
   }, []);
 
   useEffect(() => {
-    if (!uid) {
+    if (!uid || !shopId) {
       setItems([]);
       setLoading(false);
       return;
@@ -40,6 +41,7 @@ export function useUserAppointments(params: Params) {
 
     const unsub = watchUserAppointmentsWithFallback({
       uid,
+      shopId,
       limitN,
       onChange: list => {
         const withEffectiveStatus = list.map(item => ({
@@ -65,7 +67,7 @@ export function useUserAppointments(params: Params) {
 
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid, limitN, statusIn?.join('|'), version]);
+  }, [uid, shopId, limitN, statusIn?.join('|'), version]);
 
   return { loading, items, mutate };
 }

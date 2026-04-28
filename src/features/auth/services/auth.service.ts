@@ -1,18 +1,25 @@
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  updateProfile, 
-  onAuthStateChanged 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  onAuthStateChanged,
 } from '@react-native-firebase/auth';
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  serverTimestamp 
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
 } from '@react-native-firebase/firestore';
+
+export type UserRole = 'owner' | 'customer';
 
 export type RegisterInput = {
   firstName: string;
@@ -20,6 +27,9 @@ export type RegisterInput = {
   email: string;
   phone: string;
   password: string;
+  role: UserRole;
+  shopName?: string;   // obrigatório para owner
+  inviteCode?: string; // obrigatório para customer
 };
 
 export type AuthResult =
@@ -51,20 +61,93 @@ function mapFirebaseError(
   }
 }
 
-async function ensureUserDocument(
-  uid: string,
-  data: Partial<RegisterInput> & { email: string },
-) {
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+async function findShopByCode(inviteCode: string): Promise<string | null> {
   const db = getFirestore();
-  const userDocRef = doc(db, 'users', uid);
+  const qy = query(
+    collection(db, 'shops'),
+    where('code', '==', inviteCode.toUpperCase().trim()),
+    limit(1),
+  );
+  const snap = await getDocs(qy);
+  if (snap.empty) return null;
+  return snap.docs[0].id;
+}
+
+async function registerAsOwner(
+  uid: string,
+  data: RegisterInput,
+): Promise<void> {
+  const db = getFirestore();
+  const shopRef = doc(collection(db, 'shops'));
+  const shopId = shopRef.id;
+  const code = generateInviteCode();
+  const shopName = data.shopName?.trim() || 'Minha Estética';
+
+  await setDoc(shopRef, {
+    name: shopName,
+    code,
+    ownerId: uid,
+    createdAt: serverTimestamp(),
+  });
+
+  await setDoc(doc(db, 'shops', shopId, 'settings', 'config'), {
+    openHour: 8,
+    closeHour: 18,
+    slotStepMin: 30,
+    parallelCapacity: 2,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
   await setDoc(
-    userDocRef,
+    doc(db, 'users', uid),
     {
       uid,
       firstName: data.firstName ?? '',
       lastName: data.lastName ?? '',
       email: data.email,
       phone: data.phone ?? '',
+      role: 'owner',
+      shopId,
+      createdAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+async function registerAsCustomer(
+  uid: string,
+  data: RegisterInput,
+): Promise<void> {
+  if (!data.inviteCode) {
+    throw new Error('Código de convite é obrigatório.');
+  }
+
+  const shopId = await findShopByCode(data.inviteCode);
+  if (!shopId) {
+    throw new Error('Código de convite inválido. Verifique e tente novamente.');
+  }
+
+  const db = getFirestore();
+  await setDoc(
+    doc(db, 'users', uid),
+    {
+      uid,
+      firstName: data.firstName ?? '',
+      lastName: data.lastName ?? '',
+      email: data.email,
+      phone: data.phone ?? '',
+      role: 'customer',
+      shopId,
       createdAt: serverTimestamp(),
     },
     { merge: true },
@@ -100,12 +183,17 @@ export async function register(data: RegisterInput): Promise<AuthResult> {
     const displayName = `${data.firstName} ${data.lastName}`.trim();
     if (displayName) await updateProfile(cred.user, { displayName });
 
-    await ensureUserDocument(cred.user.uid, data);
+    if (data.role === 'owner') {
+      await registerAsOwner(cred.user.uid, data);
+    } else {
+      await registerAsCustomer(cred.user.uid, data);
+    }
+
     return { ok: true, user: cred.user, cred };
   } catch (e: any) {
     return {
       ok: false,
-      message: mapFirebaseError(e?.code, 'Erro ao criar conta.'),
+      message: e?.message ?? mapFirebaseError(e?.code, 'Erro ao criar conta.'),
       code: e?.code,
     };
   }

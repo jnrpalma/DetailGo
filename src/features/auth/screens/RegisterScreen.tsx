@@ -1,5 +1,4 @@
-// src/features/auth/screens/RegisterScreen.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,11 +13,11 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Mail, Lock, User, Phone } from 'lucide-react-native';
+import { Mail, Lock, User, Phone, Store, Hash, ChevronRight } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
-import type { RegisterInput } from '@features/auth/services/auth.service';
+import type { RegisterInput, UserRole } from '@features/auth/services/auth.service';
 import { colors, radii, spacing } from '@shared/theme';
 import { useForm } from '@shared/hooks/useForm';
 import { Input } from '@shared/components/Input';
@@ -34,16 +33,17 @@ type RegisterForm = {
   phone: string;
   password: string;
   confirmPassword: string;
+  shopName: string;
+  inviteCode: string;
 };
 
 export default function RegisterScreen() {
   const navigation = useNavigation<NavProp>();
   const { register } = useAuth();
 
-  // Estado para exibição do telefone com máscara
-  const [displayPhone, setDisplayPhone] = React.useState('');
+  const [accountType, setAccountType] = useState<UserRole | null>(null);
+  const [displayPhone, setDisplayPhone] = useState('');
 
-  // 👇 EXTRAIR VALIDAÇÕES PARA FORA DO useForm PARA EVITAR REFERÊNCIA CIRCULAR
   const validationRules = {
     firstName: [
       { validate: (v: string) => validationUtils.name(v), message: validationMessages.name },
@@ -64,10 +64,11 @@ export default function RegisterScreen() {
       { validate: (v: string) => validationUtils.password(v), message: validationMessages.password },
       { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
     ],
-    confirmPassword: [] as { validate: (v: string) => boolean; message: string }[], // Inicializa vazio
+    confirmPassword: [] as { validate: (v: string) => boolean; message: string }[],
+    shopName: [],
+    inviteCode: [],
   };
 
-  // Configuração do formulário com useForm
   const {
     values,
     errors,
@@ -86,44 +87,45 @@ export default function RegisterScreen() {
       phone: '',
       password: '',
       confirmPassword: '',
+      shopName: '',
+      inviteCode: '',
     },
-    validationRules
+    validationRules,
   );
 
-  // 👇 ADICIONA VALIDAÇÃO DE CONFIRMAÇÃO DE SENHA DEPOIS QUE O FORM ESTÁ INICIALIZADO
-  // Isso evita a referência circular
   React.useEffect(() => {
     if (validationRules.confirmPassword.length === 0) {
       validationRules.confirmPassword.push({
         validate: (v: string) => validationUtils.confirmPassword(values.password, v),
-        message: validationMessages.confirmPassword
+        message: validationMessages.confirmPassword,
       });
     }
   }, [values.password]);
 
   const canSubmit = useMemo(() => {
-    return (
+    if (!accountType) return false;
+    const baseOk =
       Object.keys(errors).length === 0 &&
       values.firstName &&
       values.lastName &&
       values.email &&
       values.password &&
       values.confirmPassword &&
-      !isSubmitting
-    );
-  }, [errors, values, isSubmitting]);
+      !isSubmitting;
+
+    if (accountType === 'owner') return !!baseOk;
+    return !!baseOk && values.inviteCode.trim().length === 6;
+  }, [errors, values, isSubmitting, accountType]);
 
   const handlePhoneChange = (text: string) => {
-    // Aplica máscara para exibição
     const masked = formatUtils.phoneMask(text);
     setDisplayPhone(masked);
-    
-    // Armazena apenas dígitos no estado
     const digits = formatUtils.phoneDigits(text);
     handleChange('phone', digits);
   };
 
   const handleSubmit = async () => {
+    if (!accountType) return;
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -133,6 +135,9 @@ export default function RegisterScreen() {
       email: values.email.trim(),
       phone: values.phone,
       password: values.password,
+      role: accountType,
+      shopName: accountType === 'owner' ? values.shopName.trim() || 'Minha Estética' : undefined,
+      inviteCode: accountType === 'customer' ? values.inviteCode.trim().toUpperCase() : undefined,
     };
 
     const res = await register(data);
@@ -143,23 +148,99 @@ export default function RegisterScreen() {
       return;
     }
 
-    Alert.alert('Conta criada!', 'Seu cadastro foi realizado com sucesso.', [
+    const successMsg =
+      accountType === 'owner'
+        ? 'Sua estética foi criada! Faça login para acessar o painel.'
+        : 'Cadastro realizado! Faça login para agendar serviços.';
+
+    Alert.alert('Conta criada!', successMsg, [
       { text: 'Fazer login', onPress: () => navigation.navigate('Login') },
     ]);
-    
+
     reset();
     setDisplayPhone('');
+    setAccountType(null);
   };
+
+  if (!accountType) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.brand}>DETAILGO</Text>
+            <Text style={styles.title}>Criar conta</Text>
+            <Text style={styles.subtitle}>Como você vai usar o DetailGo?</Text>
+          </View>
+
+          <View style={styles.typeCards}>
+            <TouchableOpacity
+              style={styles.typeCard}
+              onPress={() => setAccountType('owner')}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.typeIconWrap, { backgroundColor: colors.primary.light }]}>
+                <Store size={32} color={colors.primary.main} />
+              </View>
+              <View style={styles.typeCardText}>
+                <Text style={styles.typeCardTitle}>Sou proprietário</Text>
+                <Text style={styles.typeCardDesc}>
+                  Tenho uma estética automotiva e quero gerenciar meus agendamentos
+                </Text>
+              </View>
+              <ChevronRight size={20} color={colors.text.tertiary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.typeCard}
+              onPress={() => setAccountType('customer')}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.typeIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                <User size={32} color={colors.status.success} />
+              </View>
+              <View style={styles.typeCardText}>
+                <Text style={styles.typeCardTitle}>Sou cliente</Text>
+                <Text style={styles.typeCardDesc}>
+                  Quero agendar serviços em uma estética automotiva
+                </Text>
+              </View>
+              <ChevronRight size={20} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginText}>Já tem uma conta? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.loginLink}>Fazer login</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.footer}>
+            <View style={styles.divider} />
+            <Text style={styles.copyright}>© 2026 DETAILGO</Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  const isOwner = accountType === 'owner';
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={colors.background.main}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -168,19 +249,65 @@ export default function RegisterScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.brand}>DETAILGO</Text>
-          <Text style={styles.title}>Criar nova conta</Text>
+          <Text style={styles.title}>
+            {isOwner ? 'Cadastrar estética' : 'Criar conta'}
+          </Text>
           <Text style={styles.subtitle}>
-            Preencha seus dados para começar a{'\n'}
-            agendar serviços automotivos
+            {isOwner
+              ? 'Preencha os dados da sua estética e conta'
+              : 'Preencha seus dados e o código de convite'}
           </Text>
         </View>
 
+        <TouchableOpacity
+          style={styles.backTypeButton}
+          onPress={() => setAccountType(null)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backTypeText}>
+            ← {isOwner ? 'Proprietário' : 'Cliente'} · Trocar
+          </Text>
+        </TouchableOpacity>
+
         <View style={styles.form}>
+          {isOwner && (
+            <Input
+              label="Nome da estética"
+              value={values.shopName}
+              onChangeText={v => handleChange('shopName', v)}
+              onBlur={() => handleBlur('shopName')}
+              error={errors.shopName}
+              touched={touched.shopName}
+              leftIcon={<Store size={20} color={colors.text.tertiary} />}
+              placeholder="Ex: Auto Detailing São Paulo"
+              editable={!isSubmitting}
+              returnKeyType="next"
+            />
+          )}
+
+          {!isOwner && (
+            <Input
+              label="Código de convite"
+              value={values.inviteCode}
+              onChangeText={v => handleChange('inviteCode', v.toUpperCase())}
+              onBlur={() => handleBlur('inviteCode')}
+              error={errors.inviteCode}
+              touched={touched.inviteCode}
+              leftIcon={<Hash size={20} color={colors.text.tertiary} />}
+              placeholder="Ex: AB34CD"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={6}
+              editable={!isSubmitting}
+              returnKeyType="next"
+            />
+          )}
+
           <View style={styles.row}>
             <Input
               label="Nome"
               value={values.firstName}
-              onChangeText={(v) => handleChange('firstName', v)}
+              onChangeText={v => handleChange('firstName', v)}
               onBlur={() => handleBlur('firstName')}
               error={errors.firstName}
               touched={touched.firstName}
@@ -190,11 +317,10 @@ export default function RegisterScreen() {
               returnKeyType="next"
               containerStyle={styles.col}
             />
-
             <Input
               label="Sobrenome"
               value={values.lastName}
-              onChangeText={(v) => handleChange('lastName', v)}
+              onChangeText={v => handleChange('lastName', v)}
               onBlur={() => handleBlur('lastName')}
               error={errors.lastName}
               touched={touched.lastName}
@@ -209,7 +335,7 @@ export default function RegisterScreen() {
           <Input
             label="E-mail"
             value={values.email}
-            onChangeText={(v) => handleChange('email', v)}
+            onChangeText={v => handleChange('email', v)}
             onBlur={() => handleBlur('email')}
             error={errors.email}
             touched={touched.email}
@@ -244,7 +370,7 @@ export default function RegisterScreen() {
           <Input
             label="Senha"
             value={values.password}
-            onChangeText={(v) => handleChange('password', v)}
+            onChangeText={v => handleChange('password', v)}
             onBlur={() => handleBlur('password')}
             error={errors.password}
             touched={touched.password}
@@ -262,7 +388,7 @@ export default function RegisterScreen() {
           <Input
             label="Confirmar senha"
             value={values.confirmPassword}
-            onChangeText={(v) => handleChange('confirmPassword', v)}
+            onChangeText={v => handleChange('confirmPassword', v)}
             onBlur={() => handleBlur('confirmPassword')}
             error={errors.confirmPassword}
             touched={touched.confirmPassword}
@@ -287,7 +413,9 @@ export default function RegisterScreen() {
             {isSubmitting ? (
               <ActivityIndicator color={colors.text.white} />
             ) : (
-              <Text style={styles.buttonText}>Criar conta</Text>
+              <Text style={styles.buttonText}>
+                {isOwner ? 'Criar estética e conta' : 'Criar conta'}
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -321,7 +449,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   brand: {
     fontSize: 24,
@@ -342,6 +470,61 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  typeCards: {
+    gap: spacing.md,
+    marginBottom: 32,
+  },
+  typeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.card,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: 1.5,
+    borderColor: colors.border.main,
+    gap: spacing.md,
+    shadowColor: colors.text.primary,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  typeIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeCardText: {
+    flex: 1,
+  },
+  typeCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  typeCardDesc: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    lineHeight: 18,
+  },
+  backTypeButton: {
+    alignSelf: 'flex-start',
+    marginBottom: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.background.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+  },
+  backTypeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary.main,
   },
   form: {
     marginBottom: 32,

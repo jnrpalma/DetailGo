@@ -27,9 +27,7 @@ export const CACHE = {
   USER_NAME_TTL: 5 * 60 * 1000, // 5 minutos
 } as const;
 
-/**
- * Firebase paths (apenas os que não estão em outros lugares)
- */
 export const FIREBASE_PATHS = {
-  SETTINGS: 'settings/shop',
+  shopSettings: (shopId: string) => `shops/${shopId}/settings/config`,
+  shopAppointments: (shopId: string) => `shops/${shopId}/appointments`,
 } as const;

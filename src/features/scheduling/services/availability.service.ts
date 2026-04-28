@@ -1,4 +1,3 @@
-// src/features/scheduling/services/availability.service.ts
 import {
   collection,
   getDocs,
@@ -29,10 +28,11 @@ type QDoc =
 export type Slot = {
   startAtMs: number;
   endAtMs: number;
-  durationMin: number; 
+  durationMin: number;
 };
 
 export type AppointmentCreateInput = {
+  shopId: string;
   customerUid: string;
   vehicleType: VehicleType;
   carCategory: CarCategory | null;
@@ -89,40 +89,31 @@ function overlaps(
   return aStart < bEnd && bStart < aEnd;
 }
 
-/**
- * 👇 NOVA FUNÇÃO: Valida se o horário está dentro do horário comercial
- */
 function isWithinBusinessHours(slot: Slot, settings: ShopSettings): boolean {
   const slotStartHour = new Date(slot.startAtMs).getHours();
   const slotEndHour = new Date(slot.endAtMs).getHours();
   const slotEndMinutes = new Date(slot.endAtMs).getMinutes();
-  
-  // Converte para minutos desde meia-noite para comparação mais precisa
+
   const slotStartMinutes = slotStartHour * 60 + new Date(slot.startAtMs).getMinutes();
   const slotEndMinutesTotal = slotEndHour * 60 + slotEndMinutes;
-  
+
   const openMinutes = settings.openHour * 60;
   const closeMinutes = settings.closeHour * 60;
 
   return slotStartMinutes >= openMinutes && slotEndMinutesTotal <= closeMinutes;
 }
 
-/**
- * 👇 NOVA FUNÇÃO: Valida se o slot não está no passado
- */
 function isNotInPast(slot: Slot): boolean {
   return slot.startAtMs > Date.now();
 }
 
-/**
- * 👇 NOVA FUNÇÃO: Valida duração mínima do serviço
- */
 function hasValidDuration(slot: Slot, requiredDuration: number): boolean {
   const actualDuration = (slot.endAtMs - slot.startAtMs) / (60 * 1000);
-  return Math.abs(actualDuration - requiredDuration) < 1; // tolerância de 1 minuto
+  return Math.abs(actualDuration - requiredDuration) < 1;
 }
 
 async function getScheduledAppointmentsForDay(
+  shopId: string,
   dayKey: string,
   dayStart: number,
   dayEnd: number,
@@ -130,7 +121,7 @@ async function getScheduledAppointmentsForDay(
   const db = getFirestore();
 
   const qByDayKey = query(
-    collection(db, 'appointments'),
+    collection(db, 'shops', shopId, 'appointments'),
     where('status', '==', 'scheduled'),
     where('dayKey', '==', dayKey),
   );
@@ -141,16 +132,14 @@ async function getScheduledAppointmentsForDay(
     return snapByDayKey.docs.map((d: QDoc) => d.data() as AppointmentDoc);
   }
 
-  // Fallback para consulta por range (dados antigos sem dayKey)
   const qRange = query(
-    collection(db, 'appointments'),
+    collection(db, 'shops', shopId, 'appointments'),
     where('status', '==', 'scheduled'),
     where('startAtMs', '>=', dayStart),
     where('startAtMs', '<=', dayEnd),
   );
 
   const snapRange = await getDocs(qRange);
-
   return snapRange.docs.map((d: QDoc) => d.data() as AppointmentDoc);
 }
 
@@ -170,10 +159,10 @@ function generateSlots(
 
   const slots: Slot[] = [];
   for (let t = open.getTime(); t + durationMs <= close.getTime(); t += stepMs) {
-    slots.push({ 
-      startAtMs: t, 
+    slots.push({
+      startAtMs: t,
       endAtMs: t + durationMs,
-      durationMin, // 👈 Adiciona duração
+      durationMin,
     });
   }
 
@@ -202,41 +191,30 @@ function filterAvailableSlots(
 export async function getAvailableSlotsForDay(
   day: Date,
   durationMin: number,
+  shopId: string,
 ): Promise<Slot[]> {
-  const settings = await getShopSettings();
+  const settings = await getShopSettings(shopId);
   const dayKey = toDayKey(day);
   const dayStart = startOfDay(day);
   const dayEnd = endOfDay(day);
 
   const appointments = await getScheduledAppointmentsForDay(
+    shopId,
     dayKey,
     dayStart,
     dayEnd,
   );
-  
-  // Gera todos os slots possíveis
+
   const allSlots = generateSlots(day, settings, durationMin);
 
-  // 👇 APLICA TODAS AS VALIDAÇÕES
   const validSlots = allSlots.filter(slot => {
-    // 1. Não pode estar no passado
     if (!isNotInPast(slot)) return false;
-    
-    // 2. Deve estar dentro do horário comercial
     if (!isWithinBusinessHours(slot, settings)) return false;
-    
-    // 3. Deve ter a duração correta
     if (!hasValidDuration(slot, durationMin)) return false;
-    
     return true;
   });
 
-  // Filtra por disponibilidade (capacidade)
-  return filterAvailableSlots(
-    validSlots,
-    appointments,
-    settings.parallelCapacity,
-  );
+  return filterAvailableSlots(validSlots, appointments, settings.parallelCapacity);
 }
 
 async function getCustomerName(customerUid: string): Promise<string> {
@@ -246,11 +224,11 @@ async function getCustomerName(customerUid: string): Promise<string> {
     firstName?: string;
     lastName?: string;
   };
-  
+
   const firstName = userData.firstName || '';
   const lastName = userData.lastName || '';
   const fullName = `${firstName} ${lastName}`.trim();
-  
+
   return fullName || 'Cliente';
 }
 
@@ -258,36 +236,34 @@ export async function createAppointmentWithCapacityCheck(
   input: AppointmentCreateInput,
 ) {
   const db = getFirestore();
-  const settings = await getShopSettings();
+  const { shopId } = input;
+  const settings = await getShopSettings(shopId);
   const customerName = await getCustomerName(input.customerUid);
   const dayKey = toDayKey(input.startAtMs);
 
-  // 👇 VALIDAÇÕES ADICIONAIS ANTES DA TRANSAÇÃO
   const slot: Slot = {
     startAtMs: input.startAtMs,
     endAtMs: input.endAtMs,
     durationMin: input.durationMin,
   };
 
-  // Verifica se não está no passado
   if (!isNotInPast(slot)) {
     throw new AvailabilityError(
       'Não é possível agendar para horários passados',
-      'PAST_DATE'
+      'PAST_DATE',
     );
   }
 
-  // Verifica horário comercial
   if (!isWithinBusinessHours(slot, settings)) {
     throw new AvailabilityError(
       'Horário fora do expediente',
-      'OUTSIDE_BUSINESS_HOURS'
+      'OUTSIDE_BUSINESS_HOURS',
     );
   }
 
   return runTransaction(db, async tx => {
     const qy = query(
-      collection(db, 'appointments'),
+      collection(db, 'shops', shopId, 'appointments'),
       where('status', '==', 'scheduled'),
       where('dayKey', '==', dayKey),
     );
@@ -295,12 +271,9 @@ export async function createAppointmentWithCapacityCheck(
     const snap = await getDocs(qy);
 
     let concurrent = 0;
-
     snap.docs.forEach((d: QDoc) => {
       const appt = d.data() as AppointmentDoc;
-      if (
-        overlaps(appt.startAtMs, appt.endAtMs, input.startAtMs, input.endAtMs)
-      ) {
+      if (overlaps(appt.startAtMs, appt.endAtMs, input.startAtMs, input.endAtMs)) {
         concurrent += 1;
       }
     });
@@ -309,9 +282,10 @@ export async function createAppointmentWithCapacityCheck(
       throw new AvailabilityError('Horário ocupado', 'SLOT_FULL');
     }
 
-    const apptRef = doc(collection(db, 'appointments'));
+    const apptRef = doc(collection(db, 'shops', shopId, 'appointments'));
     tx.set(apptRef, {
       dayKey,
+      shopId,
       customerUid: input.customerUid,
       customerName,
       vehicleType: input.vehicleType,
@@ -334,6 +308,7 @@ export async function createAppointmentWithCapacityCheck(
     );
     tx.set(userRef, {
       dayKey,
+      shopId,
       appointmentId: apptRef.id,
       customerName,
       vehicleType: input.vehicleType,
@@ -349,24 +324,17 @@ export async function createAppointmentWithCapacityCheck(
   });
 }
 
-/**
- * 👇 NOVA FUNÇÃO: Verifica disponibilidade de um horário específico
- * Útil para validação em tempo real
- */
 export async function checkSlotAvailability(
   startAtMs: number,
   durationMin: number,
-): Promise<{
-  available: boolean;
-  reason?: string;
-}> {
-  const settings = await getShopSettings();
+  shopId: string,
+): Promise<{ available: boolean; reason?: string }> {
+  const settings = await getShopSettings(shopId);
   const dayKey = toDayKey(startAtMs);
   const endAtMs = startAtMs + durationMin * 60 * 1000;
-  
+
   const slot: Slot = { startAtMs, endAtMs, durationMin };
 
-  // Validações básicas
   if (!isNotInPast(slot)) {
     return { available: false, reason: 'Horário no passado' };
   }
@@ -375,10 +343,9 @@ export async function checkSlotAvailability(
     return { available: false, reason: 'Fora do horário comercial' };
   }
 
-  // Verifica capacidade
   const db = getFirestore();
   const qy = query(
-    collection(db, 'appointments'),
+    collection(db, 'shops', shopId, 'appointments'),
     where('status', '==', 'scheduled'),
     where('dayKey', '==', dayKey),
   );

@@ -1,5 +1,9 @@
-export const ADMIN_EMAILS = ['admgeral@teste.com'];
+export type UserRole = 'owner' | 'customer';
 
-export function isAdminEmail(email?: string | null) {
-  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+export function isOwner(role?: string | null): boolean {
+  return role === 'owner';
+}
+
+export function isCustomer(role?: string | null): boolean {
+  return role === 'customer';
 }

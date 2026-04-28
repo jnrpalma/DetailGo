@@ -41,6 +41,7 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
+import { useShop } from '@features/shops/context/ShopContext';
 import {
   getAvailableSlotsForDay,
   createAppointmentWithCapacityCheck,
@@ -458,6 +459,7 @@ export default function AppointmentScreen() {
   const auth = getAuth();
   const navigation = useNavigation<NavProp>();
   const uid = auth.currentUser?.uid;
+  const { shopId } = useShop();
 
   const [vehicleType, setVehicleType] = useState<VehicleType>('Carro');
   const [carCategory, setCarCategory] = useState<CarCategory | null>('Hatch');
@@ -506,6 +508,7 @@ export default function AppointmentScreen() {
         const list = await getAvailableSlotsForDay(
           nextDay,
           nextService.durationMin,
+          shopId ?? '',
         );
         setSlots(list);
         setSelectedSlot(null);
@@ -563,6 +566,7 @@ export default function AppointmentScreen() {
     try {
       setSubmitting(true);
       await createAppointmentWithCapacityCheck({
+        shopId: shopId ?? '',
         customerUid: uid!,
         vehicleType,
         carCategory: vehicleType === 'Carro' ? carCategory : null,

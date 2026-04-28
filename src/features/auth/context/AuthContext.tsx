@@ -6,7 +6,6 @@ import React, {
   useState,
 } from 'react';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-// 👇 IMPORTS MODULARES
 import { getAuth } from '@react-native-firebase/auth';
 import {
   subscribeAuth,
@@ -15,6 +14,8 @@ import {
   signOutUser as svcSignOut,
   type RegisterInput,
 } from '@features/auth/services/auth.service';
+
+export type { RegisterInput };
 
 type AuthContextValue = {
   user: FirebaseAuthTypes.User | null;
@@ -34,7 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    // 👇 subscribeAuth já usa a API modular internamente (já atualizamos no service)
     const unsub = subscribeAuth(u => {
       setUser(u);
       setInitializing(false);
