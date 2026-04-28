@@ -38,7 +38,11 @@ export function useDashboardAppointments({ uid, shopId, limitN = 30 }: Params) {
   const fallbackOnceRef = useRef(false);
 
   useEffect(() => {
-    if (!uid || !shopId) return;
+    if (!uid || !shopId) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
 
     const db = getFirestore();
     setLoading(true);
