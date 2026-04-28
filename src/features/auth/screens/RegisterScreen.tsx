@@ -148,18 +148,21 @@ export default function RegisterScreen() {
       return;
     }
 
-    const successMsg =
-      accountType === 'owner'
-        ? 'Sua estética foi criada! Faça login para acessar o painel.'
-        : 'Cadastro realizado! Faça login para agendar serviços.';
-
-    Alert.alert('Conta criada!', successMsg, [
-      { text: 'Fazer login', onPress: () => navigation.navigate('Login') },
-    ]);
-
     reset();
     setDisplayPhone('');
     setAccountType(null);
+
+    if (accountType === 'owner' && res.inviteCode) {
+      Alert.alert(
+        'Estética criada!',
+        `Seu código de convite é:\n\n${res.inviteCode}\n\nCompartilhe este código com seus clientes para que eles possam se cadastrar na sua loja.\n\nVocê também encontra o código em Gerenciar Loja.`,
+        [{ text: 'Entendi!' }],
+      );
+    } else {
+      Alert.alert('Conta criada!', 'Cadastro realizado com sucesso! Você já está conectado.', [
+        { text: 'OK' },
+      ]);
+    }
   };
 
   if (!accountType) {
