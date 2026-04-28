@@ -28,10 +28,10 @@ import { useShop } from '@features/shops/context/ShopContext';
 import { useAuth } from '@features/auth';
 
 // ── Configure sua chave Pix aqui ───────────────────────────────────────────
-const PIX_KEY = 'seu-email@exemplo.com'; // ← TROQUE pela sua chave Pix
+const PIX_KEY = '41270298895'; // ← TROQUE pela sua chave Pix
 const PIX_NAME = 'DetailGo';
 const PLAN_PRICE = 'R$ 89,00/mês';
-const WHATSAPP_NUMBER = '5511999999999'; // ← TROQUE pelo seu WhatsApp (com DDI)
+const WHATSAPP_NUMBER = '5511996784399'; // ← TROQUE pelo seu WhatsApp (com DDI)
 // ────────────────────────────────────────────────────────────────────────────
 
 const FEATURES = [
