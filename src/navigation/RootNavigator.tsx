@@ -12,13 +12,14 @@ import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
 import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 import ProfileScreen from '@features/profile/screens/ProfileScreen';
+import SubscriptionScreen from '@features/subscription/screens/SubscriptionScreen';
 import { useShop } from '@features/shops/context/ShopContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const { user, initializing } = useAuth();
-  const { userRole, loading: loadingShop } = useShop();
+  const { userRole, loading: loadingShop, isSubscriptionActive } = useShop();
 
   if (initializing || (user && loadingShop)) {
     return (
@@ -34,12 +35,21 @@ export default function RootNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
         isOwner ? (
-          <Stack.Group>
-            <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
-            <Stack.Screen name="AdminManage" component={AdminManageScreen} />
-            <Stack.Screen name="AdminHistory" component={AdminHistoryScreen} />
-          </Stack.Group>
+          isSubscriptionActive ? (
+            // Owner com assinatura ativa → painel completo
+            <Stack.Group>
+              <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+              <Stack.Screen name="AdminManage" component={AdminManageScreen} />
+              <Stack.Screen name="AdminHistory" component={AdminHistoryScreen} />
+            </Stack.Group>
+          ) : (
+            // Owner sem assinatura → tela de pagamento
+            <Stack.Group>
+              <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+            </Stack.Group>
+          )
         ) : (
+          // Cliente → painel de agendamentos
           <Stack.Group>
             <Stack.Screen name="Dashboard" component={DashboardScreen} />
             <Stack.Screen name="Appointment" component={AppointmentScreen} />

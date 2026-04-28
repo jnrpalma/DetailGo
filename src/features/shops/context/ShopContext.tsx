@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@features/auth';
 
 export type UserRole = 'owner' | 'customer';
+export type SubscriptionStatus = 'trial' | 'active' | 'inactive';
 
 export type ShopDoc = {
   id: string;
@@ -20,6 +21,9 @@ export type ShopDoc = {
   code: string;
   ownerId: string;
   createdAt?: any;
+  subscriptionStatus: SubscriptionStatus;
+  trialEndsAt?: any;   // Firestore Timestamp
+  activeUntil?: any;   // Firestore Timestamp
 };
 
 type UserDoc = {
@@ -32,9 +36,34 @@ type ShopContextValue = {
   shop: ShopDoc | null;
   userRole: UserRole | null;
   loading: boolean;
+  isSubscriptionActive: boolean;
+  trialDaysLeft: number;
 };
 
 const ShopContext = createContext<ShopContextValue | undefined>(undefined);
+
+function computeSubscription(shop: ShopDoc | null): {
+  isSubscriptionActive: boolean;
+  trialDaysLeft: number;
+} {
+  if (!shop) return { isSubscriptionActive: false, trialDaysLeft: 0 };
+
+  const now = Date.now();
+
+  if (shop.subscriptionStatus === 'trial') {
+    const endsAt = shop.trialEndsAt?.toMillis?.() ?? 0;
+    const msLeft = endsAt - now;
+    const daysLeft = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+    return { isSubscriptionActive: daysLeft > 0, trialDaysLeft: daysLeft };
+  }
+
+  if (shop.subscriptionStatus === 'active') {
+    const until = shop.activeUntil?.toMillis?.() ?? 0;
+    return { isSubscriptionActive: until > now, trialDaysLeft: 0 };
+  }
+
+  return { isSubscriptionActive: false, trialDaysLeft: 0 };
+}
 
 export function ShopProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -46,7 +75,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingShop, setLoadingShop] = useState(false);
 
-  // Subscribe to users/{uid} for shopId + role
   useEffect(() => {
     if (!user?.uid) {
       setShopId(null);
@@ -72,7 +100,6 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [user?.uid]);
 
-  // Subscribe to shops/{shopId} when shopId is known
   useEffect(() => {
     if (!shopId) {
       setShop(null);
@@ -99,10 +126,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [shopId]);
 
   const loading = loadingUser || loadingShop;
+  const { isSubscriptionActive, trialDaysLeft } = computeSubscription(shop);
 
   const value = useMemo<ShopContextValue>(
-    () => ({ shopId, shop, userRole, loading }),
-    [shopId, shop, userRole, loading],
+    () => ({ shopId, shop, userRole, loading, isSubscriptionActive, trialDaysLeft }),
+    [shopId, shop, userRole, loading, isSubscriptionActive, trialDaysLeft],
   );
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;

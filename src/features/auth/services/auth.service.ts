@@ -17,6 +17,7 @@ import {
   where,
   getDocs,
   limit,
+  Timestamp,
 } from '@react-native-firebase/firestore';
 
 export type UserRole = 'owner' | 'customer';
@@ -93,11 +94,16 @@ async function registerAsOwner(
   const code = generateInviteCode();
   const shopName = data.shopName?.trim() || 'Minha Estética';
 
+  const trialEndsAt = Timestamp.fromMillis(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
   await setDoc(shopRef, {
     name: shopName,
     code,
     ownerId: uid,
     createdAt: serverTimestamp(),
+    subscriptionStatus: 'trial',
+    trialEndsAt,
+    activeUntil: null,
   });
 
   await setDoc(doc(db, 'shops', shopId, 'settings', 'config'), {
