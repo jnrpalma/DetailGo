@@ -3,6 +3,9 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
 
+  // SUBSCRIPTION
+  Subscription: undefined;
+
   // USER
   Dashboard: undefined;
   Appointment:
