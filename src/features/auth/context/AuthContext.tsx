@@ -24,7 +24,7 @@ type AuthContextValue = {
     email: string,
     password: string,
   ) => Promise<{ ok: boolean; message?: string }>;
-  register: (data: RegisterInput) => Promise<{ ok: boolean; message?: string }>;
+  register: (data: RegisterInput) => Promise<{ ok: boolean; message?: string; inviteCode?: string }>;
   signOut: () => Promise<void>;
 };
 
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register: AuthContextValue['register'] = async data => {
     const res = await svcRegister(data);
     if (!res.ok) return { ok: false, message: res.message };
-    return { ok: true };
+    return { ok: true, inviteCode: res.inviteCode };
   };
 
   const signOut = async () => {

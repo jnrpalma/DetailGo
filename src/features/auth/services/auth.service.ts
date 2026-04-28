@@ -37,6 +37,7 @@ export type AuthResult =
       ok: true;
       user: FirebaseAuthTypes.User;
       cred?: FirebaseAuthTypes.UserCredential;
+      inviteCode?: string;
     }
   | { ok: false; message: string; code?: string };
 
@@ -85,7 +86,7 @@ async function findShopByCode(inviteCode: string): Promise<string | null> {
 async function registerAsOwner(
   uid: string,
   data: RegisterInput,
-): Promise<void> {
+): Promise<string> {
   const db = getFirestore();
   const shopRef = doc(collection(db, 'shops'));
   const shopId = shopRef.id;
@@ -122,6 +123,8 @@ async function registerAsOwner(
     },
     { merge: true },
   );
+
+  return code;
 }
 
 async function registerAsCustomer(
@@ -184,12 +187,12 @@ export async function register(data: RegisterInput): Promise<AuthResult> {
     if (displayName) await updateProfile(cred.user, { displayName });
 
     if (data.role === 'owner') {
-      await registerAsOwner(cred.user.uid, data);
+      const inviteCode = await registerAsOwner(cred.user.uid, data);
+      return { ok: true, user: cred.user, cred, inviteCode };
     } else {
       await registerAsCustomer(cred.user.uid, data);
+      return { ok: true, user: cred.user, cred };
     }
-
-    return { ok: true, user: cred.user, cred };
   } catch (e: any) {
     return {
       ok: false,
