@@ -1,14 +1,13 @@
-// src/App.tsx
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from '@features/auth';
+import { ShopProvider } from '@features/shops/context/ShopContext';
 import BootSplash from 'react-native-bootsplash';
 import RootNavigator from 'src/navigation/RootNavigator';
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
 
-  // Timer para splash screen
   useEffect(() => {
     const timer = setTimeout(async () => {
       await BootSplash.hide({ fade: true });
@@ -18,16 +17,17 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Mostra splash enquanto não está pronto
   if (!isReady) {
     return null;
   }
 
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <ShopProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </ShopProvider>
     </AuthProvider>
   );
 }

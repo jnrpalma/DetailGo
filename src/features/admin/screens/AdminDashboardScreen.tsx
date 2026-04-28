@@ -58,6 +58,7 @@ import { useCustomerName } from '@shared/hooks/useFirestoreCache';
 import { UI } from '@shared/constants/app.constants';
 
 import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
+import { useShop } from '@features/shops/context/ShopContext';
 import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
 import { getAppointmentStatusConfig } from '@features/appointments/domain/appointment.helpers';
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
@@ -87,6 +88,7 @@ export default function AdminDashboardScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
   const db = getFirestore();
+  const { shopId } = useShop();
 
   const [profile, setProfile] = useState<UserProfile>({});
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
@@ -182,11 +184,13 @@ export default function AdminDashboardScreen() {
         }
 
         const name = await fetchCustomerName(it.customerUid);
-        try {
-          await updateDoc(doc(db, 'appointments', it.id), {
-            customerName: name,
-          });
-        } catch {}
+        if (shopId) {
+          try {
+            await updateDoc(doc(db, 'shops', shopId, 'appointments', it.id), {
+              customerName: name,
+            });
+          } catch {}
+        }
         updated.push({ ...it, customerName: name });
       }),
     );
@@ -217,12 +221,12 @@ export default function AdminDashboardScreen() {
   }, [profile.role, navigation, user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !shopId) return;
 
     setLoadingWeek(true);
 
     const qyWeek = query(
-      collection(db, 'appointments'),
+      collection(db, 'shops', shopId, 'appointments'),
       where('status', 'in', ['scheduled', 'in_progress']),
       where('startAtMs', '>=', weekStartMs),
       where('startAtMs', '<=', weekEndMs),
@@ -269,7 +273,7 @@ export default function AdminDashboardScreen() {
     );
 
     return () => unsub();
-  }, [db, user?.uid, weekStartMs, weekEndMs, fetchCustomerName]);
+  }, [db, user?.uid, shopId, weekStartMs, weekEndMs, fetchCustomerName]);
 
   if (!user?.uid) {
     return (
@@ -301,10 +305,11 @@ export default function AdminDashboardScreen() {
   };
 
   const doUpdate = async (item: AdminAppointment, next: AppointmentStatus) => {
-    if (updatingId) return;
+    if (updatingId || !shopId) return;
     setUpdatingId(item.id);
     try {
       await updateAppointmentStatus({
+        shopId,
         appointmentId: item.id,
         customerUid: item.customerUid,
         status: next,

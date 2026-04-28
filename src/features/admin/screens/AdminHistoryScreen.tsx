@@ -43,6 +43,7 @@ import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { colors, spacing, radii } from '@shared/theme';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
+import { useShop } from '@features/shops/context/ShopContext';
 
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
@@ -81,6 +82,7 @@ export default function AdminHistoryScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
   const db   = getFirestore();
+  const { shopId } = useShop();
 
   const [loading,     setLoading]     = useState(true);
   const [items,       setItems]       = useState<AdminAppointment[]>([]);
@@ -124,7 +126,7 @@ export default function AdminHistoryScreen() {
     );
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !shopId) return;
 
     setLoading(true);
     setItems([]);
@@ -132,7 +134,7 @@ export default function AdminHistoryScreen() {
     canLoadMoreRef.current = true;
 
     const qy = query(
-      collection(db, 'appointments'),
+      collection(db, 'shops', shopId, 'appointments'),
       where('status', 'in', statusSet),
       orderBy('startAtMs', 'desc'),
       limit(PAGE_SIZE),
@@ -169,14 +171,14 @@ export default function AdminHistoryScreen() {
 
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, statusSet]);
+  }, [user?.uid, shopId, statusSet]);
 
   const loadMore = async () => {
-    if (loadingMore || !canLoadMoreRef.current || !lastDocRef.current) return;
+    if (loadingMore || !canLoadMoreRef.current || !lastDocRef.current || !shopId) return;
     try {
       setLoadingMore(true);
       const qy = query(
-        collection(db, 'appointments'),
+        collection(db, 'shops', shopId, 'appointments'),
         where('status', 'in', statusSet),
         orderBy('startAtMs', 'desc'),
         startAfter(lastDocRef.current),

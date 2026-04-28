@@ -20,8 +20,6 @@ const DEFAULT_SETTINGS: ShopSettings = {
   parallelCapacity: 2,
 };
 
-const SETTINGS_PATH = 'settings/shop';
-
 export class ShopSettingsError extends Error {
   constructor(message: string) {
     super(message);
@@ -30,7 +28,7 @@ export class ShopSettingsError extends Error {
 }
 
 function validateHour(hour?: number): number | null {
-  return hour && hour >= 0 && hour <= 23 ? hour : null;
+  return hour != null && hour >= 0 && hour <= 23 ? hour : null;
 }
 
 function validateSlotStep(step?: number): number | null {
@@ -62,12 +60,15 @@ function hasSettingsChanged(
   );
 }
 
-export async function ensureShopSettings(): Promise<{
+function settingsRef(shopId: string) {
+  return doc(getFirestore(), 'shops', shopId, 'settings', 'config');
+}
+
+export async function ensureShopSettings(shopId: string): Promise<{
   created: boolean;
   settings: ShopSettings;
 }> {
-  const db = getFirestore();
-  const ref = doc(db, SETTINGS_PATH);
+  const ref = settingsRef(shopId);
 
   try {
     const snap = await getDoc(ref);
@@ -99,18 +100,17 @@ export async function ensureShopSettings(): Promise<{
   }
 }
 
-export async function getShopSettings(): Promise<ShopSettings> {
-  const { settings } = await ensureShopSettings();
+export async function getShopSettings(shopId: string): Promise<ShopSettings> {
+  const { settings } = await ensureShopSettings(shopId);
   return settings;
 }
 
 export async function updateShopSettings(
+  shopId: string,
   updates: Partial<ShopSettings>,
 ): Promise<ShopSettings> {
-  const db = getFirestore();
-  const ref = doc(db, SETTINGS_PATH);
-
-  const current = await getShopSettings();
+  const ref = settingsRef(shopId);
+  const current = await getShopSettings(shopId);
   const merged = validateAndMergeSettings({ ...current, ...updates });
 
   await setDoc(

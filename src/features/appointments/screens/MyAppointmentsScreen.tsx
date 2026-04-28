@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
+import { useShop } from '@features/shops/context/ShopContext';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';
@@ -42,12 +43,14 @@ export default function MyAppointmentsScreen() {
   const navigation = useNavigation<NavProp>();
   const auth = getAuth();
   const uid = auth.currentUser?.uid;
+  const { shopId } = useShop();
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
 
   const { loading, items, mutate } = useUserAppointments({
     uid,
+    shopId,
     statusIn: ACTIVE_APPOINTMENT_SET,
     limitN: 50,
   });
@@ -116,7 +119,7 @@ export default function MyAppointmentsScreen() {
     setReschedulingId(item.id);
 
     if (!isExpired) {
-      const cancelResult = await cancelAppointment(item.id, uid!);
+      const cancelResult = await cancelAppointment(item.id, uid!, shopId ?? '');
 
       if (!cancelResult.ok) {
         Alert.alert(
@@ -144,7 +147,7 @@ export default function MyAppointmentsScreen() {
   const executeCancel = async (item: UserAppointment) => {
     setCancellingId(item.id);
 
-    const result = await cancelAppointment(item.id, uid!);
+    const result = await cancelAppointment(item.id, uid!, shopId ?? '');
 
     if (result.ok) {
       Alert.alert('Sucesso', result.message);

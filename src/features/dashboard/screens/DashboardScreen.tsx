@@ -33,7 +33,7 @@ import { colors, spacing, radii } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
 
 import { useAuth } from '@features/auth';
-import { isAdminEmail } from '@features/auth/utils/roles';
+import { useShop } from '@features/shops/context/ShopContext';
 import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
 import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
 import type { RootStackParamList } from '@app/types';
@@ -68,6 +68,7 @@ export default function DashboardScreen() {
   const user = auth.currentUser!;
   const uid = user.uid;
   const { signOut } = useAuth();
+  const { shopId } = useShop();
 
   const [profile, setProfile] = useState<UserProfile>({
     photoURL: user.photoURL ?? undefined,
@@ -76,11 +77,10 @@ export default function DashboardScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-UI.MENU_WIDTH)).current;
 
-  const isAdmin = isAdminEmail(user.email);
-
   const { loading: loadingAppointments, items: appointments } =
     useDashboardAppointments({
       uid,
+      shopId: shopId ?? '',
       limitN: 30,
     });
 
@@ -368,15 +368,6 @@ export default function DashboardScreen() {
                   <Text style={styles.drawerItemText}>Histórico</Text>
                 </TouchableOpacity>
 
-                {isAdmin && (
-                  <TouchableOpacity
-                    style={styles.drawerItem}
-                    onPress={() => navigateFromMenu('AdminDashboard')}
-                  >
-                    <Settings size={22} color={colors.primary.main} />
-                    <Text style={styles.drawerItemText}>Painel Admin</Text>
-                  </TouchableOpacity>
-                )}
 
                 <View style={styles.drawerDivider} />
 

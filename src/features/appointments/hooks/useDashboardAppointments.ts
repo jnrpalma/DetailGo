@@ -28,16 +28,17 @@ type QDoc =
 
 type Params = {
   uid: string;
+  shopId: string;
   limitN?: number;
 };
 
-export function useDashboardAppointments({ uid, limitN = 30 }: Params) {
+export function useDashboardAppointments({ uid, shopId, limitN = 30 }: Params) {
   const [items, setItems] = useState<DashboardAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const fallbackOnceRef = useRef(false);
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !shopId) return;
 
     const db = getFirestore();
     setLoading(true);
@@ -61,8 +62,7 @@ export function useDashboardAppointments({ uid, limitN = 30 }: Params) {
           status: getEffectiveStatus(item.status, item.startAtMs),
         }));
 
-        const activeAppointments =
-          filterActiveAppointments(withEffectiveStatus);
+        const activeAppointments = filterActiveAppointments(withEffectiveStatus);
 
         if (snap.docs.length > 0) {
           setItems(activeAppointments);
@@ -80,7 +80,7 @@ export function useDashboardAppointments({ uid, limitN = 30 }: Params) {
 
         try {
           const qGlobal = query(
-            collection(db, 'appointments'),
+            collection(db, 'shops', shopId, 'appointments'),
             where('customerUid', '==', uid),
             where('status', 'in', ['scheduled', 'in_progress']),
             orderBy('startAtMs', 'asc'),
@@ -111,7 +111,7 @@ export function useDashboardAppointments({ uid, limitN = 30 }: Params) {
     );
 
     return () => unsub();
-  }, [uid, limitN]);
+  }, [uid, shopId, limitN]);
 
   return { items, loading };
 }

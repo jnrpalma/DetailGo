@@ -1,5 +1,4 @@
-// src/navigation/RootNavigator.tsx
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 
@@ -13,59 +12,15 @@ import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
 import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
 import ProfileScreen from '@features/profile/screens/ProfileScreen';
-
-import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
-import { isAdminEmail } from '@features/auth/utils/roles';
-import { ensureShopSettings } from '@features/settings/services/shopSettings.service';
+import { useShop } from '@features/shops/context/ShopContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-type UserProfile = {
-  role?: 'admin' | 'user';
-  email?: string;
-};
-
 export default function RootNavigator() {
   const { user, initializing } = useAuth();
+  const { userRole, loading: loadingShop } = useShop();
 
-  const [role, setRole] = useState<UserProfile['role']>(undefined);
-  const [loadingRole, setLoadingRole] = useState(false);
-
-  useEffect(() => {
-    if (!user) {
-      setRole(undefined);
-      setLoadingRole(false);
-      return;
-    }
-
-    setLoadingRole(true);
-    const db = getFirestore();
-    const ref = doc(db, 'users', user.uid);
-
-    const unsub = onSnapshot(
-      ref,
-      snap => {
-        const data = (snap.data() ?? {}) as UserProfile;
-        setRole(data.role);
-        setLoadingRole(false);
-      },
-      err => {
-        console.error('Erro ao carregar role:', err);
-        setLoadingRole(false);
-      },
-    );
-
-    return unsub;
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (!user) return;
-    ensureShopSettings().catch(err =>
-      console.error('Erro ao garantir settings/shop:', err),
-    );
-  }, [user?.uid]);
-
-  if (initializing || (user && loadingRole)) {
+  if (initializing || (user && loadingShop)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
@@ -73,12 +28,12 @@ export default function RootNavigator() {
     );
   }
 
-  const isAdmin = role === 'admin' || isAdminEmail(user?.email);
+  const isOwner = userRole === 'owner';
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
-        isAdmin ? (
+        isOwner ? (
           <Stack.Group>
             <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
             <Stack.Screen name="AdminManage" component={AdminManageScreen} />

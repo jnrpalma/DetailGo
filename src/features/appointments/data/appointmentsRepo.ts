@@ -25,12 +25,13 @@ type QDoc =
 
 export function watchUserAppointmentsWithFallback(params: {
   uid: string;
+  shopId: string;
   limitN?: number;
   onChange: (items: UserAppointment[]) => void;
   onError?: (err: unknown) => void;
 }) {
   const db = getFirestore();
-  const { uid, limitN = 50, onChange, onError } = params;
+  const { uid, shopId, limitN = 50, onChange, onError } = params;
 
   let fallbackDone = false;
 
@@ -61,7 +62,7 @@ export function watchUserAppointmentsWithFallback(params: {
 
       try {
         const globalQy = query(
-          collection(db, 'appointments'),
+          collection(db, 'shops', shopId, 'appointments'),
           where('customerUid', '==', uid),
           orderBy('startAtMs', 'desc'),
           limit(limitN),
@@ -87,22 +88,23 @@ export function watchUserAppointmentsWithFallback(params: {
 
 export async function fetchUserAppointmentsGlobal(params: {
   uid: string;
+  shopId: string;
   statusIn?: AppointmentStatus[];
   limitN?: number;
 }) {
   const db = getFirestore();
-  const { uid, statusIn, limitN = 50 } = params;
+  const { uid, shopId, statusIn, limitN = 50 } = params;
 
   const qy = statusIn?.length
     ? query(
-        collection(db, 'appointments'),
+        collection(db, 'shops', shopId, 'appointments'),
         where('customerUid', '==', uid),
         where('status', 'in', statusIn),
         orderBy('startAtMs', 'desc'),
         limit(limitN),
       )
     : query(
-        collection(db, 'appointments'),
+        collection(db, 'shops', shopId, 'appointments'),
         where('customerUid', '==', uid),
         orderBy('startAtMs', 'desc'),
         limit(limitN),

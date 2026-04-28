@@ -16,13 +16,15 @@ const NO_SHOW_GRACE_MIN = 15;
 const NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN * 60 * 1000;
 
 export async function updateAppointmentStatus(params: {
+  shopId: string;
   appointmentId: string;
   customerUid: string;
   status: AppointmentStatus;
 }) {
   const db = getFirestore();
-  const globalRef = doc(db, 'appointments', params.appointmentId);
+  const { shopId, appointmentId, customerUid, status } = params;
 
+  const globalRef = doc(db, 'shops', shopId, 'appointments', appointmentId);
   const globalSnap = await getDoc(globalRef);
   const globalData = (globalSnap.data() ?? {}) as any;
 
@@ -35,7 +37,7 @@ export async function updateAppointmentStatus(params: {
     if (
       expired &&
       currentStatus === 'scheduled' &&
-      (params.status === 'in_progress' || params.status === 'done')
+      (status === 'in_progress' || status === 'done')
     ) {
       const err: any = new Error(
         'Agendamento expirado. Deve ser marcado como não realizado.',
@@ -45,20 +47,18 @@ export async function updateAppointmentStatus(params: {
     }
   }
 
-  const userCol = collection(db, 'users', params.customerUid, 'appointments');
-  const qy = query(userCol, where('appointmentId', '==', params.appointmentId));
+  const userCol = collection(db, 'users', customerUid, 'appointments');
+  const qy = query(userCol, where('appointmentId', '==', appointmentId));
   const snap = await getDocs(qy);
 
   const payload: Record<string, unknown> = {
-    status: params.status,
+    status,
     updatedAt: serverTimestamp(),
   };
 
-  if (params.status === 'in_progress')
-    (payload as any).startedAt = serverTimestamp();
-  if (params.status === 'done') (payload as any).doneAt = serverTimestamp();
-  if (params.status === 'no_show')
-    (payload as any).noShowAt = serverTimestamp();
+  if (status === 'in_progress') payload.startedAt = serverTimestamp();
+  if (status === 'done') payload.doneAt = serverTimestamp();
+  if (status === 'no_show') payload.noShowAt = serverTimestamp();
 
   const updates: Promise<void>[] = [updateDoc(globalRef, payload)];
 

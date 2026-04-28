@@ -26,6 +26,7 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
+import { useShop } from '@features/shops/context/ShopContext';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
@@ -55,10 +56,12 @@ export default function HistoryScreen() {
   const navigation = useNavigation<NavProp>();
   const auth = getAuth();
   const uid  = auth.currentUser?.uid;
+  const { shopId } = useShop();
   const [filter, setFilter] = useState<FilterId>('all');
 
   const { loading, items } = useUserAppointments({
     uid,
+    shopId,
     statusIn: HISTORY_APPOINTMENT_SET,
     limitN: 50,
   });
