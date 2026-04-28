@@ -74,7 +74,7 @@ type UserProfile = {
   photoURL?: string;
 
   photoB64?: string;
-  role?: 'admin' | 'user';
+  role?: 'owner' | 'customer';
 };
 
 type QDoc =
@@ -211,14 +211,6 @@ export default function AdminDashboardScreen() {
 
     return () => unsubProfile();
   }, [db, user?.uid]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (profile.role && profile.role !== 'admin') {
-      Alert.alert('Acesso negado', 'Sua conta não é admin.');
-      navigation.replace('Dashboard' as any);
-    }
-  }, [profile.role, navigation, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || !shopId) return;
@@ -659,7 +651,7 @@ export default function AdminDashboardScreen() {
                 <Text style={styles.userName}>{fullName}</Text>
                 <Text style={styles.userEmail}>{user.email}</Text>
                 <View style={styles.adminBadge}>
-                  <Text style={styles.adminBadgeText}>Administrador</Text>
+                  <Text style={styles.adminBadgeText}>Proprietário</Text>
                 </View>
               </View>
             </View>
@@ -710,10 +702,10 @@ export default function AdminDashboardScreen() {
                 <View style={styles.drawerUserInfo}>
                   <Text style={styles.drawerUserName}>{fullName}</Text>
                   <Text style={styles.drawerUserEmail}>{user.email}</Text>
-                  {profile.role === 'admin' && (
+                  {profile.role === 'owner' && (
                     <View style={styles.drawerAdminBadge}>
                       <Text style={styles.drawerAdminBadgeText}>
-                        Administrador
+                        Proprietário
                       </Text>
                     </View>
                   )}
