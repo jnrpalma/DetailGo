@@ -137,15 +137,6 @@ async function registerAsCustomer(
   uid: string,
   data: RegisterInput,
 ): Promise<void> {
-  if (!data.inviteCode) {
-    throw new Error('Código de convite é obrigatório.');
-  }
-
-  const shopId = await findShopByCode(data.inviteCode);
-  if (!shopId) {
-    throw new Error('Código de convite inválido. Verifique e tente novamente.');
-  }
-
   const db = getFirestore();
   await setDoc(
     doc(db, 'users', uid),
@@ -156,7 +147,7 @@ async function registerAsCustomer(
       email: data.email,
       phone: data.phone ?? '',
       role: 'customer',
-      shopId,
+      shopId: null,
       createdAt: serverTimestamp(),
     },
     { merge: true },

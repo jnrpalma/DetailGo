@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Mail, Lock, User, Phone, Store, Hash, ChevronRight } from 'lucide-react-native';
+import { Mail, Lock, User, Phone, Store, ChevronRight } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
@@ -113,8 +113,7 @@ export default function RegisterScreen() {
       values.confirmPassword &&
       !isSubmitting;
 
-    if (accountType === 'owner') return !!baseOk;
-    return !!baseOk && values.inviteCode.trim().length === 6;
+    return !!baseOk;
   }, [errors, values, isSubmitting, accountType]);
 
   const handlePhoneChange = (text: string) => {
@@ -159,9 +158,11 @@ export default function RegisterScreen() {
         [{ text: 'Entendi!' }],
       );
     } else {
-      Alert.alert('Conta criada!', 'Cadastro realizado com sucesso! Você já está conectado.', [
-        { text: 'OK' },
-      ]);
+      Alert.alert(
+        'Conta criada!',
+        'Cadastro realizado com sucesso!\n\nPara agendar serviços, peça o código de convite da estética no seu dashboard.',
+        [{ text: 'OK' }],
+      );
     }
   };
 
@@ -258,7 +259,7 @@ export default function RegisterScreen() {
           <Text style={styles.subtitle}>
             {isOwner
               ? 'Preencha os dados da sua estética e conta'
-              : 'Preencha seus dados e o código de convite'}
+              : 'Preencha seus dados para criar sua conta'}
           </Text>
         </View>
 
@@ -288,23 +289,6 @@ export default function RegisterScreen() {
             />
           )}
 
-          {!isOwner && (
-            <Input
-              label="Código de convite"
-              value={values.inviteCode}
-              onChangeText={v => handleChange('inviteCode', v.toUpperCase())}
-              onBlur={() => handleBlur('inviteCode')}
-              error={errors.inviteCode}
-              touched={touched.inviteCode}
-              leftIcon={<Hash size={20} color={colors.text.tertiary} />}
-              placeholder="Ex: AB34CD"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={6}
-              editable={!isSubmitting}
-              returnKeyType="next"
-            />
-          )}
 
           <View style={styles.row}>
             <Input

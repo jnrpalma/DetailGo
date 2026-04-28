@@ -5,9 +5,11 @@ import {
   Animated,
   FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   StatusBar,
@@ -34,6 +36,7 @@ import { UI } from '@shared/constants/app.constants';
 
 import { useAuth } from '@features/auth';
 import { useShop } from '@features/shops/context/ShopContext';
+import { joinShop } from '@features/shops/services/joinShop.service';
 import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
 import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
 import type { RootStackParamList } from '@app/types';
@@ -41,6 +44,7 @@ import type { RootStackParamList } from '@app/types';
 import {
   Calendar,
   History,
+  Link as LinkIcon,
   LogOut,
   Settings,
   User,
@@ -76,6 +80,10 @@ export default function DashboardScreen() {
   const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-UI.MENU_WIDTH)).current;
+
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joiningShop, setJoiningShop] = useState(false);
 
   const { loading: loadingAppointments, items: appointments } =
     useDashboardAppointments({
@@ -176,6 +184,24 @@ export default function DashboardScreen() {
     }
   };
 
+  const handleJoinShop = async () => {
+    if (joinCode.trim().length !== 6) {
+      Alert.alert('Atenção', 'O código deve ter 6 caracteres.');
+      return;
+    }
+    setJoiningShop(true);
+    try {
+      await joinShop(uid, joinCode);
+      setJoinModalVisible(false);
+      setJoinCode('');
+      Alert.alert('Vinculado!', 'Sua conta foi vinculada à estética. Agora você pode agendar serviços!');
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Código inválido. Tente novamente.');
+    } finally {
+      setJoiningShop(false);
+    }
+  };
+
   // TODO AQUI
   const handleNotifications = () => {
     Alert.alert(
@@ -268,10 +294,34 @@ export default function DashboardScreen() {
 
           {/* Conteúdo principal */}
           <View style={styles.content}>
+            {/* Card de vinculação — só aparece quando sem shopId */}
+            {!shopId && (
+              <TouchableOpacity
+                style={styles.joinCard}
+                onPress={() => setJoinModalVisible(true)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.joinCardIcon}>
+                  <LinkIcon size={22} color={colors.primary.main} />
+                </View>
+                <View style={styles.joinCardText}>
+                  <Text style={styles.joinCardTitle}>Vincule-se a uma estética</Text>
+                  <Text style={styles.joinCardDesc}>Toque aqui e insira o código de convite</Text>
+                </View>
+                <ChevronRight size={18} color={colors.primary.main} />
+              </TouchableOpacity>
+            )}
+
             {/* Botão de agendamento */}
             <TouchableOpacity
-              style={styles.bookingButton}
-              onPress={() => navigateDirect('Appointment')}
+              style={[styles.bookingButton, !shopId && styles.bookingButtonDisabled]}
+              onPress={() => {
+                if (!shopId) {
+                  setJoinModalVisible(true);
+                  return;
+                }
+                navigateDirect('Appointment');
+              }}
               activeOpacity={0.9}
             >
               <LinearGradient
@@ -387,6 +437,48 @@ export default function DashboardScreen() {
           </>
         )}
       </SafeAreaView>
+
+      {/* Modal de vinculação à estética */}
+      <Modal
+        visible={joinModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setJoinModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setJoinModalVisible(false)}>
+          <Pressable style={styles.modalBox} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Código de convite</Text>
+            <Text style={styles.modalDesc}>
+              Peça o código de 6 letras para a estética que deseja usar e insira abaixo.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={joinCode}
+              onChangeText={t => setJoinCode(t.toUpperCase())}
+              placeholder="Ex: AB34CD"
+              placeholderTextColor={colors.text.disabled}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={6}
+              editable={!joiningShop}
+            />
+            <TouchableOpacity
+              style={[styles.modalBtn, (joinCode.trim().length !== 6 || joiningShop) && styles.modalBtnDisabled]}
+              onPress={handleJoinShop}
+              disabled={joinCode.trim().length !== 6 || joiningShop}
+              activeOpacity={0.8}
+            >
+              {joiningShop
+                ? <ActivityIndicator color={colors.text.white} />
+                : <Text style={styles.modalBtnText}>Vincular minha conta</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setJoinModalVisible(false)} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
@@ -632,6 +724,107 @@ const styles = StyleSheet.create({
   },
   drawerLogoutText: {
     color: colors.status.error,
+    fontWeight: '600',
+  },
+  bookingButtonDisabled: {
+    opacity: 0.5,
+  },
+  joinCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary.light,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: colors.primary.main,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  joinCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.background.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinCardText: {
+    flex: 1,
+  },
+  joinCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary.main,
+    marginBottom: 2,
+  },
+  joinCardDesc: {
+    fontSize: 12,
+    color: colors.primary.main,
+    opacity: 0.8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalBox: {
+    backgroundColor: colors.background.card,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 360,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  modalDesc: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: colors.border.main,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text.primary,
+    textAlign: 'center',
+    letterSpacing: 6,
+    marginBottom: spacing.md,
+    backgroundColor: colors.background.surface,
+  },
+  modalBtn: {
+    height: 48,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalBtnDisabled: {
+    backgroundColor: colors.text.disabled,
+  },
+  modalBtnText: {
+    color: colors.text.white,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalCancel: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  modalCancelText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
     fontWeight: '600',
   },
 });
