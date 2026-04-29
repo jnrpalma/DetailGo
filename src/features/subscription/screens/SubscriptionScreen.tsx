@@ -80,16 +80,16 @@ export default function SubscriptionScreen() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ data: { shopId: shop.id } }),
+        body: JSON.stringify({ shopId: shop.id }),
       });
 
+      const result = await response.json() as Record<string, any>;
+
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err?.error?.message ?? 'Erro ao gerar PIX.');
+        throw new Error(result?.error ?? 'Erro ao gerar PIX.');
       }
 
-      const result = await response.json();
-      setPixData(result.result);
+      setPixData(result as PixData);
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Não foi possível gerar o PIX. Tente novamente.');
     } finally {
@@ -216,7 +216,7 @@ export default function SubscriptionScreen() {
                   {loadingPix ? (
                     <ActivityIndicator color={colors.text.white} />
                   ) : (
-                    <Text style={styles.generateBtnText}>Gerar QR Code PIX — R$ 89,00</Text>
+                    <Text style={styles.generateBtnText}>Gerar QR Code PIX — {PLAN_PRICE.replace('/mês','')}</Text>
                   )}
                 </TouchableOpacity>
               </>
