@@ -417,9 +417,7 @@ export default function AdminDashboardScreen() {
             const dayNumber = dayDate.getDate();
             const isToday =
               dateUtils.isCurrentWeek(weekAnchor) &&
-              dayDate.getDate() === new Date().getDate() &&
-              dayDate.getMonth() === new Date().getMonth() &&
-              dayDate.getFullYear() === new Date().getFullYear();
+              dateUtils.isToday(dayDate);
 
             const dayAppointments = appointmentsWeek.filter(item => {
               const itemDate = new Date(item.startAtMs);

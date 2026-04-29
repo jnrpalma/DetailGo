@@ -47,4 +47,12 @@ export const formatUtils = {
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + '...';
   },
+
+  normalizeEmail: (email: string): string => {
+    return email.trim().toLowerCase();
+  },
+
+  padZero: (num: number): string => {
+    return String(num).padStart(2, '0');
+  },
 } as const;
