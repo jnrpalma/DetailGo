@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   Linking,
   ScrollView,
   Share,
@@ -20,19 +22,22 @@ import {
   Shield,
   TrendingUp,
   LogOut,
+  RefreshCw,
 } from 'lucide-react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { getAuth } from '@react-native-firebase/auth';
 
 import { colors, spacing, radii } from '@shared/theme';
 import { useShop } from '@features/shops/context/ShopContext';
 import { useAuth } from '@features/auth';
 
-// ── Configure sua chave Pix aqui ───────────────────────────────────────────
-const PIX_KEY = '41270298895'; // ← TROQUE pela sua chave Pix
+// ── Configurações ──────────────────────────────────────────────────────────
 const PIX_NAME = 'DetailGo';
 const PLAN_PRICE = 'R$ 89,00/mês';
-const WHATSAPP_NUMBER = '5511996784399'; // ← TROQUE pelo seu WhatsApp (com DDI)
-// ────────────────────────────────────────────────────────────────────────────
+const WHATSAPP_NUMBER = '5511996784399';
+const CREATE_PIX_URL =
+  'https://us-central1-magic-auto.cloudfunctions.net/createPixCharge';
+// ───────────────────────────────────────────────────────────────────────────
 
 const FEATURES = [
   'Agendamentos ilimitados',
@@ -43,29 +48,73 @@ const FEATURES = [
   'Suporte via WhatsApp',
 ];
 
+type PixData = {
+  payment_id: string;
+  qr_code: string;
+  qr_code_base64: string;
+  expires_at: string;
+};
+
 export default function SubscriptionScreen() {
-  const { shop, trialDaysLeft, signOut: _ } = { ...useShop(), signOut: useAuth().signOut };
+  const { shop, trialDaysLeft } = useShop();
   const { signOut } = useAuth();
+
+  const [pixData, setPixData] = useState<PixData | null>(null);
+  const [loadingPix, setLoadingPix] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const isTrialActive = trialDaysLeft > 0;
 
-  const pixMessage = `DetailGo - Plano Pro\nLoja: ${shop?.name ?? ''}\nCódigo da loja: ${shop?.code ?? ''}\nValor: ${PLAN_PRICE}`;
+  const handleGeneratePix = async () => {
+    if (!shop?.id) return;
+    setLoadingPix(true);
+    setPixData(null);
+
+    try {
+      const auth = getAuth();
+      const idToken = await auth.currentUser?.getIdToken();
+
+      const response = await fetch(CREATE_PIX_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ data: { shopId: shop.id } }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err?.error?.message ?? 'Erro ao gerar PIX.');
+      }
+
+      const result = await response.json();
+      setPixData(result.result);
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível gerar o PIX. Tente novamente.');
+    } finally {
+      setLoadingPix(false);
+    }
+  };
 
   const handleCopyPix = async () => {
-    await Share.share({ message: `Chave Pix: ${PIX_KEY}\n\n${pixMessage}` });
+    if (!pixData?.qr_code) return;
+    await Share.share({ message: pixData.qr_code });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   };
 
   const handleWhatsApp = async () => {
     const text = encodeURIComponent(
       `Olá! Acabei de fazer o pagamento do DetailGo Pro.\n\n` +
-      `Loja: ${shop?.name ?? ''}\nCódigo: ${shop?.code ?? ''}\n\nPode ativar meu plano?`,
+        `Loja: ${shop?.name ?? ''}\nCódigo: ${shop?.code ?? ''}\n\nPode confirmar a ativação?`,
     );
     const url = `whatsapp://send?phone=${WHATSAPP_NUMBER}&text=${text}`;
     const canOpen = await Linking.canOpenURL(url);
     if (canOpen) {
       await Linking.openURL(url);
     } else {
-      Alert.alert('WhatsApp não encontrado', `Entre em contato pelo número: ${WHATSAPP_NUMBER}`);
+      Alert.alert('WhatsApp não encontrado', `Entre em contato: ${WHATSAPP_NUMBER}`);
     }
   };
 
@@ -96,12 +145,13 @@ export default function SubscriptionScreen() {
                 <View style={styles.trialBadge}>
                   <Clock size={14} color="#F97316" />
                   <Text style={styles.trialBadgeText}>
-                    Trial gratuito · {trialDaysLeft} {trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
+                    Trial gratuito · {trialDaysLeft}{' '}
+                    {trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
                   </Text>
                 </View>
                 <Text style={styles.headerTitle}>Seu trial está ativo</Text>
                 <Text style={styles.headerSubtitle}>
-                  Aproveite todos os recursos. Assine antes de expirar para não perder o acesso.
+                  Assine agora para não perder o acesso quando expirar.
                 </Text>
               </>
             ) : (
@@ -114,7 +164,7 @@ export default function SubscriptionScreen() {
                 </View>
                 <Text style={styles.headerTitle}>Ative seu plano</Text>
                 <Text style={styles.headerSubtitle}>
-                  Para continuar recebendo agendamentos, ative o plano Pro.
+                  Para receber agendamentos, ative o plano Pro.
                 </Text>
               </>
             )}
@@ -142,55 +192,102 @@ export default function SubscriptionScreen() {
             ))}
           </View>
 
-          {/* ── Como pagar ── */}
+          {/* ── Pagamento PIX ── */}
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
               <Shield size={18} color={colors.primary.main} />
-              <Text style={styles.cardTitle}>Como assinar</Text>
+              <Text style={styles.cardTitle}>Pagar com PIX</Text>
             </View>
 
-            <View style={styles.stepRow}>
-              <View style={styles.stepNum}><Text style={styles.stepNumText}>1</Text></View>
-              <Text style={styles.stepText}>
-                Faça um Pix de <Text style={styles.bold}>R$ 89,00</Text> para a chave abaixo
-              </Text>
-            </View>
+            {!pixData ? (
+              <>
+                <Text style={styles.pixIntro}>
+                  Clique para gerar um QR Code PIX exclusivo para sua loja.
+                  Assim que o pagamento for confirmado, seu acesso é liberado
+                  automaticamente em segundos.
+                </Text>
 
-            <View style={styles.pixBox}>
-              <View style={styles.pixInfo}>
-                <Text style={styles.pixLabel}>Chave Pix</Text>
-                <Text style={styles.pixValue}>{PIX_KEY}</Text>
-                <Text style={styles.pixLabel}>Favorecido</Text>
-                <Text style={styles.pixValue}>{PIX_NAME}</Text>
-              </View>
-              <TouchableOpacity style={styles.pixCopyBtn} onPress={handleCopyPix} activeOpacity={0.8}>
-                <Copy size={16} color={colors.primary.main} />
-                <Text style={styles.pixCopyText}>Compartilhar</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={[styles.generateBtn, loadingPix && styles.generateBtnDisabled]}
+                  onPress={handleGeneratePix}
+                  disabled={loadingPix}
+                  activeOpacity={0.85}
+                >
+                  {loadingPix ? (
+                    <ActivityIndicator color={colors.text.white} />
+                  ) : (
+                    <Text style={styles.generateBtnText}>Gerar QR Code PIX — R$ 89,00</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {/* QR Code */}
+                <View style={styles.qrContainer}>
+                  {pixData.qr_code_base64 ? (
+                    <Image
+                      source={{ uri: `data:image/png;base64,${pixData.qr_code_base64}` }}
+                      style={styles.qrImage}
+                      resizeMode="contain"
+                    />
+                  ) : null}
+                </View>
 
-            <View style={styles.stepRow}>
-              <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
-              <Text style={styles.stepText}>
-                No campo de mensagem do Pix, coloque{' '}
-                <Text style={styles.bold}>"{shop?.name ?? 'nome da sua loja'}"</Text>
-              </Text>
-            </View>
+                <Text style={styles.qrInstructions}>
+                  Abra o app do seu banco → PIX → Pagar com QR Code
+                </Text>
 
-            <View style={styles.stepRow}>
-              <View style={styles.stepNum}><Text style={styles.stepNumText}>3</Text></View>
-              <Text style={styles.stepText}>
-                Avise pelo WhatsApp que o pagamento foi feito. Ativamos em até 1 hora!
-              </Text>
-            </View>
+                {/* Copia e Cola */}
+                <TouchableOpacity
+                  style={styles.copyBtn}
+                  onPress={handleCopyPix}
+                  activeOpacity={0.8}
+                >
+                  {copied ? (
+                    <>
+                      <CheckCircle2 size={18} color={colors.status.success} />
+                      <Text style={[styles.copyBtnText, { color: colors.status.success }]}>
+                        Código copiado!
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={18} color={colors.primary.main} />
+                      <Text style={styles.copyBtnText}>Copiar código PIX (copia e cola)</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
+                {/* Gerar novo */}
+                <TouchableOpacity
+                  style={styles.regenerateBtn}
+                  onPress={handleGeneratePix}
+                  activeOpacity={0.7}
+                >
+                  <RefreshCw size={14} color={colors.text.tertiary} />
+                  <Text style={styles.regenerateBtnText}>Gerar novo código</Text>
+                </TouchableOpacity>
+
+                {/* Aviso automático */}
+                <View style={styles.autoActivateBox}>
+                  <CheckCircle2 size={14} color={colors.status.success} />
+                  <Text style={styles.autoActivateText}>
+                    Após o pagamento, seu acesso é liberado automaticamente em até 1 minuto.
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* ── Dúvidas ── */}
+          <View style={styles.card}>
             <TouchableOpacity
               style={styles.whatsappBtn}
               onPress={handleWhatsApp}
               activeOpacity={0.85}
             >
               <MessageCircle size={20} color="#FFFFFF" />
-              <Text style={styles.whatsappBtnText}>Avisar que paguei no WhatsApp</Text>
+              <Text style={styles.whatsappBtnText}>Falar com suporte no WhatsApp</Text>
             </TouchableOpacity>
           </View>
 
@@ -210,13 +307,8 @@ export default function SubscriptionScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background.main,
-  },
-  content: {
-    flexGrow: 1,
-  },
+  safe: { flex: 1, backgroundColor: colors.background.main },
+  content: { flexGrow: 1 },
   header: {
     padding: spacing.lg,
     paddingBottom: 32,
@@ -230,15 +322,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  brand: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.white,
-    letterSpacing: 1.5,
-  },
-  logoutBtn: {
-    padding: spacing.xs,
-  },
+  brand: { fontSize: 20, fontWeight: '800', color: colors.text.white, letterSpacing: 1.5 },
+  logoutBtn: { padding: spacing.xs },
   trialBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -250,17 +335,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginBottom: spacing.sm,
   },
-  expiredBadge: {
-    backgroundColor: '#FEF2F2',
-  },
-  trialBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#F97316',
-  },
-  expiredBadgeText: {
-    color: colors.status.error,
-  },
+  expiredBadge: { backgroundColor: '#FEF2F2' },
+  trialBadgeText: { fontSize: 12, fontWeight: '700', color: '#F97316' },
+  expiredBadgeText: { color: colors.status.error },
   headerTitle: {
     fontSize: 26,
     fontWeight: '800',
@@ -283,21 +360,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
   },
-  price: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.text.white,
-    lineHeight: 40,
-  },
-  pricePer: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.9)',
-  },
-  priceSub: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
-  },
+  price: { fontSize: 36, fontWeight: '800', color: colors.text.white, lineHeight: 40 },
+  pricePer: { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
+  priceSub: { fontSize: 11, color: 'rgba(255,255,255,0.7)' },
   card: {
     backgroundColor: colors.background.card,
     borderRadius: radii.lg,
@@ -318,93 +383,82 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  featureText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    flex: 1,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  stepNum: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.primary.main,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-    flexShrink: 0,
-  },
-  stepNumText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.text.white,
-  },
-  stepText: {
+  featureText: { fontSize: 14, color: colors.text.secondary, flex: 1 },
+  pixIntro: {
     fontSize: 14,
     color: colors.text.secondary,
     lineHeight: 20,
-    flex: 1,
+    marginBottom: spacing.lg,
   },
-  bold: {
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  pixBox: {
-    backgroundColor: colors.background.surface,
+  generateBtn: {
+    height: 52,
+    backgroundColor: colors.primary.main,
     borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  generateBtnDisabled: { backgroundColor: colors.text.disabled },
+  generateBtnText: { color: colors.text.white, fontSize: 15, fontWeight: '700' },
+  qrContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.md,
+    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border.main,
-    padding: spacing.md,
+  },
+  qrImage: { width: 200, height: 200 },
+  qrInstructions: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    textAlign: 'center',
     marginBottom: spacing.md,
-    gap: spacing.sm,
   },
-  pixInfo: {
-    gap: 4,
-  },
-  pixLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.text.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 4,
-  },
-  pixValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  pixCopyBtn: {
+  copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.sm,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
     borderWidth: 1.5,
     borderColor: colors.primary.main,
-    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  pixCopyText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary.main,
+  copyBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary.main },
+  regenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  regenerateBtnText: { fontSize: 12, color: colors.text.tertiary },
+  autoActivateBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    backgroundColor: '#F0FDF4',
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  autoActivateText: {
+    fontSize: 12,
+    color: colors.status.success,
+    flex: 1,
+    fontWeight: '600',
+    lineHeight: 16,
   },
   whatsappBtn: {
     flexDirection: 'row',
@@ -414,13 +468,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#25D366',
     borderRadius: radii.md,
     paddingVertical: 14,
-    marginTop: spacing.xs,
   },
-  whatsappBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  whatsappBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   noteBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -428,9 +477,5 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
-  noteText: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    flex: 1,
-  },
+  noteText: { fontSize: 12, color: colors.text.tertiary, flex: 1 },
 });
