@@ -6,7 +6,7 @@ import { MercadoPagoConfig, Payment } from 'mercadopago';
 
 const mpAccessToken = defineSecret('MP_ACCESS_TOKEN');
 
-const PLAN_AMOUNT = 0.01; // ← TESTE: mudar para 89.0 em produção
+const PLAN_AMOUNT = 0.01; // DEV: mudar para 89.0 antes de lançar
 const PLAN_DESCRIPTION = 'DetailGo Pro - Plano Mensal';
 
 export const createPixCharge = onRequest(
