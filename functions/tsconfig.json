@@ -3,7 +3,8 @@
     "module": "commonjs",
     "noImplicitReturns": true,
     "noUnusedLocals": false,
-    "outDir": "lib",
+    "outDir": "./lib",
+    "rootDir": "./src",
     "sourceMap": true,
     "strict": true,
     "target": "es2017",
@@ -12,5 +13,6 @@
     "resolveJsonModule": true
   },
   "compileOnSave": true,
-  "include": ["src"]
+  "include": ["src/**/*"],
+  "exclude": ["lib", "node_modules"]
 }
