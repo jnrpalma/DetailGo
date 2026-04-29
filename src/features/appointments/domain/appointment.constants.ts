@@ -1,5 +1,5 @@
 // src/features/appointments/domain/appointment.constants.ts
-import type { AppointmentStatus } from "./appointment.types";
+import type { AppointmentStatus } from './appointment.types';
 
 /**
  * Tipos de veículo disponíveis
@@ -18,11 +18,11 @@ export const APPOINTMENT = {
   // Grace period para não comparecimento
   NO_SHOW_GRACE_MIN: 15,
   NO_SHOW_GRACE_MS: 15 * 60 * 1000,
-  
+
   // Limites padrão
   DEFAULT_LIMIT: 50,
   MAX_CAPACITY: 10,
-  
+
   // Listas de valores válidos
   CAR_CATEGORIES: ['Hatch', 'Sedan', 'SUV', 'Picape cabine dupla'] as const,
   VEHICLE_TYPES: ['Carro', 'Moto'] as const,
@@ -32,17 +32,17 @@ export const APPOINTMENT = {
  * Status de agendamentos ativos (que ainda estão em andamento ou agendados)
  */
 export const ACTIVE_APPOINTMENT_SET = [
-  'scheduled', 
-  'in_progress'
+  'scheduled',
+  'in_progress',
 ] as const satisfies readonly AppointmentStatus[];
 
 /**
  * Status de agendamentos históricos (já finalizados)
  */
 export const HISTORY_APPOINTMENT_SET = [
-  'done', 
-  'no_show', 
-  'cancelled'
+  'done',
+  'no_show',
+  'cancelled',
 ] as const satisfies readonly AppointmentStatus[];
 
 /**

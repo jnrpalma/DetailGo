@@ -1,15 +1,5 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import {
-  doc,
-  getFirestore,
-  onSnapshot,
-} from '@react-native-firebase/firestore';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { doc, getFirestore, onSnapshot } from '@react-native-firebase/firestore';
 import { useAuth } from '@features/auth';
 
 export type UserRole = 'owner' | 'customer';
@@ -22,8 +12,8 @@ export type ShopDoc = {
   ownerId: string;
   createdAt?: any;
   subscriptionStatus: SubscriptionStatus;
-  trialEndsAt?: any;   // Firestore Timestamp
-  activeUntil?: any;   // Firestore Timestamp
+  trialEndsAt?: any; // Firestore Timestamp
+  activeUntil?: any; // Firestore Timestamp
 };
 
 type UserDoc = {

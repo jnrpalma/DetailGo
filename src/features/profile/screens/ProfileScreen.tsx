@@ -108,11 +108,10 @@ export default function ProfileScreen() {
       const pendingFromFirestore = data.pendingEmail || '';
 
       const shouldClearPending =
-        pendingFromFirestore &&
-        normalizeEmail(authEmail) === normalizeEmail(pendingFromFirestore);
+        pendingFromFirestore && normalizeEmail(authEmail) === normalizeEmail(pendingFromFirestore);
 
       const phoneValue = data.phone || '';
-      
+
       setProfile({
         firstName: data.firstName || '',
         lastName: data.lastName || '',
@@ -229,10 +228,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      const credential = auth.EmailAuthProvider.credential(
-        currentUser.email,
-        password,
-      );
+      const credential = auth.EmailAuthProvider.credential(currentUser.email, password);
       await currentUser.reauthenticateWithCredential(credential);
 
       await currentUser.verifyBeforeUpdateEmail(nextEmail);
@@ -260,10 +256,7 @@ export default function ProfileScreen() {
 
       const code = error?.code;
 
-      if (
-        code === 'auth/wrong-password' ||
-        code === 'auth/invalid-credential'
-      ) {
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         Alert.alert('Erro', 'Senha incorreta');
       } else if (code === 'auth/too-many-requests') {
         Alert.alert('Erro', 'Muitas tentativas. Aguarde alguns minutos.');
@@ -274,10 +267,7 @@ export default function ProfileScreen() {
       } else if (code === 'auth/invalid-email') {
         Alert.alert('Erro', 'Email inválido.');
       } else {
-        Alert.alert(
-          'Erro',
-          `Não foi possível alterar.\n${error?.message || ''}`.trim(),
-        );
+        Alert.alert('Erro', `Não foi possível alterar.\n${error?.message || ''}`.trim());
       }
     } finally {
       setUpdatingEmail(false);
@@ -373,10 +363,7 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={colors.background.main}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.container}
@@ -396,18 +383,13 @@ export default function ProfileScreen() {
             <View style={styles.headerPlaceholder} />
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.form}>
               <View style={styles.row}>
                 <Input
                   label="Nome *"
                   value={profile.firstName || ''}
-                  onChangeText={(text) =>
-                    setProfile({ ...profile, firstName: text })
-                  }
+                  onChangeText={text => setProfile({ ...profile, firstName: text })}
                   leftIcon={<User size={20} color={colors.text.tertiary} />}
                   placeholder="Seu nome"
                   editable={!saving}
@@ -417,9 +399,7 @@ export default function ProfileScreen() {
                 <Input
                   label="Sobrenome *"
                   value={profile.lastName || ''}
-                  onChangeText={(text) =>
-                    setProfile({ ...profile, lastName: text })
-                  }
+                  onChangeText={text => setProfile({ ...profile, lastName: text })}
                   leftIcon={<User size={20} color={colors.text.tertiary} />}
                   placeholder="Seu sobrenome"
                   editable={!saving}
@@ -451,12 +431,8 @@ export default function ProfileScreen() {
 
                     {!!profile.pendingEmail && (
                       <View style={styles.pendingBox}>
-                        <Text style={styles.pendingTitle}>
-                          Pendente de confirmação
-                        </Text>
-                        <Text style={styles.pendingEmail}>
-                          {profile.pendingEmail}
-                        </Text>
+                        <Text style={styles.pendingTitle}>Pendente de confirmação</Text>
+                        <Text style={styles.pendingEmail}>{profile.pendingEmail}</Text>
 
                         <TouchableOpacity
                           style={[
@@ -468,16 +444,11 @@ export default function ProfileScreen() {
                           activeOpacity={0.7}
                         >
                           {checkingConfirm ? (
-                            <ActivityIndicator
-                              size="small"
-                              color={colors.text.white}
-                            />
+                            <ActivityIndicator size="small" color={colors.text.white} />
                           ) : (
                             <>
                               <RefreshCw size={16} color={colors.text.white} />
-                              <Text style={styles.verifyButtonText}>
-                                Verificar confirmação
-                              </Text>
+                              <Text style={styles.verifyButtonText}>Verificar confirmação</Text>
                             </>
                           )}
                         </TouchableOpacity>
@@ -485,8 +456,7 @@ export default function ProfileScreen() {
                     )}
 
                     <Text style={styles.hintText}>
-                      Ao alterar, você receberá um link de confirmação no novo
-                      e-mail.
+                      Ao alterar, você receberá um link de confirmação no novo e-mail.
                     </Text>
                   </>
                 ) : (
@@ -527,10 +497,7 @@ export default function ProfileScreen() {
                         disabled={updatingEmail}
                       >
                         {updatingEmail ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={colors.text.white}
-                          />
+                          <ActivityIndicator size="small" color={colors.text.white} />
                         ) : (
                           <>
                             <Check size={16} color={colors.text.white} />
@@ -541,8 +508,8 @@ export default function ProfileScreen() {
                     </View>
 
                     <Text style={styles.hintText}>
-                      Dica: se o novo e-mail já existir em outro usuário, o
-                      Firebase pode não enviar o link.
+                      Dica: se o novo e-mail já existir em outro usuário, o Firebase pode não enviar
+                      o link.
                     </Text>
                   </View>
                 )}
@@ -560,9 +527,7 @@ export default function ProfileScreen() {
                     <View style={[styles.inputWrapper, styles.inputEditable]}>
                       <Phone size={18} color={colors.text.tertiary} />
                       <Text style={styles.valueText}>
-                        {profile.phone
-                          ? formatUtils.phoneMask(profile.phone)
-                          : 'Não informado'}
+                        {profile.phone ? formatUtils.phoneMask(profile.phone) : 'Não informado'}
                       </Text>
                       <View style={styles.editBadge}>
                         <Pencil size={14} color={colors.primary.main} />
@@ -598,10 +563,7 @@ export default function ProfileScreen() {
                         disabled={saving}
                       >
                         {saving ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={colors.text.white}
-                          />
+                          <ActivityIndicator size="small" color={colors.text.white} />
                         ) : (
                           <>
                             <Check size={16} color={colors.text.white} />
@@ -613,16 +575,11 @@ export default function ProfileScreen() {
                   </View>
                 )}
 
-                <Text style={styles.hintText}>
-                  Informe seu WhatsApp para receber notificações
-                </Text>
+                <Text style={styles.hintText}>Informe seu WhatsApp para receber notificações</Text>
               </View>
 
               <TouchableOpacity
-                style={[
-                  styles.saveButtonBottom,
-                  saving && styles.saveButtonDisabled,
-                ]}
+                style={[styles.saveButtonBottom, saving && styles.saveButtonDisabled]}
                 onPress={handleSave}
                 disabled={saving || editingEmail || editingPhone}
                 activeOpacity={0.7}

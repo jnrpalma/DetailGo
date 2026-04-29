@@ -16,9 +16,7 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getAuth } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
@@ -47,10 +45,7 @@ import {
   createAppointmentWithCapacityCheck,
   type Slot,
 } from '@features/appointments/services/availability.service';
-import type {
-  VehicleType,
-  CarCategory,
-} from '@features/appointments/domain/appointment.types';
+import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
 import { CAR_CATEGORIES } from '@features/appointments/domain/appointment.constants';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 import { colors, spacing, radii, borders } from '@shared/theme';
@@ -249,9 +244,7 @@ function ServiceDetailsModal({
               </View>
               <View style={styles.detailsTitleContainer}>
                 <Text style={styles.detailsTitle}>{details.title}</Text>
-                <Text style={styles.detailsSubtitle}>
-                  {details.description}
-                </Text>
+                <Text style={styles.detailsSubtitle}>{details.description}</Text>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <X size={18} color={colors.text.tertiary} />
@@ -261,9 +254,7 @@ function ServiceDetailsModal({
             <View style={styles.priceDurationRow}>
               <View style={styles.priceBadge}>
                 <Text style={styles.priceBadgeLabel}>Valor</Text>
-                <Text style={styles.priceBadgeValue}>
-                  {formatUtils.currency(price)}
-                </Text>
+                <Text style={styles.priceBadgeValue}>{formatUtils.currency(price)}</Text>
               </View>
               <View style={styles.durationBadge}>
                 <Clock size={14} color={colors.text.secondary} />
@@ -274,10 +265,7 @@ function ServiceDetailsModal({
             <View style={styles.detailsSection}>
               <View style={styles.sectionHeader}>
                 <View
-                  style={[
-                    styles.sectionIcon,
-                    { backgroundColor: colors.status.success + '20' },
-                  ]}
+                  style={[styles.sectionIcon, { backgroundColor: colors.status.success + '20' }]}
                 >
                   <Check size={14} color={colors.status.success} />
                 </View>
@@ -289,10 +277,7 @@ function ServiceDetailsModal({
                   return (
                     <View key={`inc-${idx}`} style={styles.includedItem}>
                       <View
-                        style={[
-                          styles.itemIcon,
-                          { backgroundColor: colors.status.success + '10' },
-                        ]}
+                        style={[styles.itemIcon, { backgroundColor: colors.status.success + '10' }]}
                       >
                         <ItemIcon size={12} color={colors.status.success} />
                       </View>
@@ -307,10 +292,7 @@ function ServiceDetailsModal({
               <View style={styles.detailsSection}>
                 <View style={styles.sectionHeader}>
                   <View
-                    style={[
-                      styles.sectionIcon,
-                      { backgroundColor: colors.status.error + '20' },
-                    ]}
+                    style={[styles.sectionIcon, { backgroundColor: colors.status.error + '20' }]}
                   >
                     <AlertCircle size={14} color={colors.status.error} />
                   </View>
@@ -322,10 +304,7 @@ function ServiceDetailsModal({
                     return (
                       <View key={`exc-${idx}`} style={styles.excludedItem}>
                         <View
-                          style={[
-                            styles.itemIcon,
-                            { backgroundColor: colors.status.error + '10' },
-                          ]}
+                          style={[styles.itemIcon, { backgroundColor: colors.status.error + '10' }]}
                         >
                           <ItemIcon size={12} color={colors.status.error} />
                         </View>
@@ -341,10 +320,7 @@ function ServiceDetailsModal({
               <View style={styles.detailsSection}>
                 <View style={styles.sectionHeader}>
                   <View
-                    style={[
-                      styles.sectionIcon,
-                      { backgroundColor: colors.primary.main + '20' },
-                    ]}
+                    style={[styles.sectionIcon, { backgroundColor: colors.primary.main + '20' }]}
                   >
                     <Sparkles size={14} color={colors.primary.main} />
                   </View>
@@ -395,12 +371,7 @@ function SelectModal<T extends string>({
   onClose: () => void;
 }) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <View style={styles.modalCard}>
           <View style={styles.modalCardHeader}>
@@ -416,22 +387,14 @@ function SelectModal<T extends string>({
               return (
                 <TouchableOpacity
                   key={opt}
-                  style={[
-                    styles.modalItem,
-                    isSelected && styles.modalItemSelected,
-                  ]}
+                  style={[styles.modalItem, isSelected && styles.modalItemSelected]}
                   onPress={() => {
                     onSelect(opt);
                     onClose();
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.modalItemText,
-                      isSelected && styles.modalItemTextSelected,
-                    ]}
-                  >
+                  <Text style={[styles.modalItemText, isSelected && styles.modalItemTextSelected]}>
                     {opt}
                   </Text>
                   {isSelected && (
@@ -499,11 +462,7 @@ export default function AppointmentScreen() {
 
       try {
         setLoadingSlots(true);
-        const list = await getAvailableSlotsForDay(
-          nextDay,
-          nextService.durationMin,
-          shopId ?? '',
-        );
+        const list = await getAvailableSlotsForDay(nextDay, nextService.durationMin, shopId ?? '');
         setSlots(list);
         setSelectedSlot(null);
       } catch (error) {
@@ -518,10 +477,7 @@ export default function AppointmentScreen() {
     [selectedService],
   );
 
-  const handleDayChange = async (
-    event: DateTimePickerEvent,
-    selected?: Date,
-  ) => {
+  const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
     if (Platform.OS === 'android' && event.type === 'dismissed') {
       setShowDayPicker(false);
       return;
@@ -599,17 +555,11 @@ export default function AppointmentScreen() {
 
   return (
     <>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={colors.background.main}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {/* Header sem ícone de calendário */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <ArrowLeft size={18} color={colors.text.primary} />
           </TouchableOpacity>
 
@@ -650,15 +600,10 @@ export default function AppointmentScreen() {
         >
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>DATA</Text>
-            <TouchableOpacity
-              style={styles.dateSelector}
-              onPress={() => setShowDayPicker(true)}
-            >
+            <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDayPicker(true)}>
               <View style={styles.dateSelectorContent}>
                 <Calendar size={18} color={colors.primary.main} />
-                <Text style={styles.dateSelectorText}>
-                  {dateUtils.formatDate(day.getTime())}
-                </Text>
+                <Text style={styles.dateSelectorText}>{dateUtils.formatDate(day.getTime())}</Text>
               </View>
               <ChevronRight size={16} color={colors.text.tertiary} />
             </TouchableOpacity>
@@ -678,10 +623,7 @@ export default function AppointmentScreen() {
             <Text style={styles.sectionLabel}>VEÍCULO</Text>
             <View style={styles.vehicleGrid}>
               <TouchableOpacity
-                style={[
-                  styles.vehicleCard,
-                  vehicleType === 'Carro' && styles.vehicleCardSelected,
-                ]}
+                style={[styles.vehicleCard, vehicleType === 'Carro' && styles.vehicleCardSelected]}
                 onPress={() => {
                   setVehicleType('Carro');
                   if (!carCategory) setCarCategory('Hatch');
@@ -689,11 +631,7 @@ export default function AppointmentScreen() {
               >
                 <Car
                   size={16}
-                  color={
-                    vehicleType === 'Carro'
-                      ? colors.primary.main
-                      : colors.text.tertiary
-                  }
+                  color={vehicleType === 'Carro' ? colors.primary.main : colors.text.tertiary}
                 />
                 <Text
                   style={[
@@ -706,10 +644,7 @@ export default function AppointmentScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.vehicleCard,
-                  vehicleType === 'Moto' && styles.vehicleCardSelected,
-                ]}
+                style={[styles.vehicleCard, vehicleType === 'Moto' && styles.vehicleCardSelected]}
                 onPress={() => {
                   setVehicleType('Moto');
                   setCarCategory(null);
@@ -717,11 +652,7 @@ export default function AppointmentScreen() {
               >
                 <Car
                   size={16}
-                  color={
-                    vehicleType === 'Moto'
-                      ? colors.primary.main
-                      : colors.text.tertiary
-                  }
+                  color={vehicleType === 'Moto' ? colors.primary.main : colors.text.tertiary}
                 />
                 <Text
                   style={[
@@ -738,18 +669,10 @@ export default function AppointmentScreen() {
           {vehicleType === 'Carro' && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>CATEGORIA</Text>
-              <TouchableOpacity
-                style={styles.selector}
-                onPress={() => setCategoryModalOpen(true)}
-              >
+              <TouchableOpacity style={styles.selector} onPress={() => setCategoryModalOpen(true)}>
                 <View style={styles.selectorContent}>
                   <Car size={16} color={colors.text.secondary} />
-                  <Text
-                    style={[
-                      styles.selectorText,
-                      !carCategory && styles.selectorPlaceholder,
-                    ]}
-                  >
+                  <Text style={[styles.selectorText, !carCategory && styles.selectorPlaceholder]}>
                     {carCategory ?? 'Selecione'}
                   </Text>
                 </View>
@@ -768,16 +691,12 @@ export default function AppointmentScreen() {
               >
                 <View style={styles.serviceCardLeft}>
                   <View style={styles.serviceIconContainer}>
-                    <SelectedServiceIcon
-                      size={18}
-                      color={colors.primary.main}
-                    />
+                    <SelectedServiceIcon size={18} color={colors.primary.main} />
                   </View>
                   <View style={styles.serviceInfo}>
                     <Text style={styles.serviceName}>{serviceLabel}</Text>
                     <Text style={styles.serviceDuration}>
-                      {selectedService?.durationMin}min •{' '}
-                      {formatUtils.currency(finalPrice)}
+                      {selectedService?.durationMin}min • {formatUtils.currency(finalPrice)}
                     </Text>
                   </View>
                 </View>
@@ -791,15 +710,10 @@ export default function AppointmentScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity
-                style={styles.selector}
-                onPress={() => setServiceModalOpen(true)}
-              >
+              <TouchableOpacity style={styles.selector} onPress={() => setServiceModalOpen(true)}>
                 <View style={styles.selectorContent}>
                   <Clock size={16} color={colors.text.secondary} />
-                  <Text style={styles.selectorPlaceholder}>
-                    Selecione um serviço
-                  </Text>
+                  <Text style={styles.selectorPlaceholder}>Selecione um serviço</Text>
                 </View>
                 <ChevronRight size={16} color={colors.text.tertiary} />
               </TouchableOpacity>
@@ -842,18 +756,10 @@ export default function AppointmentScreen() {
                   const isSelected = selectedSlot?.startAtMs === item.startAtMs;
                   return (
                     <TouchableOpacity
-                      style={[
-                        styles.slotCard,
-                        isSelected && styles.slotCardSelected,
-                      ]}
+                      style={[styles.slotCard, isSelected && styles.slotCardSelected]}
                       onPress={() => setSelectedSlot(item)}
                     >
-                      <Text
-                        style={[
-                          styles.slotTime,
-                          isSelected && styles.slotTimeSelected,
-                        ]}
-                      >
+                      <Text style={[styles.slotTime, isSelected && styles.slotTimeSelected]}>
                         {dateUtils.formatHour(item.startAtMs)}
                       </Text>
                     </TouchableOpacity>
@@ -866,17 +772,12 @@ export default function AppointmentScreen() {
           {canConfirm && (
             <View style={styles.totalCard}>
               <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>
-                {formatUtils.currency(finalPrice)}
-              </Text>
+              <Text style={styles.totalValue}>{formatUtils.currency(finalPrice)}</Text>
             </View>
           )}
 
           <TouchableOpacity
-            style={[
-              styles.confirmButton,
-              !canConfirm && styles.confirmButtonDisabled,
-            ]}
+            style={[styles.confirmButton, !canConfirm && styles.confirmButtonDisabled]}
             onPress={handleSave}
             disabled={!canConfirm || submitting}
           >

@@ -49,8 +49,7 @@ import type { AppointmentStatus } from '@features/appointments/domain/appointmen
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 interface FirebaseError extends Error {
   code?: string;
@@ -61,18 +60,25 @@ const ALL_HISTORY_STATUSES: AppointmentStatus[] = ['done', 'no_show', 'cancelled
 type FilterId = 'all' | 'done' | 'no_show' | 'cancelled';
 
 const FILTER_OPTIONS: { id: FilterId; label: string }[] = [
-  { id: 'all',       label: 'Todos'          },
-  { id: 'done',      label: 'Concluídos'     },
-  { id: 'no_show',   label: 'Não realizados' },
-  { id: 'cancelled', label: 'Cancelados'     },
+  { id: 'all', label: 'Todos' },
+  { id: 'done', label: 'Concluídos' },
+  { id: 'no_show', label: 'Não realizados' },
+  { id: 'cancelled', label: 'Cancelados' },
 ];
 
-const STATUS_CONFIG: Partial<Record<AppointmentStatus, {
-  label: string; color: string; icon: any;
-}>> = {
-  done:      { label: 'Concluído',     color: colors.status.success, icon: CheckCircle2 },
-  no_show:   { label: 'Não realizado', color: colors.status.error,   icon: XCircle      },
-  cancelled: { label: 'Cancelado',     color: colors.text.disabled,  icon: Ban          },
+const STATUS_CONFIG: Partial<
+  Record<
+    AppointmentStatus,
+    {
+      label: string;
+      color: string;
+      icon: any;
+    }
+  >
+> = {
+  done: { label: 'Concluído', color: colors.status.success, icon: CheckCircle2 },
+  no_show: { label: 'Não realizado', color: colors.status.error, icon: XCircle },
+  cancelled: { label: 'Cancelado', color: colors.text.disabled, icon: Ban },
 };
 
 const PAGE_SIZE = 30;
@@ -81,25 +87,25 @@ export default function AdminHistoryScreen() {
   const navigation = useNavigation();
   const auth = getAuth();
   const user = auth.currentUser;
-  const db   = getFirestore();
+  const db = getFirestore();
   const { shopId } = useShop();
 
-  const [loading,     setLoading]     = useState(true);
-  const [items,       setItems]       = useState<AdminAppointment[]>([]);
-  const [filter,      setFilter]      = useState<FilterId>('all');
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<AdminAppointment[]>([]);
+  const [filter, setFilter] = useState<FilterId>('all');
   const [loadingMore, setLoadingMore] = useState(false);
 
   // 👈 ARMAZENA OS TOTAIS DO ÚLTIMO CARREGAMENTO COMPLETO
   const [totals, setTotals] = useState({ done: 0, revenue: 0 });
 
-  const lastDocRef     = useRef<QDoc | null>(null);
+  const lastDocRef = useRef<QDoc | null>(null);
   const canLoadMoreRef = useRef(true);
 
   const { fetchCustomerName } = useCustomerName();
 
   const statusSet = useMemo((): AppointmentStatus[] => {
-    if (filter === 'done')      return ['done'];
-    if (filter === 'no_show')   return ['no_show'];
+    if (filter === 'done') return ['done'];
+    if (filter === 'no_show') return ['no_show'];
     if (filter === 'cancelled') return ['cancelled'];
     return ALL_HISTORY_STATUSES;
   }, [filter]);
@@ -110,13 +116,11 @@ export default function AdminHistoryScreen() {
     const revenue = items
       .filter(i => i.status === 'done')
       .reduce((acc, i) => acc + (i.price ?? 0), 0);
-    
+
     setTotals({ done: doneCount, revenue });
   }, [items]);
 
-  const enrichWithNames = async (
-    list: AdminAppointment[],
-  ): Promise<AdminAppointment[]> =>
+  const enrichWithNames = async (list: AdminAppointment[]): Promise<AdminAppointment[]> =>
     Promise.all(
       list.map(async it => {
         if (it.customerName && it.customerName !== 'Cliente') return it;
@@ -130,7 +134,7 @@ export default function AdminHistoryScreen() {
 
     setLoading(true);
     setItems([]);
-    lastDocRef.current     = null;
+    lastDocRef.current = null;
     canLoadMoreRef.current = true;
 
     const qy = query(
@@ -147,7 +151,7 @@ export default function AdminHistoryScreen() {
           .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
           .filter(Boolean) as AdminAppointment[];
 
-        lastDocRef.current     = (snap.docs[snap.docs.length - 1] as QDoc | undefined) ?? null;
+        lastDocRef.current = (snap.docs[snap.docs.length - 1] as QDoc | undefined) ?? null;
         canLoadMoreRef.current = snap.docs.length >= PAGE_SIZE;
 
         const withNames = await enrichWithNames(base);
@@ -156,11 +160,11 @@ export default function AdminHistoryScreen() {
       },
       (error: FirebaseError) => {
         console.error('AdminHistory snapshot error:', error);
-        
+
         if (error.code === 'failed-precondition') {
           Alert.alert(
             '⚠️ Índice necessário',
-            'O Firestore precisa de um índice para esta consulta. Acesse o console do Firebase e crie um índice composto com status (ascendente) e startAtMs (descendente).'
+            'O Firestore precisa de um índice para esta consulta. Acesse o console do Firebase e crie um índice composto com status (ascendente) e startAtMs (descendente).',
           );
         } else {
           Alert.alert('Erro', 'Falha ao carregar histórico.');
@@ -189,7 +193,8 @@ export default function AdminHistoryScreen() {
         .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
         .filter(Boolean) as AdminAppointment[];
 
-      lastDocRef.current     = (snap.docs[snap.docs.length - 1] as QDoc | undefined) ?? lastDocRef.current;
+      lastDocRef.current =
+        (snap.docs[snap.docs.length - 1] as QDoc | undefined) ?? lastDocRef.current;
       canLoadMoreRef.current = snap.docs.length >= PAGE_SIZE;
 
       const withNames = await enrichWithNames(base);
@@ -212,8 +217,8 @@ export default function AdminHistoryScreen() {
         ? `Carro • ${item.carCategory}`
         : item.vehicleType;
 
-    const cfg         = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
-    const StatusIcon  = cfg.icon;
+    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
+    const StatusIcon = cfg.icon;
 
     return (
       <View style={[styles.card, { borderLeftColor: cfg.color }]}>
@@ -228,9 +233,7 @@ export default function AdminHistoryScreen() {
 
         <View style={[styles.statusBadge, { backgroundColor: `${cfg.color}15` }]}>
           <StatusIcon size={12} color={cfg.color} />
-          <Text style={[styles.statusLabel, { color: cfg.color }]}>
-            {cfg.label}
-          </Text>
+          <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
         </View>
 
         <View style={styles.cardDivider} />
@@ -270,9 +273,7 @@ export default function AdminHistoryScreen() {
   }
 
   // 👈 FILTRA OS ITENS PARA EXIBIÇÃO NA LISTA
-  const displayItems = filter === 'all'
-    ? items
-    : items.filter(item => item.status === filter);
+  const displayItems = filter === 'all' ? items : items.filter(item => item.status === filter);
 
   // 👈 RESUMO SEMPRE VISÍVEL, usando totals (que são persistentes)
   const showSummary = totals.done > 0;
@@ -281,7 +282,6 @@ export default function AdminHistoryScreen() {
     <>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity

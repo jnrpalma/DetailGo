@@ -77,8 +77,7 @@ type UserProfile = {
   role?: 'owner' | 'customer';
 };
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 const AVATAR_SIZE = UI.AVATAR_SIZE;
 const MENU_W = UI.MENU_WIDTH;
@@ -95,23 +94,15 @@ export default function AdminDashboardScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-MENU_W)).current;
 
-  const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>(
-    [],
-  );
+  const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
 
-  const weekStartMs = useMemo(
-    () => dateUtils.startOfWeek(weekAnchor),
-    [weekAnchor],
-  );
-  const weekEndMs = useMemo(
-    () => dateUtils.endOfWeek(weekAnchor),
-    [weekAnchor],
-  );
+  const weekStartMs = useMemo(() => dateUtils.startOfWeek(weekAnchor), [weekAnchor]);
+  const weekEndMs = useMemo(() => dateUtils.endOfWeek(weekAnchor), [weekAnchor]);
 
   const { fetchCustomerName } = useCustomerName();
 
@@ -158,17 +149,10 @@ export default function AdminDashboardScreen() {
       if (!b64) return;
 
       setSaving('avatar');
-      await setDoc(
-        doc(getFirestore(), 'users', user!.uid),
-        { photoB64: b64 },
-        { merge: true },
-      );
+      await setDoc(doc(getFirestore(), 'users', user!.uid), { photoB64: b64 }, { merge: true });
       setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (e: any) {
-      Alert.alert(
-        'Erro',
-        `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`,
-      );
+      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
     } finally {
       setSaving(null);
     }
@@ -310,9 +294,7 @@ export default function AdminDashboardScreen() {
       console.error(e);
       Alert.alert(
         'Erro',
-        e?.code === 'APPOINTMENT_EXPIRED'
-          ? 'Agendamento expirado.'
-          : 'Não foi possível atualizar.',
+        e?.code === 'APPOINTMENT_EXPIRED' ? 'Agendamento expirado.' : 'Não foi possível atualizar.',
       );
     } finally {
       setUpdatingId(null);
@@ -341,12 +323,8 @@ export default function AdminDashboardScreen() {
     const startDay = startDate.getDate();
     const endDay = endDate.getDate();
 
-    const startMonth = startDate
-      .toLocaleString('pt-BR', { month: 'long' })
-      .toUpperCase();
-    const endMonth = endDate
-      .toLocaleString('pt-BR', { month: 'long' })
-      .toUpperCase();
+    const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+    const endMonth = endDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
     const startYear = startDate.getFullYear();
     const endYear = endDate.getFullYear();
 
@@ -404,10 +382,7 @@ export default function AdminDashboardScreen() {
 
         <View style={styles.premiumProgress}>
           <View
-            style={[
-              styles.premiumProgressBar,
-              { width: `${(new Date().getDay() / 6) * 100}%` },
-            ]}
+            style={[styles.premiumProgressBar, { width: `${(new Date().getDay() / 6) * 100}%` }]}
           />
         </View>
 
@@ -415,9 +390,7 @@ export default function AdminDashboardScreen() {
           {weekDays.map((day, index) => {
             const dayDate = dateUtils.addDays(startDate, index);
             const dayNumber = dayDate.getDate();
-            const isToday =
-              dateUtils.isCurrentWeek(weekAnchor) &&
-              dateUtils.isToday(dayDate);
+            const isToday = dateUtils.isCurrentWeek(weekAnchor) && dateUtils.isToday(dayDate);
 
             const dayAppointments = appointmentsWeek.filter(item => {
               const itemDate = new Date(item.startAtMs);
@@ -434,27 +407,14 @@ export default function AdminDashboardScreen() {
                 style={[styles.premiumDay, isToday && styles.premiumDayToday]}
                 activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    styles.premiumDayName,
-                    isToday && styles.premiumDayTextToday,
-                  ]}
-                >
+                <Text style={[styles.premiumDayName, isToday && styles.premiumDayTextToday]}>
                   {day}
                 </Text>
-                <Text
-                  style={[
-                    styles.premiumDayNumber,
-                    isToday && styles.premiumDayTextToday,
-                  ]}
-                >
+                <Text style={[styles.premiumDayNumber, isToday && styles.premiumDayTextToday]}>
                   {dayNumber}
                 </Text>
                 <View
-                  style={[
-                    styles.premiumDayDot,
-                    dayAppointments > 0 && styles.premiumDayDotActive,
-                  ]}
+                  style={[styles.premiumDayDot, dayAppointments > 0 && styles.premiumDayDotActive]}
                 />
               </TouchableOpacity>
             );
@@ -517,12 +477,7 @@ export default function AdminDashboardScreen() {
             <Text style={styles.serviceName} numberOfLines={2}>
               {item.serviceLabel ?? 'Serviço'}
             </Text>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: `${statusConfig.color}20` },
-              ]}
-            >
+            <View style={[styles.statusBadge, { backgroundColor: `${statusConfig.color}20` }]}>
               <StatusIcon size={14} color={statusConfig.color} />
               <Text style={[styles.statusText, { color: statusConfig.color }]}>
                 {statusConfig.label}
@@ -537,15 +492,11 @@ export default function AdminDashboardScreen() {
           <View style={styles.detailsRow}>
             <View style={styles.detailItem}>
               <Calendar size={14} color={colors.text.tertiary} />
-              <Text style={styles.detailText}>
-                {dateUtils.formatDate(item.startAtMs)}
-              </Text>
+              <Text style={styles.detailText}>{dateUtils.formatDate(item.startAtMs)}</Text>
             </View>
             <View style={styles.detailItem}>
               <Clock size={14} color={colors.text.tertiary} />
-              <Text style={styles.detailText}>
-                {dateUtils.formatHour(item.startAtMs)}
-              </Text>
+              <Text style={styles.detailText}>{dateUtils.formatHour(item.startAtMs)}</Text>
             </View>
           </View>
 
@@ -562,9 +513,7 @@ export default function AdminDashboardScreen() {
                   { backgroundColor: action.color },
                   (!canPress || isNoShow) && styles.actionButtonDisabled,
                 ]}
-                onPress={() =>
-                  isNoShow ? alertCannotWork() : doUpdate(item, action.next)
-                }
+                onPress={() => (isNoShow ? alertCannotWork() : doUpdate(item, action.next))}
                 disabled={!canPress || isNoShow}
                 activeOpacity={0.7}
               >
@@ -586,10 +535,7 @@ export default function AdminDashboardScreen() {
 
   return (
     <>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={colors.primary.main}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.container}>
           <LinearGradient
@@ -599,11 +545,7 @@ export default function AdminDashboardScreen() {
             style={styles.header}
           >
             <View style={styles.headerTop}>
-              <TouchableOpacity
-                onPress={toggleMenu}
-                style={styles.menuButton}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
                 <View style={styles.menuIcon}>
                   <View style={styles.menuBar} />
                   <View style={[styles.menuBar, { width: 20 }]} />
@@ -665,18 +607,14 @@ export default function AdminDashboardScreen() {
                 data={appointmentsWeek}
                 keyExtractor={item => item.id}
                 renderItem={renderAppointment}
-                ItemSeparatorComponent={() => (
-                  <View style={{ height: spacing.md }} />
-                )}
+                ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={<WeekHeaderPremium />}
                 ListEmptyComponent={
                   <View style={styles.emptyState}>
                     <Calendar size={48} color={colors.text.disabled} />
-                    <Text style={styles.emptyStateTitle}>
-                      Nenhum agendamento
-                    </Text>
+                    <Text style={styles.emptyStateTitle}>Nenhum agendamento</Text>
                     <Text style={styles.emptyStateText}>
                       Não há serviços agendados para esta semana.
                     </Text>
@@ -690,21 +628,14 @@ export default function AdminDashboardScreen() {
         {menuVisible && (
           <>
             <Pressable style={styles.overlay} onPress={toggleMenu} />
-            <Animated.View
-              style={[
-                styles.drawer,
-                { transform: [{ translateX: slideAnim }] },
-              ]}
-            >
+            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
               <View style={styles.drawerHeader}>
                 <View style={styles.drawerUserInfo}>
                   <Text style={styles.drawerUserName}>{fullName}</Text>
                   <Text style={styles.drawerUserEmail}>{user.email}</Text>
                   {profile.role === 'owner' && (
                     <View style={styles.drawerAdminBadge}>
-                      <Text style={styles.drawerAdminBadgeText}>
-                        Proprietário
-                      </Text>
+                      <Text style={styles.drawerAdminBadgeText}>Proprietário</Text>
                     </View>
                   )}
                 </View>
@@ -742,11 +673,7 @@ export default function AdminDashboardScreen() {
                   onPress={handleSignOut}
                 >
                   <LogOut size={22} color={colors.status.error} />
-                  <Text
-                    style={[styles.drawerItemText, styles.drawerLogoutText]}
-                  >
-                    Sair
-                  </Text>
+                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>

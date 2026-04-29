@@ -136,23 +136,17 @@ export default function AdminManageScreen() {
     if (!settings) return;
     const val = settings[field] + dir;
     if (val < 0 || val > 23) return;
-    setSettings(prev => prev ? { ...prev, [field]: val } : prev);
+    setSettings(prev => (prev ? { ...prev, [field]: val } : prev));
   };
 
   const stepCapacity = (dir: 1 | -1) => {
     if (!settings) return;
     const val = settings.parallelCapacity + dir;
     if (val < 1 || val > 10) return;
-    setSettings(prev => prev ? { ...prev, parallelCapacity: val } : prev);
+    setSettings(prev => (prev ? { ...prev, parallelCapacity: val } : prev));
   };
 
-  const HourStepper = ({
-    label,
-    field,
-  }: {
-    label: string;
-    field: 'openHour' | 'closeHour';
-  }) => (
+  const HourStepper = ({ label, field }: { label: string; field: 'openHour' | 'closeHour' }) => (
     <View style={styles.stepperRow}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <View style={styles.stepper}>
@@ -163,9 +157,7 @@ export default function AdminManageScreen() {
         >
           <ChevronDown size={18} color={colors.primary.main} />
         </TouchableOpacity>
-        <Text style={styles.stepperValue}>
-          {formatUtils.padZero(settings?.[field] ?? 0)}:00
-        </Text>
+        <Text style={styles.stepperValue}>{formatUtils.padZero(settings?.[field] ?? 0)}:00</Text>
         <TouchableOpacity
           style={styles.stepperBtn}
           onPress={() => stepHour(field, 1)}
@@ -193,10 +185,7 @@ export default function AdminManageScreen() {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* ── Código de convite ── */}
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
@@ -206,18 +195,20 @@ export default function AdminManageScreen() {
               <Text style={styles.cardTitle}>Código de convite</Text>
             </View>
             <Text style={styles.cardDesc}>
-              Compartilhe este código com seus clientes para que eles possam se cadastrar na sua loja.
+              Compartilhe este código com seus clientes para que eles possam se cadastrar na sua
+              loja.
             </Text>
 
             <View style={styles.codeBox}>
-              {shop?.code
-                ? shop.code.split('').map((char, i) => (
-                    <View key={i} style={styles.codeLetter}>
-                      <Text style={styles.codeLetterText}>{char}</Text>
-                    </View>
-                  ))
-                : <ActivityIndicator color={colors.primary.main} />
-              }
+              {shop?.code ? (
+                shop.code.split('').map((char, i) => (
+                  <View key={i} style={styles.codeLetter}>
+                    <Text style={styles.codeLetterText}>{char}</Text>
+                  </View>
+                ))
+              ) : (
+                <ActivityIndicator color={colors.primary.main} />
+              )}
             </View>
 
             <View style={styles.codeActions}>
@@ -226,10 +217,11 @@ export default function AdminManageScreen() {
                 onPress={handleCopyCode}
                 activeOpacity={0.8}
               >
-                {copied
-                  ? <Check size={16} color={colors.status.success} />
-                  : <Copy size={16} color={colors.primary.main} />
-                }
+                {copied ? (
+                  <Check size={16} color={colors.status.success} />
+                ) : (
+                  <Copy size={16} color={colors.primary.main} />
+                )}
                 <Text style={[styles.codeActionText, copied && { color: colors.status.success }]}>
                   {copied ? 'Compartilhado!' : 'Compartilhar'}
                 </Text>
@@ -241,9 +233,7 @@ export default function AdminManageScreen() {
                 activeOpacity={0.8}
               >
                 <MessageCircle size={16} color="#FFFFFF" />
-                <Text style={[styles.codeActionText, { color: '#FFFFFF' }]}>
-                  WhatsApp
-                </Text>
+                <Text style={[styles.codeActionText, { color: '#FFFFFF' }]}>WhatsApp</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -268,10 +258,7 @@ export default function AdminManageScreen() {
             />
 
             <TouchableOpacity
-              style={[
-                styles.saveBtn,
-                (!shopName.trim() || savingName) && styles.saveBtnDisabled,
-              ]}
+              style={[styles.saveBtn, (!shopName.trim() || savingName) && styles.saveBtnDisabled]}
               onPress={handleSaveName}
               disabled={!shopName.trim() || savingName}
               activeOpacity={0.8}
@@ -299,7 +286,10 @@ export default function AdminManageScreen() {
             </View>
 
             {loadingSettings ? (
-              <ActivityIndicator color={colors.primary.main} style={{ marginVertical: spacing.lg }} />
+              <ActivityIndicator
+                color={colors.primary.main}
+                style={{ marginVertical: spacing.lg }}
+              />
             ) : settings ? (
               <>
                 <HourStepper label="Abertura" field="openHour" />
@@ -314,12 +304,9 @@ export default function AdminManageScreen() {
                     {SLOT_STEP_OPTIONS.map(opt => (
                       <TouchableOpacity
                         key={opt}
-                        style={[
-                          styles.pill,
-                          settings.slotStepMin === opt && styles.pillActive,
-                        ]}
+                        style={[styles.pill, settings.slotStepMin === opt && styles.pillActive]}
                         onPress={() =>
-                          setSettings(prev => prev ? { ...prev, slotStepMin: opt } : prev)
+                          setSettings(prev => (prev ? { ...prev, slotStepMin: opt } : prev))
                         }
                         activeOpacity={0.7}
                       >

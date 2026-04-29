@@ -37,10 +37,6 @@ export function getEffectiveStatus(
   return status;
 }
 
-export function filterActiveAppointments<T extends { status: string }>(
-  appointments: T[],
-): T[] {
-  return appointments.filter(
-    item => item.status === 'scheduled' || item.status === 'in_progress',
-  );
+export function filterActiveAppointments<T extends { status: string }>(appointments: T[]): T[] {
+  return appointments.filter(item => item.status === 'scheduled' || item.status === 'in_progress');
 }

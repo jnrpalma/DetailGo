@@ -43,18 +43,12 @@ function validateAndMergeSettings(data: Partial<ShopSettings>): ShopSettings {
   return {
     openHour: validateHour(data?.openHour) ?? DEFAULT_SETTINGS.openHour,
     closeHour: validateHour(data?.closeHour) ?? DEFAULT_SETTINGS.closeHour,
-    slotStepMin:
-      validateSlotStep(data?.slotStepMin) ?? DEFAULT_SETTINGS.slotStepMin,
-    parallelCapacity:
-      validateCapacity(data?.parallelCapacity) ??
-      DEFAULT_SETTINGS.parallelCapacity,
+    slotStepMin: validateSlotStep(data?.slotStepMin) ?? DEFAULT_SETTINGS.slotStepMin,
+    parallelCapacity: validateCapacity(data?.parallelCapacity) ?? DEFAULT_SETTINGS.parallelCapacity,
   };
 }
 
-function hasSettingsChanged(
-  old: Partial<ShopSettings>,
-  newSettings: ShopSettings,
-): boolean {
+function hasSettingsChanged(old: Partial<ShopSettings>, newSettings: ShopSettings): boolean {
   return (Object.keys(newSettings) as Array<keyof ShopSettings>).some(
     key => old[key] !== newSettings[key],
   );
@@ -86,11 +80,7 @@ export async function ensureShopSettings(shopId: string): Promise<{
     const merged = validateAndMergeSettings(data);
 
     if (hasSettingsChanged(data, merged)) {
-      await setDoc(
-        ref,
-        { ...merged, updatedAt: serverTimestamp() },
-        { merge: true },
-      );
+      await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
     }
 
     return { created: false, settings: merged };
@@ -113,11 +103,7 @@ export async function updateShopSettings(
   const current = await getShopSettings(shopId);
   const merged = validateAndMergeSettings({ ...current, ...updates });
 
-  await setDoc(
-    ref,
-    { ...merged, updatedAt: serverTimestamp() },
-    { merge: true },
-  );
+  await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
 
   return merged;
 }

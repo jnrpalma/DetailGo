@@ -48,9 +48,7 @@ export function useCustomerName() {
             firstName?: string;
             lastName?: string;
           };
-          return (
-            `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente'
-          );
+          return `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() || 'Cliente';
         } catch {
           return 'Cliente';
         }

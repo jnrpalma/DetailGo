@@ -26,18 +26,13 @@ export default function AppointmentCard({ item }: Props) {
           {item.serviceLabel ?? 'Serviço'}
         </Text>
         <Text style={styles.cardSubtitle}>{subtitle}</Text>
-        <Text style={[styles.status, { color: statusConfig.color }]}>
-          {statusConfig.label}
-        </Text>
+        <Text style={[styles.status, { color: statusConfig.color }]}>{statusConfig.label}</Text>
       </View>
 
       <View style={styles.cardRight}>
-        <Text style={styles.cardPrice}>
-          +{formatUtils.currencyCompact(item.price)}
-        </Text>
+        <Text style={styles.cardPrice}>+{formatUtils.currencyCompact(item.price)}</Text>
         <Text style={styles.cardDate}>
-          {dateUtils.formatDate(item.startAtMs)} •{' '}
-          {dateUtils.formatHour(item.startAtMs)}
+          {dateUtils.formatDate(item.startAtMs)} • {dateUtils.formatHour(item.startAtMs)}
         </Text>
       </View>
     </View>

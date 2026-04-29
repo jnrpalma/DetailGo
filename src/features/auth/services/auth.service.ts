@@ -31,7 +31,7 @@ export type RegisterInput = {
   phone: string;
   password: string;
   role: UserRole;
-  shopName?: string;   // obrigatório para owner
+  shopName?: string; // obrigatório para owner
   inviteCode?: string; // obrigatório para customer
 };
 
@@ -43,7 +43,6 @@ export type AuthResult =
       inviteCode?: string;
     }
   | { ok: false; message: string; code?: string };
-
 
 async function findShopByCode(inviteCode: string): Promise<string | null> {
   const db = getFirestore();
@@ -57,10 +56,7 @@ async function findShopByCode(inviteCode: string): Promise<string | null> {
   return snap.docs[0].id;
 }
 
-async function registerAsOwner(
-  uid: string,
-  data: RegisterInput,
-): Promise<string> {
+async function registerAsOwner(uid: string, data: RegisterInput): Promise<string> {
   const db = getFirestore();
   const shopRef = doc(collection(db, 'shops'));
   const shopId = shopRef.id;
@@ -106,10 +102,7 @@ async function registerAsOwner(
   return code;
 }
 
-async function registerAsCustomer(
-  uid: string,
-  data: RegisterInput,
-): Promise<void> {
+async function registerAsCustomer(uid: string, data: RegisterInput): Promise<void> {
   const db = getFirestore();
   await setDoc(
     doc(db, 'users', uid),
@@ -127,10 +120,7 @@ async function registerAsCustomer(
   );
 }
 
-export async function signIn(
-  email: string,
-  password: string,
-): Promise<AuthResult> {
+export async function signIn(email: string, password: string): Promise<AuthResult> {
   try {
     const auth = getAuth();
     const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -147,11 +137,7 @@ export async function signIn(
 export async function register(data: RegisterInput): Promise<AuthResult> {
   try {
     const auth = getAuth();
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      data.email.trim(),
-      data.password,
-    );
+    const cred = await createUserWithEmailAndPassword(auth, data.email.trim(), data.password);
 
     const displayName = `${data.firstName} ${data.lastName}`.trim();
     if (displayName) await updateProfile(cred.user, { displayName });
@@ -180,8 +166,6 @@ export function getCurrentUser(): FirebaseAuthTypes.User | null {
   return getAuth().currentUser;
 }
 
-export function subscribeAuth(
-  callback: (user: FirebaseAuthTypes.User | null) => void,
-) {
+export function subscribeAuth(callback: (user: FirebaseAuthTypes.User | null) => void) {
   return onAuthStateChanged(getAuth(), callback);
 }

@@ -38,24 +38,31 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 type FilterId = 'all' | 'done' | 'no_show' | 'cancelled';
 
 const FILTER_OPTIONS: { id: FilterId; label: string }[] = [
-  { id: 'all',       label: 'Todos'          },
-  { id: 'done',      label: 'Concluídos'     },
-  { id: 'no_show',   label: 'Não realizados' },
-  { id: 'cancelled', label: 'Cancelados'     },
+  { id: 'all', label: 'Todos' },
+  { id: 'done', label: 'Concluídos' },
+  { id: 'no_show', label: 'Não realizados' },
+  { id: 'cancelled', label: 'Cancelados' },
 ];
 
-const STATUS_CONFIG: Partial<Record<AppointmentStatus, {
-  label: string; color: string; icon: any;
-}>> = {
-  done:      { label: 'Concluído',     color: colors.status.success, icon: CheckCircle2 },
-  no_show:   { label: 'Não realizado', color: colors.status.error,   icon: XCircle      },
-  cancelled: { label: 'Cancelado',     color: colors.text.disabled,  icon: Ban          },
+const STATUS_CONFIG: Partial<
+  Record<
+    AppointmentStatus,
+    {
+      label: string;
+      color: string;
+      icon: any;
+    }
+  >
+> = {
+  done: { label: 'Concluído', color: colors.status.success, icon: CheckCircle2 },
+  no_show: { label: 'Não realizado', color: colors.status.error, icon: XCircle },
+  cancelled: { label: 'Cancelado', color: colors.text.disabled, icon: Ban },
 };
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NavProp>();
   const auth = getAuth();
-  const uid  = auth.currentUser?.uid;
+  const uid = auth.currentUser?.uid;
   const { shopId } = useShop();
   const [filter, setFilter] = useState<FilterId>('all');
 
@@ -66,11 +73,9 @@ export default function HistoryScreen() {
     limitN: 50,
   });
 
-  const filteredItems = filter === 'all'
-    ? items
-    : items.filter(it => it.status === filter);
+  const filteredItems = filter === 'all' ? items : items.filter(it => it.status === filter);
 
-  const totalDone  = items.filter(i => i.status === 'done').length;
+  const totalDone = items.filter(i => i.status === 'done').length;
   const totalSpent = items
     .filter(i => i.status === 'done')
     .reduce((acc, i) => acc + (i.price ?? 0), 0);
@@ -81,7 +86,7 @@ export default function HistoryScreen() {
         ? `Carro • ${item.carCategory}`
         : item.vehicleType;
 
-    const cfg        = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
+    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
     const StatusIcon = cfg.icon;
 
     return (
@@ -90,19 +95,14 @@ export default function HistoryScreen() {
           <Text style={styles.cardService} numberOfLines={1}>
             {item.serviceLabel ?? 'Serviço'}
           </Text>
-          <Text style={[
-            styles.cardPrice,
-            item.status !== 'done' && styles.cardPriceMuted,
-          ]}>
+          <Text style={[styles.cardPrice, item.status !== 'done' && styles.cardPriceMuted]}>
             {formatUtils.currencyCompact(item.price)}
           </Text>
         </View>
 
         <View style={[styles.statusBadge, { backgroundColor: `${cfg.color}15` }]}>
           <StatusIcon size={12} color={cfg.color} />
-          <Text style={[styles.statusLabel, { color: cfg.color }]}>
-            {cfg.label}
-          </Text>
+          <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
         </View>
 
         <View style={styles.cardDivider} />
@@ -110,15 +110,11 @@ export default function HistoryScreen() {
         <View style={styles.cardMeta}>
           <View style={styles.metaItem}>
             <Calendar size={13} color={colors.text.tertiary} />
-            <Text style={styles.metaText}>
-              {dateUtils.formatDate(item.startAtMs)}
-            </Text>
+            <Text style={styles.metaText}>{dateUtils.formatDate(item.startAtMs)}</Text>
           </View>
           <View style={styles.metaItem}>
             <Clock size={13} color={colors.text.tertiary} />
-            <Text style={styles.metaText}>
-              {dateUtils.formatHour(item.startAtMs)}
-            </Text>
+            <Text style={styles.metaText}>{dateUtils.formatHour(item.startAtMs)}</Text>
           </View>
           <View style={styles.vehicleChip}>
             <Text style={styles.vehicleChipText}>{subtitle}</Text>
@@ -142,7 +138,6 @@ export default function HistoryScreen() {
     <>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -166,9 +161,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>
-                {formatUtils.currency(totalSpent)}
-              </Text>
+              <Text style={styles.summaryValue}>{formatUtils.currency(totalSpent)}</Text>
               <Text style={styles.summaryLabel}>investidos</Text>
             </View>
           </View>

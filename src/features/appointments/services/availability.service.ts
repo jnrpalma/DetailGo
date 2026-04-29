@@ -23,8 +23,7 @@ import type {
 import { APPOINTMENT } from '@features/appointments/domain/appointment.constants';
 import { dateUtils } from '@shared/utils/date.utils';
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 export type Slot = {
   startAtMs: number;
@@ -61,12 +60,7 @@ export class AvailabilityError extends Error {
   }
 }
 
-function overlaps(
-  aStart: number,
-  aEnd: number,
-  bStart: number,
-  bEnd: number,
-): boolean {
+function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
 
@@ -124,11 +118,7 @@ async function getScheduledAppointmentsForDay(
   return snapRange.docs.map((d: QDoc) => d.data() as AppointmentDoc);
 }
 
-function generateSlots(
-  day: Date,
-  settings: ShopSettings,
-  durationMin: number,
-): Slot[] {
+function generateSlots(day: Date, settings: ShopSettings, durationMin: number): Slot[] {
   const open = new Date(day);
   open.setHours(settings.openHour, 0, 0, 0);
 
@@ -158,9 +148,7 @@ function filterAvailableSlots(
   return slots.filter(slot => {
     let concurrent = 0;
     for (const appt of appointments) {
-      if (
-        overlaps(appt.startAtMs, appt.endAtMs, slot.startAtMs, slot.endAtMs)
-      ) {
+      if (overlaps(appt.startAtMs, appt.endAtMs, slot.startAtMs, slot.endAtMs)) {
         concurrent += 1;
         if (concurrent >= capacity) return false;
       }
@@ -179,12 +167,7 @@ export async function getAvailableSlotsForDay(
   const dayStart = dateUtils.startOfDay(day);
   const dayEnd = dateUtils.endOfDay(day);
 
-  const appointments = await getScheduledAppointmentsForDay(
-    shopId,
-    dayKey,
-    dayStart,
-    dayEnd,
-  );
+  const appointments = await getScheduledAppointmentsForDay(shopId, dayKey, dayStart, dayEnd);
 
   const allSlots = generateSlots(day, settings, durationMin);
 
@@ -213,9 +196,7 @@ async function getCustomerName(customerUid: string): Promise<string> {
   return fullName || 'Cliente';
 }
 
-export async function createAppointmentWithCapacityCheck(
-  input: AppointmentCreateInput,
-) {
+export async function createAppointmentWithCapacityCheck(input: AppointmentCreateInput) {
   const db = getFirestore();
   const { shopId } = input;
   const settings = await getShopSettings(shopId);
@@ -229,17 +210,11 @@ export async function createAppointmentWithCapacityCheck(
   };
 
   if (!isNotInPast(slot)) {
-    throw new AvailabilityError(
-      'Não é possível agendar para horários passados',
-      'PAST_DATE',
-    );
+    throw new AvailabilityError('Não é possível agendar para horários passados', 'PAST_DATE');
   }
 
   if (!isWithinBusinessHours(slot, settings)) {
-    throw new AvailabilityError(
-      'Horário fora do expediente',
-      'OUTSIDE_BUSINESS_HOURS',
-    );
+    throw new AvailabilityError('Horário fora do expediente', 'OUTSIDE_BUSINESS_HOURS');
   }
 
   return runTransaction(db, async tx => {
@@ -280,13 +255,7 @@ export async function createAppointmentWithCapacityCheck(
       createdAt: serverTimestamp(),
     });
 
-    const userRef = doc(
-      db,
-      'users',
-      input.customerUid,
-      'appointments',
-      apptRef.id,
-    );
+    const userRef = doc(db, 'users', input.customerUid, 'appointments', apptRef.id);
     tx.set(userRef, {
       dayKey,
       shopId,

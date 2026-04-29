@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { getAuth } from '@react-native-firebase/auth';
 import {
@@ -20,11 +14,10 @@ export type { RegisterInput };
 type AuthContextValue = {
   user: FirebaseAuthTypes.User | null;
   initializing: boolean;
-  signIn: (
-    email: string,
-    password: string,
-  ) => Promise<{ ok: boolean; message?: string }>;
-  register: (data: RegisterInput) => Promise<{ ok: boolean; message?: string; inviteCode?: string }>;
+  signIn: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
+  register: (
+    data: RegisterInput,
+  ) => Promise<{ ok: boolean; message?: string; inviteCode?: string }>;
   signOut: () => Promise<void>;
 };
 

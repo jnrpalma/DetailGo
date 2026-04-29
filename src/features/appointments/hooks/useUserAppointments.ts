@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 
-import type {
-  AppointmentStatus,
-  UserAppointment,
-} from '../domain/appointment.types';
+import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
 import { watchUserAppointmentsWithFallback } from '../data/appointmentsRepo';
 import { getEffectiveStatus } from '../domain/appointment.helpers';
 
@@ -21,10 +18,7 @@ export function useUserAppointments(params: Params) {
   const [items, setItems] = useState<UserAppointment[]>([]);
   const [version, setVersion] = useState(0);
 
-  const statusSet = useMemo(
-    () => new Set<AppointmentStatus>(statusIn ?? []),
-    [statusIn],
-  );
+  const statusSet = useMemo(() => new Set<AppointmentStatus>(statusIn ?? []), [statusIn]);
 
   const mutate = useCallback(() => {
     setVersion(v => v + 1);

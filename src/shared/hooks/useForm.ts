@@ -15,37 +15,43 @@ type Touched<T> = Partial<Record<keyof T, boolean>>;
 
 export function useForm<T extends Record<string, any>>(
   initialValues: T,
-  validationRules?: ValidationRules<T>
+  validationRules?: ValidationRules<T>,
 ) {
   const [values, setValues] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Errors<T>>({});
   const [touched, setTouched] = useState<Touched<T>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = useCallback((field: keyof T, value: any) => {
-    setValues(prev => ({ ...prev, [field]: value }));
-    
-    // Limpar erro do campo ao digitar
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof T, value: any) => {
+      setValues(prev => ({ ...prev, [field]: value }));
+
+      // Limpar erro do campo ao digitar
+      if (errors[field]) {
+        setErrors(prev => ({ ...prev, [field]: undefined }));
+      }
+    },
+    [errors],
+  );
 
   const handleBlur = useCallback((field: keyof T) => {
     setTouched(prev => ({ ...prev, [field]: true }));
   }, []);
 
-  const validateField = useCallback((field: keyof T, value: any): string | undefined => {
-    if (!validationRules || !validationRules[field]) return undefined;
+  const validateField = useCallback(
+    (field: keyof T, value: any): string | undefined => {
+      if (!validationRules || !validationRules[field]) return undefined;
 
-    const rules = validationRules[field]!;
-    for (const rule of rules) {
-      if (!rule.validate(value)) {
-        return rule.message;
+      const rules = validationRules[field]!;
+      for (const rule of rules) {
+        if (!rule.validate(value)) {
+          return rule.message;
+        }
       }
-    }
-    return undefined;
-  }, [validationRules]);
+      return undefined;
+    },
+    [validationRules],
+  );
 
   const validateForm = useCallback((): boolean => {
     if (!validationRules) return true;
@@ -76,11 +82,14 @@ export function useForm<T extends Record<string, any>>(
     setIsSubmitting(false);
   }, [initialValues]);
 
-  const resetField = useCallback((field: keyof T) => {
-    setValues(prev => ({ ...prev, [field]: initialValues[field] }));
-    setErrors(prev => ({ ...prev, [field]: undefined }));
-    setTouched(prev => ({ ...prev, [field]: false }));
-  }, [initialValues]);
+  const resetField = useCallback(
+    (field: keyof T) => {
+      setValues(prev => ({ ...prev, [field]: initialValues[field] }));
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setTouched(prev => ({ ...prev, [field]: false }));
+    },
+    [initialValues],
+  );
 
   return {
     values,

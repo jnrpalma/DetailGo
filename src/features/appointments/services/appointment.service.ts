@@ -68,9 +68,7 @@ export function getAppointmentRules(appointment: {
       canCancel: !passedTime,
       canReschedule: true,
       isExpired: passedTime,
-      message: passedTime
-        ? 'Horário já passou. Você pode reagendar, mas não cancelar.'
-        : undefined,
+      message: passedTime ? 'Horário já passou. Você pode reagendar, mas não cancelar.' : undefined,
     };
   }
 
@@ -115,13 +113,7 @@ export async function cancelAppointment(
       };
     }
 
-    const userAppointmentRef = doc(
-      db,
-      'users',
-      customerUid,
-      'appointments',
-      appointmentId,
-    );
+    const userAppointmentRef = doc(db, 'users', customerUid, 'appointments', appointmentId);
     const batch = writeBatch(db);
 
     batch.update(appointmentRef, {
