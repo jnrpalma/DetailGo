@@ -96,5 +96,5 @@ yarn-error.log
 !.yarn/sdks
 !.yarn/versions
 
-# Claude Code worktrees (pastas temporárias de desenvolvimento)
-.claude/worktrees/
+# Claude Code (pastas temporárias de desenvolvimento)
+.claude/
