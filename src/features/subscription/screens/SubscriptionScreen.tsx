@@ -33,7 +33,7 @@ import { useAuth } from '@features/auth';
 
 // ── Configurações ──────────────────────────────────────────────────────────
 const PIX_NAME = 'DetailGo';
-const PLAN_PRICE = 'R$ 89,00/mês';
+const PLAN_PRICE = 'R$ 0,01/mês'; // DEV: mudar para R$ 89,00/mês antes de lançar
 const WHATSAPP_NUMBER = '5511996784399';
 const CREATE_PIX_URL =
   'https://us-central1-magic-auto.cloudfunctions.net/createPixCharge';
@@ -170,7 +170,7 @@ export default function SubscriptionScreen() {
             )}
 
             <View style={styles.priceBox}>
-              <Text style={styles.price}>R$ 89</Text>
+              <Text style={styles.price}>R$ 0,01</Text>
               <View>
                 <Text style={styles.pricePer}>/mês</Text>
                 <Text style={styles.priceSub}>sem contrato</Text>
