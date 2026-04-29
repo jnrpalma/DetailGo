@@ -7,22 +7,47 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Mail, Lock, User, Phone, Store, ChevronRight } from 'lucide-react-native';
+import {
+  ArrowRight,
+  ArrowLeft,
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Store,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+} from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
 import type { RegisterInput, UserRole } from '@features/auth/services/auth.service';
-import { colors, radii, spacing } from '@shared/theme';
 import { useForm } from '@shared/hooks/useForm';
-import { Input } from '@shared/components/Input';
 import { validationUtils, validationMessages } from '@shared/utils/validation.utils';
 import { formatUtils } from '@shared/utils/format.utils';
+
+// ── Garage Dark palette ───────────────────────────────────────
+const D = {
+  bg: '#0B0D0E',
+  card: '#191D20',
+  ink: '#F5F7F8',
+  ink2: '#A8B0B4',
+  ink3: '#6B7378',
+  primary: '#D4FF3D',
+  primaryL: 'rgba(212,255,61,0.12)',
+  border: 'rgba(255,255,255,0.08)',
+  borderFocus: 'rgba(212,255,61,0.5)',
+  accent: '#FF5C39',
+} as const;
+// ─────────────────────────────────────────────────────────────
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,12 +62,31 @@ type RegisterForm = {
   inviteCode: string;
 };
 
+const ACCOUNT_TYPES = [
+  {
+    key: 'customer' as UserRole,
+    label: 'Cliente',
+    desc: 'Quero agendar serviços para o meu carro.',
+    badge: 'GRÁTIS',
+    Icon: User,
+  },
+  {
+    key: 'owner' as UserRole,
+    label: 'Dono de estética',
+    desc: 'Tenho um negócio e quero gerenciar agenda.',
+    badge: 'PRO · R$ 89/mês',
+    Icon: Store,
+  },
+];
+
 export default function RegisterScreen() {
   const navigation = useNavigation<NavProp>();
   const { register } = useAuth();
 
   const [accountType, setAccountType] = useState<UserRole | null>(null);
   const [displayPhone, setDisplayPhone] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const validationRules = {
     firstName: [
@@ -127,20 +171,16 @@ export default function RegisterScreen() {
       values.password &&
       values.confirmPassword &&
       !isSubmitting;
-
     return !!baseOk;
   }, [errors, values, isSubmitting, accountType]);
 
   const handlePhoneChange = (text: string) => {
-    const masked = formatUtils.phoneMask(text);
-    setDisplayPhone(masked);
-    const digits = formatUtils.phoneDigits(text);
-    handleChange('phone', digits);
+    setDisplayPhone(formatUtils.phoneMask(text));
+    handleChange('phone', formatUtils.phoneDigits(text));
   };
 
   const handleSubmit = async () => {
-    if (!accountType) return;
-    if (!validateForm()) return;
+    if (!accountType || !validateForm()) return;
 
     setIsSubmitting(true);
     const data: RegisterInput = {
@@ -151,7 +191,6 @@ export default function RegisterScreen() {
       password: values.password,
       role: accountType,
       shopName: accountType === 'owner' ? values.shopName.trim() || 'Minha Estética' : undefined,
-      inviteCode: accountType === 'customer' ? values.inviteCode.trim().toUpperCase() : undefined,
     };
 
     const res = await register(data);
@@ -169,83 +208,84 @@ export default function RegisterScreen() {
     if (accountType === 'owner' && res.inviteCode) {
       Alert.alert(
         'Estética criada!',
-        `Seu código de convite é:\n\n${res.inviteCode}\n\nCompartilhe este código com seus clientes para que eles possam se cadastrar na sua loja.\n\nVocê também encontra o código em Gerenciar Loja.`,
-        [{ text: 'Entendi!' }],
+        `Seu código de convite é:\n\n${res.inviteCode}\n\nCompartilhe com seus clientes. Também disponível em Gerenciar Loja.`,
+        [{ text: 'Entendido!' }],
       );
     } else {
       Alert.alert(
         'Conta criada!',
-        'Cadastro realizado com sucesso!\n\nPara agendar serviços, peça o código de convite da estética no seu dashboard.',
+        'Peça o código de convite da estética no seu dashboard para agendar serviços.',
         [{ text: 'OK' }],
       );
     }
   };
 
+  // ── Step 1: Seleção de tipo ────────────────────────────────
   if (!accountType) {
     return (
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.brand}>DETAILGO</Text>
-            <Text style={styles.title}>Criar conta</Text>
-            <Text style={styles.subtitle}>Como você vai usar o DetailGo?</Text>
+          {/* Header */}
+          <View style={styles.step1Header}>
+            <Text style={styles.stepIndicator}>01 / 02 · TIPO</Text>
+            <Text style={styles.step1Title}>Como você usa o DetailGo?</Text>
+            <Text style={styles.step1Sub}>Escolha um perfil para começar.</Text>
           </View>
 
+          {/* Cards */}
           <View style={styles.typeCards}>
-            <TouchableOpacity
-              style={styles.typeCard}
-              onPress={() => setAccountType('owner')}
-              activeOpacity={0.85}
-            >
-              <View style={[styles.typeIconWrap, { backgroundColor: colors.primary.light }]}>
-                <Store size={32} color={colors.primary.main} />
-              </View>
-              <View style={styles.typeCardText}>
-                <Text style={styles.typeCardTitle}>Sou proprietário</Text>
-                <Text style={styles.typeCardDesc}>
-                  Tenho uma estética automotiva e quero gerenciar meus agendamentos
-                </Text>
-              </View>
-              <ChevronRight size={20} color={colors.text.tertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.typeCard}
-              onPress={() => setAccountType('customer')}
-              activeOpacity={0.85}
-            >
-              <View style={[styles.typeIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                <User size={32} color={colors.status.success} />
-              </View>
-              <View style={styles.typeCardText}>
-                <Text style={styles.typeCardTitle}>Sou cliente</Text>
-                <Text style={styles.typeCardDesc}>
-                  Quero agendar serviços em uma estética automotiva
-                </Text>
-              </View>
-              <ChevronRight size={20} color={colors.text.tertiary} />
-            </TouchableOpacity>
+            {ACCOUNT_TYPES.map(type => {
+              const sel = accountType === type.key;
+              return (
+                <TouchableOpacity
+                  key={type.key}
+                  style={[styles.typeCard, sel && styles.typeCardSel]}
+                  onPress={() => setAccountType(type.key)}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.typeIconWrap, sel && styles.typeIconWrapSel]}>
+                    <type.Icon size={20} color={sel ? '#0B0D0E' : D.ink} />
+                  </View>
+                  <View style={styles.typeCardBody}>
+                    <View style={styles.typeCardTop}>
+                      <Text style={[styles.typeCardLabel, sel && styles.typeCardLabelSel]}>
+                        {type.label}
+                      </Text>
+                      <Text style={styles.typeCardBadge}>{type.badge}</Text>
+                    </View>
+                    <Text style={styles.typeCardDesc}>{type.desc}</Text>
+                  </View>
+                  <View style={[styles.typeRadio, sel && styles.typeRadioSel]}>
+                    {sel && <CheckCircle2 size={14} color="#0B0D0E" />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Já tem uma conta? </Text>
+          {/* Trial notice */}
+          <View style={styles.trialBox}>
+            <Text style={styles.trialLabel}>TRIAL 14 DIAS</Text>
+            <Text style={styles.trialDesc}>
+              Donos começam com 14 dias grátis. Cancele quando quiser.
+            </Text>
+          </View>
+
+          {/* Login link */}
+          <View style={styles.loginRow}>
+            <Text style={styles.loginText}>Já tem conta? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
               <Text style={styles.loginLink}>Fazer login</Text>
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.footer}>
-            <View style={styles.divider} />
-            <Text style={styles.copyright}>© 2026 DETAILGO</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -254,336 +294,474 @@ export default function RegisterScreen() {
 
   const isOwner = accountType === 'owner';
 
+  // ── Step 2: Formulário ─────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.brand}>DETAILGO</Text>
-          <Text style={styles.title}>{isOwner ? 'Cadastrar estética' : 'Criar conta'}</Text>
-          <Text style={styles.subtitle}>
-            {isOwner
-              ? 'Preencha os dados da sua estética e conta'
-              : 'Preencha seus dados para criar sua conta'}
-          </Text>
+        {/* Header */}
+        <View style={styles.step2Header}>
+          <Text style={styles.stepIndicator}>02 / 02 · CADASTRO</Text>
+          <Text style={styles.step2Title}>{isOwner ? 'Cadastrar\nestética' : 'Criar\nconta'}</Text>
+
+          {/* Type switcher pill */}
+          <TouchableOpacity style={styles.typePill} onPress={() => setAccountType(null)}>
+            <ArrowLeft size={12} color={D.primary} />
+            <Text style={styles.typePillText}>
+              {isOwner ? 'Dono de estética' : 'Cliente'} · trocar
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.backTypeButton}
-          onPress={() => setAccountType(null)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backTypeText}>← {isOwner ? 'Proprietário' : 'Cliente'} · Trocar</Text>
-        </TouchableOpacity>
-
-        <View style={styles.form}>
+        {/* Campos */}
+        <View style={styles.fields}>
           {isOwner && (
-            <Input
-              label="Nome da estética"
+            <DField
+              label="NOME DA ESTÉTICA"
+              icon={<Store size={18} color={D.ink3} />}
               value={values.shopName}
               onChangeText={v => handleChange('shopName', v)}
               onBlur={() => handleBlur('shopName')}
-              error={errors.shopName}
-              touched={touched.shopName}
-              leftIcon={<Store size={20} color={colors.text.tertiary} />}
-              placeholder="Ex: Auto Detailing São Paulo"
-              editable={!isSubmitting}
-              returnKeyType="next"
+              placeholder="Ex: Tirac Auto Detailing"
+              error={touched.shopName ? errors.shopName : undefined}
             />
           )}
 
           <View style={styles.row}>
-            <Input
-              label="Nome"
+            <DField
+              label="NOME"
+              icon={<User size={18} color={D.ink3} />}
               value={values.firstName}
               onChangeText={v => handleChange('firstName', v)}
               onBlur={() => handleBlur('firstName')}
-              error={errors.firstName}
-              touched={touched.firstName}
-              leftIcon={<User size={20} color={colors.text.tertiary} />}
-              placeholder="Seu nome"
-              editable={!isSubmitting}
-              returnKeyType="next"
+              placeholder="Nome"
+              error={touched.firstName ? errors.firstName : undefined}
               containerStyle={styles.col}
             />
-            <Input
-              label="Sobrenome"
+            <DField
+              label="SOBRENOME"
+              icon={<User size={18} color={D.ink3} />}
               value={values.lastName}
               onChangeText={v => handleChange('lastName', v)}
               onBlur={() => handleBlur('lastName')}
-              error={errors.lastName}
-              touched={touched.lastName}
-              leftIcon={<User size={20} color={colors.text.tertiary} />}
-              placeholder="Seu sobrenome"
-              editable={!isSubmitting}
-              returnKeyType="next"
+              placeholder="Sobrenome"
+              error={touched.lastName ? errors.lastName : undefined}
               containerStyle={styles.col}
             />
           </View>
 
-          <Input
-            label="E-mail"
+          <DField
+            label="E-MAIL"
+            icon={<Mail size={18} color={D.ink3} />}
             value={values.email}
             onChangeText={v => handleChange('email', v)}
             onBlur={() => handleBlur('email')}
-            error={errors.email}
-            touched={touched.email}
-            leftIcon={<Mail size={20} color={colors.text.tertiary} />}
             placeholder="seu@email.com"
-            autoCapitalize="none"
-            autoCorrect={false}
             keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-            editable={!isSubmitting}
+            autoCapitalize="none"
+            error={touched.email ? errors.email : undefined}
           />
 
-          <Input
-            label="Telefone"
+          <DField
+            label="TELEFONE"
+            icon={<Phone size={18} color={D.ink3} />}
             value={displayPhone}
             onChangeText={handlePhoneChange}
             onBlur={() => handleBlur('phone')}
-            error={errors.phone}
-            touched={touched.phone}
-            leftIcon={<Phone size={20} color={colors.text.tertiary} />}
             placeholder="(11) 91234-5678"
             keyboardType="phone-pad"
-            autoComplete="tel"
-            textContentType="telephoneNumber"
-            returnKeyType="next"
-            editable={!isSubmitting}
             maxLength={15}
+            error={touched.phone ? errors.phone : undefined}
           />
 
-          <Input
-            label="Senha"
+          <DField
+            label="SENHA"
+            icon={<Lock size={18} color={D.ink3} />}
             value={values.password}
             onChangeText={v => handleChange('password', v)}
             onBlur={() => handleBlur('password')}
-            error={errors.password}
-            touched={touched.password}
-            leftIcon={<Lock size={20} color={colors.text.tertiary} />}
             placeholder="mínimo 6 caracteres"
-            isPassword
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="next"
-            editable={!isSubmitting}
+            secureTextEntry={!showPassword}
+            error={touched.password ? errors.password : undefined}
+            trailing={
+              <TouchableOpacity onPress={() => setShowPassword(v => !v)}>
+                {showPassword ? (
+                  <EyeOff size={18} color={D.ink3} />
+                ) : (
+                  <Eye size={18} color={D.ink3} />
+                )}
+              </TouchableOpacity>
+            }
           />
 
-          <Input
-            label="Confirmar senha"
+          <DField
+            label="CONFIRMAR SENHA"
+            icon={<Lock size={18} color={D.ink3} />}
             value={values.confirmPassword}
             onChangeText={v => handleChange('confirmPassword', v)}
             onBlur={() => handleBlur('confirmPassword')}
-            error={errors.confirmPassword}
-            touched={touched.confirmPassword}
-            leftIcon={<Lock size={20} color={colors.text.tertiary} />}
             placeholder="repita a senha"
-            isPassword
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-            editable={!isSubmitting}
+            secureTextEntry={!showConfirm}
+            error={touched.confirmPassword ? errors.confirmPassword : undefined}
+            trailing={
+              <TouchableOpacity onPress={() => setShowConfirm(v => !v)}>
+                {showConfirm ? (
+                  <EyeOff size={18} color={D.ink3} />
+                ) : (
+                  <Eye size={18} color={D.ink3} />
+                )}
+              </TouchableOpacity>
+            }
           />
+        </View>
 
+        {/* CTA */}
+        <View style={styles.cta}>
           <TouchableOpacity
-            style={[styles.button, !canSubmit && styles.buttonDisabled]}
+            style={[styles.btn, (!canSubmit || isSubmitting) && styles.btnDisabled]}
             onPress={handleSubmit}
             disabled={!canSubmit || isSubmitting}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             {isSubmitting ? (
-              <ActivityIndicator color={colors.text.white} />
+              <ActivityIndicator color="#0B0D0E" />
             ) : (
-              <Text style={styles.buttonText}>
-                {isOwner ? 'Criar estética e conta' : 'Criar conta'}
-              </Text>
+              <>
+                <Text style={styles.btnText}>
+                  {isOwner ? 'Criar estética e conta' : 'Criar conta'}
+                </Text>
+                <View style={styles.btnArrow}>
+                  <ArrowRight size={18} color="#0B0D0E" />
+                </View>
+              </>
             )}
           </TouchableOpacity>
 
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Já tem uma conta? </Text>
+          <View style={styles.loginRow}>
+            <Text style={styles.loginText}>Já tem conta? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
               <Text style={styles.loginLink}>Fazer login</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.footer}>
-          <View style={styles.divider} />
-          <Text style={styles.copyright}>© 2026 DETAILGO</Text>
-        </View>
+        <View style={{ height: 24 }} />
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+// ── Dark Field Component ───────────────────────────────────────
+function DField({
+  label,
+  icon,
+  value,
+  onChangeText,
+  onBlur,
+  placeholder,
+  error,
+  trailing,
+  keyboardType,
+  autoCapitalize,
+  maxLength,
+  secureTextEntry,
+  containerStyle,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+  onChangeText: (v: string) => void;
+  onBlur: () => void;
+  placeholder: string;
+  error?: string;
+  trailing?: React.ReactNode;
+  keyboardType?: any;
+  autoCapitalize?: any;
+  maxLength?: number;
+  secureTextEntry?: boolean;
+  containerStyle?: any;
+}) {
+  return (
+    <View style={[styles.fieldWrap, containerStyle]}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={[styles.field, !!error && styles.fieldError]}>
+        {icon}
+        <TextInput
+          style={styles.fieldInput}
+          value={value}
+          onChangeText={onChangeText}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          placeholderTextColor={D.ink3}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize || 'words'}
+          autoCorrect={false}
+          maxLength={maxLength}
+          secureTextEntry={secureTextEntry}
+          editable
+        />
+        {trailing}
+      </View>
+      {!!error && <Text style={styles.fieldErrorText}>{error}</Text>}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.main,
+    backgroundColor: D.bg,
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 22,
     paddingTop: 60,
-    paddingBottom: spacing.lg,
+    paddingBottom: 24,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
+
+  // ── Step 1
+  step1Header: {
+    marginBottom: 28,
   },
-  brand: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.primary.main,
-    letterSpacing: 2,
-    marginBottom: spacing.lg,
-    textTransform: 'uppercase',
+  stepIndicator: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: D.ink3,
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
-  title: {
-    fontSize: 28,
+  step1Title: {
+    fontSize: 26,
     fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    color: D.ink,
+    letterSpacing: -0.5,
+    marginBottom: 6,
   },
-  subtitle: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 24,
+  step1Sub: {
+    fontSize: 14,
+    color: D.ink2,
+    lineHeight: 20,
   },
   typeCards: {
-    gap: spacing.md,
-    marginBottom: 32,
+    gap: 10,
+    marginBottom: 16,
   },
   typeCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background.card,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border.main,
-    gap: spacing.md,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: D.card,
+    borderWidth: 1,
+    borderColor: D.border,
+  },
+  typeCardSel: {
+    backgroundColor: D.primaryL,
+    borderColor: D.primary,
   },
   typeIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.md,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  typeCardText: {
+  typeIconWrapSel: {
+    backgroundColor: D.primary,
+  },
+  typeCardBody: {
     flex: 1,
   },
-  typeCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
+  typeCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
+  typeCardLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: D.ink,
+  },
+  typeCardLabelSel: {
+    color: D.ink,
+  },
+  typeCardBadge: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: D.primary,
+    letterSpacing: 0.5,
+  },
   typeCardDesc: {
-    fontSize: 13,
-    color: colors.text.secondary,
+    fontSize: 12,
+    color: D.ink2,
     lineHeight: 18,
   },
-  backTypeButton: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.md,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.sm,
+  typeRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: D.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  typeRadioSel: {
+    backgroundColor: D.primary,
+    borderColor: D.primary,
+  },
+  trialBox: {
+    padding: 14,
+    backgroundColor: 'rgba(212,255,61,0.04)',
     borderWidth: 1,
-    borderColor: colors.border.main,
+    borderColor: D.border,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    marginBottom: 24,
   },
-  backTypeText: {
-    fontSize: 13,
+  trialLabel: {
+    fontSize: 10,
     fontWeight: '600',
-    color: colors.primary.main,
+    color: D.ink3,
+    letterSpacing: 0.5,
+    marginBottom: 5,
   },
-  form: {
-    marginBottom: 32,
+  trialDesc: {
+    fontSize: 12,
+    color: D.ink2,
+    lineHeight: 18,
+  },
+
+  // ── Step 2
+  step2Header: {
+    marginBottom: 24,
+  },
+  step2Title: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: D.ink,
+    letterSpacing: -0.8,
+    lineHeight: 32,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  typePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: D.primaryL,
+    borderWidth: 1,
+    borderColor: 'rgba(212,255,61,0.2)',
+  },
+  typePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: D.primary,
+  },
+
+  // ── Fields
+  fields: {
+    gap: 12,
+    marginBottom: 24,
   },
   row: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: 0,
+    gap: 10,
   },
   col: {
     flex: 1,
   },
-  button: {
-    height: 52,
-    backgroundColor: colors.primary.main,
-    borderRadius: radii.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    shadowColor: colors.primary.main,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+  fieldWrap: {
+    gap: 5,
   },
-  buttonDisabled: {
-    backgroundColor: colors.text.disabled,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '700',
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: D.ink3,
     letterSpacing: 0.5,
   },
-  loginContainer: {
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: D.card,
+    borderWidth: 1,
+    borderColor: D.border,
+    paddingHorizontal: 14,
+  },
+  fieldError: {
+    borderColor: D.accent,
+  },
+  fieldInput: {
+    flex: 1,
+    fontSize: 14,
+    color: D.ink,
+    fontWeight: '500',
+  },
+  fieldErrorText: {
+    fontSize: 11,
+    color: D.accent,
+    marginTop: 2,
+  },
+
+  // ── CTA
+  cta: {
+    gap: 16,
+  },
+  btn: {
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: D.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+  },
+  btnDisabled: {
+    opacity: 0.35,
+  },
+  btnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0B0D0E',
+  },
+  btnArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.lg,
   },
   loginText: {
-    fontSize: 15,
-    color: colors.text.secondary,
+    fontSize: 14,
+    color: D.ink2,
   },
   loginLink: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: colors.primary.main,
-  },
-  footer: {
-    marginTop: 'auto',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginBottom: spacing.lg,
-  },
-  copyright: {
-    fontSize: 13,
-    color: colors.text.disabled,
-    textAlign: 'center',
+    color: D.primary,
   },
 });

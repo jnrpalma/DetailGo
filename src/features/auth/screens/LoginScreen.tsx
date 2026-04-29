@@ -1,25 +1,42 @@
-// src/features/auth/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Mail, Lock } from 'lucide-react-native';
+import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
+import Svg, { Defs, Pattern, Path as SvgPath, Rect } from 'react-native-svg';
 
-import { colors, spacing, radii } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
-import { Input } from '@shared/components/Input';
+
+// ── Garage Dark palette ───────────────────────────────────────
+const D = {
+  bg: '#0B0D0E',
+  card: '#191D20',
+  ink: '#F5F7F8',
+  ink2: '#A8B0B4',
+  ink3: '#6B7378',
+  primary: '#D4FF3D',
+  primaryL: 'rgba(212,255,61,0.12)',
+  border: 'rgba(255,255,255,0.08)',
+  accent: '#FF5C39',
+} as const;
+// ─────────────────────────────────────────────────────────────
+
+const { height: SCREEN_H } = Dimensions.get('window');
+const HERO_H = Math.round(SCREEN_H * 0.52);
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -29,6 +46,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
 
@@ -38,11 +56,9 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!isValid) return;
-
     setLoading(true);
     const result = await signIn(email, password);
     setLoading(false);
-
     if (!result.ok) {
       Alert.alert('Erro ao acessar', result.message || 'Email ou senha incorretos', [
         { text: 'Tentar novamente' },
@@ -59,59 +75,77 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.brand}>DETAILGO</Text>
-          <Text style={styles.tagline}>
-            Acesse sua conta para agendar{'\n'}
-            serviços de estética automotiva
-          </Text>
+        {/* ── Hero ──────────────────────────────────────────── */}
+        <View style={[styles.hero, { height: HERO_H }]}>
+          {/* Grid SVG */}
+          <Svg style={StyleSheet.absoluteFill} opacity={0.15}>
+            <Defs>
+              <Pattern id="grid" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                <SvgPath d="M 32 0 L 0 0 0 32" fill="none" stroke="#fff" strokeWidth={0.5} />
+              </Pattern>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#grid)" />
+          </Svg>
+
+          {/* Glows */}
+          <View style={styles.glowGreen} />
+          <View style={styles.glowRed} />
+
+          {/* Hero content — pinned to bottom */}
+          <View style={styles.heroContent}>
+            <View style={styles.badge}>
+              <View style={styles.badgeDot} />
+              <Text style={styles.badgeText}>ESTÉTICA AUTOMOTIVA</Text>
+            </View>
+
+            <Text style={styles.heroTitle}>
+              {'DETAIL'}
+              <Text style={{ color: D.primary }}>{'·'}</Text>
+              {'\nGO.'}
+            </Text>
+
+            <Text style={styles.heroSub}>
+              Agende serviços com a estética que cuida do seu carro.
+            </Text>
+          </View>
         </View>
 
+        {/* ── Form ──────────────────────────────────────────── */}
         <View style={styles.form}>
-          <Input
-            label="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            onBlur={() => handleBlur('email')}
-            error={touched.email && !isValidEmail ? 'E-mail inválido' : undefined}
-            touched={touched.email}
-            leftIcon={<Mail size={20} color={colors.text.tertiary} />}
-            placeholder="seu@email.com"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-            editable={!loading}
-          />
+          {/* Email */}
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>E-MAIL</Text>
+            <View style={[styles.field, touched.email && !isValidEmail && styles.fieldError]}>
+              <Mail size={18} color={D.ink3} />
+              <TextInput
+                style={styles.fieldInput}
+                value={email}
+                onChangeText={setEmail}
+                onBlur={() => handleBlur('email')}
+                placeholder="seu@email.com"
+                placeholderTextColor={D.ink3}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                editable={!loading}
+              />
+            </View>
+          </View>
 
-          {/* 👇 AGORA USA O LABEL DO PRÓPRIO INPUT */}
-          <Input
-            label="Senha"
-            value={password}
-            onChangeText={setPassword}
-            onBlur={() => handleBlur('password')}
-            error={touched.password && !isValidPassword ? 'Mínimo de 6 caracteres' : undefined}
-            touched={touched.password}
-            leftIcon={<Lock size={20} color={colors.text.tertiary} />}
-            placeholder="••••••••"
-            isPassword
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="password"
-            textContentType="password"
-            returnKeyType="go"
-            onSubmitEditing={handleLogin}
-            editable={!loading}
-            rightIcon={
+          {/* Senha */}
+          <View style={styles.fieldWrap}>
+            <View style={styles.labelRow}>
+              <Text style={styles.fieldLabel}>SENHA</Text>
               <TouchableOpacity
                 onPress={() =>
                   Alert.alert(
@@ -120,38 +154,67 @@ export default function LoginScreen() {
                   )
                 }
               >
-                <Text style={styles.forgotLink}>Esqueceu?</Text>
+                <Text style={styles.forgotText}>Esqueceu?</Text>
               </TouchableOpacity>
-            }
-          />
+            </View>
+            <View style={[styles.field, touched.password && !isValidPassword && styles.fieldError]}>
+              <Lock size={18} color={D.ink3} />
+              <TextInput
+                style={styles.fieldInput}
+                value={password}
+                onChangeText={setPassword}
+                onBlur={() => handleBlur('password')}
+                placeholder="••••••••"
+                placeholderTextColor={D.ink3}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="password"
+                textContentType="password"
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
+                editable={!loading}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(v => !v)}>
+                {showPassword ? (
+                  <EyeOff size={18} color={D.ink3} />
+                ) : (
+                  <Eye size={18} color={D.ink3} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
 
+          {/* CTA */}
           <TouchableOpacity
-            style={[styles.button, !isValid && styles.buttonDisabled]}
+            style={[styles.btn, (!isValid || loading) && styles.btnDisabled]}
             onPress={handleLogin}
             disabled={!isValid || loading}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color={colors.text.white} />
+              <ActivityIndicator color="#0B0D0E" />
             ) : (
-              <Text style={styles.buttonText}>Entrar</Text>
+              <>
+                <Text style={styles.btnText}>Entrar na garagem</Text>
+                <View style={styles.btnArrow}>
+                  <ArrowRight size={18} color="#0B0D0E" />
+                </View>
+              </>
             )}
           </TouchableOpacity>
 
-          <Text style={styles.terms}>Ao entrar, você acessa seus agendamentos e histórico.</Text>
+          {/* Register link */}
+          <View style={styles.registerRow}>
+            <Text style={styles.registerText}>Sem conta? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
+              <Text style={styles.registerLink}>Criar agora</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.footer}>
-          <View style={styles.divider} />
-
-          <View style={styles.signupContainer}>
-            <Text style={styles.signupText}>Não tem conta? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
-              <Text style={styles.signupLink}>Criar conta</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.copyright}>© 2026 DETAILGO</Text>
+          <Text style={styles.footerText}>© 2026 DETAILGO</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -161,98 +224,173 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.main,
+    backgroundColor: D.bg,
   },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: 80,
-    paddingBottom: spacing.lg,
+
+  // ── Hero
+  hero: {
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: D.border,
   },
-  header: {
+  glowGreen: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    top: -100,
+    right: -80,
+    borderRadius: 150,
+    backgroundColor: 'rgba(212,255,61,0.14)',
+  },
+  glowRed: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    bottom: -60,
+    left: -60,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,92,57,0.09)',
+  },
+  heroContent: {
+    position: 'absolute',
+    bottom: 28,
+    left: 24,
+    right: 24,
+  },
+  badge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 56,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: D.primaryL,
+    alignSelf: 'flex-start',
+    marginBottom: 14,
   },
-  brand: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.primary.main,
-    letterSpacing: 2,
-    marginBottom: spacing.md,
-    textTransform: 'uppercase',
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: D.primary,
   },
-  tagline: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  form: {
-    marginBottom: 40,
-  },
-  forgotLink: {
-    fontSize: 14,
+  badgeText: {
+    fontSize: 11,
     fontWeight: '600',
-    color: colors.primary.main,
-    padding: 4,
-  },
-  button: {
-    height: 52,
-    backgroundColor: colors.primary.main,
-    borderRadius: radii.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    shadowColor: colors.primary.main,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  buttonDisabled: {
-    backgroundColor: colors.text.disabled,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '700',
+    color: D.primary,
     letterSpacing: 0.5,
   },
-  terms: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    marginTop: spacing.lg,
+  heroTitle: {
+    fontSize: 60,
+    fontWeight: '800',
+    color: D.ink,
+    letterSpacing: -2,
+    lineHeight: 58,
+    marginBottom: 12,
+  },
+  heroSub: {
+    fontSize: 13,
+    color: D.ink2,
     lineHeight: 20,
+    maxWidth: 240,
   },
-  footer: {
-    marginTop: 'auto',
+
+  // ── Form
+  form: {
+    padding: 22,
+    gap: 14,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginBottom: spacing.lg,
+  fieldWrap: {
+    gap: 6,
   },
-  signupContainer: {
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: D.ink3,
+    letterSpacing: 0.5,
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: D.card,
+    borderWidth: 1,
+    borderColor: D.border,
+    paddingHorizontal: 14,
+  },
+  fieldError: {
+    borderColor: D.accent,
+  },
+  fieldInput: {
+    flex: 1,
+    fontSize: 15,
+    color: D.ink,
+    fontWeight: '500',
+  },
+  forgotText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: D.primary,
+  },
+
+  // ── Button
+  btn: {
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: D.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    marginTop: 8,
+  },
+  btnDisabled: {
+    opacity: 0.35,
+  },
+  btnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0B0D0E',
+  },
+  btnArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Footer
+  registerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginTop: 6,
   },
-  signupText: {
-    fontSize: 15,
-    color: colors.text.secondary,
+  registerText: {
+    fontSize: 14,
+    color: D.ink2,
   },
-  signupLink: {
-    fontSize: 15,
+  registerLink: {
+    fontSize: 14,
     fontWeight: '700',
-    color: colors.primary.main,
+    color: D.primary,
   },
-  copyright: {
-    fontSize: 13,
-    color: colors.text.disabled,
-    textAlign: 'center',
+  footer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: D.ink3,
   },
 });
