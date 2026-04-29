@@ -102,7 +102,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     const unsub = onSnapshot(
       doc(db, 'shops', shopId),
       snap => {
-        if (snap.exists) {
+        if (snap.exists()) {
           setShop({ id: snap.id, ...(snap.data() as Omit<ShopDoc, 'id'>) });
         } else {
           setShop(null);

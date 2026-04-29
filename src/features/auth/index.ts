@@ -5,7 +5,15 @@ export { AuthProvider, useAuth } from './context/AuthContext';
 export { default as LoginScreen } from './screens/LoginScreen';
 export { default as RegisterScreen } from './screens/RegisterScreen';
 
-export * from './services/auth.service';
+// Services (exporta tudo exceto UserRole para evitar conflito com roles.ts)
+export {
+  signIn,
+  register,
+  signOutUser,
+  getCurrentUser,
+  subscribeAuth,
+} from './services/auth.service';
+export type { RegisterInput, AuthResult, UserRole } from './services/auth.service';
 
 // Utils
-export * from './utils/roles';
+export { isOwner, isCustomer } from './utils/roles';
