@@ -1,9 +1,7 @@
 # OSX
-#
 .DS_Store
 
 # Xcode
-#
 build/
 *.pbxuser
 !default.pbxuser
@@ -21,49 +19,73 @@ DerivedData
 *.ipa
 *.xcuserstate
 **/.xcode.env.local
+**/.xcode.env
 
 # Android/IntelliJ
-#
-build/
 .idea
 .gradle
 local.properties
 *.iml
 *.hprof
 .cxx/
-*.keystore
-!debug.keystore
 .kotlin/
 
+# ── SEGURANÇA: Keystores (nunca subir chaves de assinatura) ──────────────────
+*.keystore
+*.jks
+# debug.keystore também ignorado — não expor chave de assinatura
+
+# ── SEGURANÇA: Firebase / Google Services ────────────────────────────────────
+# Contém API keys, project IDs e configurações do Firebase
+google-services.json
+GoogleService-Info.plist
+
+# ── SEGURANÇA: Variáveis de ambiente e secrets ────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+*.secret
+*.secrets
+
+# ── SEGURANÇA: Chaves privadas e certificados ────────────────────────────────
+*.pem
+*.p12
+*.key
+*.cer
+*.der
+serviceAccountKey.json
+*service-account*.json
+*credentials*.json
+
+# ── SEGURANÇA: Firebase Functions secrets locais ────────────────────────────
+functions/.env
+functions/.env.*
+functions/.secret.*
+
 # node.js
-#
 node_modules/
 npm-debug.log
 yarn-error.log
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-# screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
+# Bundle artifact
+*.jsbundle
 
+# fastlane
 **/fastlane/report.xml
 **/fastlane/Preview.html
 **/fastlane/screenshots
 **/fastlane/test_output
 
-# Bundle artifact
-*.jsbundle
-
 # Ruby / CocoaPods
 **/Pods/
 /vendor/bundle/
 
-# Temporary files created by Metro to check the health of the file watcher
+# Metro
 .metro-health-check*
 
-# testing
+# Testing
 /coverage
 
 # Yarn
@@ -73,3 +95,6 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Claude Code worktrees (pastas temporárias de desenvolvimento)
+.claude/worktrees/
