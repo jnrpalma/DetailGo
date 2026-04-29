@@ -40,7 +40,7 @@ const v2_1 = require("firebase-functions/v2");
 const admin = __importStar(require("firebase-admin"));
 const mercadopago_1 = require("mercadopago");
 const mpAccessToken = (0, params_1.defineSecret)('MP_ACCESS_TOKEN');
-const PLAN_AMOUNT = 0.01; // ← TESTE: mudar para 89.0 em produção
+const PLAN_AMOUNT = 0.01; // DEV: mudar para 89.0 antes de lançar
 const PLAN_DESCRIPTION = 'DetailGo Pro - Plano Mensal';
 exports.createPixCharge = (0, https_1.onRequest)({ secrets: [mpAccessToken], cors: true }, async (req, res) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
