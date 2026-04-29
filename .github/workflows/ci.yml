@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Permissões mínimas necessárias (segurança)
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Qualidade de código
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          # Sem tokens extras — apenas leitura do repo
+          persist-credentials: false
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instala dependências
+        run: npm ci
+        # npm ci é mais seguro que npm install em CI:
+        # usa package-lock.json exato, não modifica nada
+
+      - name: Verifica formatação (Prettier)
+        run: npm run format:check
+
+      - name: Verifica tipos TypeScript
+        run: npx tsc --noEmit
+        # Garante que não há erros de tipo no código
+
+  commit-lint:
+    name: Valida mensagens de commit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instala dependências
+        run: npm ci
+
+      - name: Valida commits do PR
+        run: |
+          npx commitlint \
+            --from ${{ github.event.pull_request.base.sha }} \
+            --to ${{ github.event.pull_request.head.sha }} \
+            --verbose
+        # Verifica TODOS os commits do PR, não só o último
