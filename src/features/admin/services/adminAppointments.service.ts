@@ -37,9 +37,7 @@ export async function updateAppointmentStatus(params: {
       currentStatus === 'scheduled' &&
       (status === 'in_progress' || status === 'done')
     ) {
-      const err: any = new Error(
-        'Agendamento expirado. Deve ser marcado como não realizado.',
-      );
+      const err: any = new Error('Agendamento expirado. Deve ser marcado como não realizado.');
       err.code = 'APPOINTMENT_EXPIRED';
       throw err;
     }
@@ -61,9 +59,7 @@ export async function updateAppointmentStatus(params: {
   const updates: Promise<void>[] = [updateDoc(globalRef, payload)];
 
   snap.docs.forEach(
-    (
-      d: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>,
-    ) => {
+    (d: FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>) => {
       updates.push(updateDoc(d.ref, payload));
     },
   );

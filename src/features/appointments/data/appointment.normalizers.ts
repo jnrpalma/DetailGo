@@ -1,11 +1,7 @@
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import type {
-  AppointmentStatus,
-  UserAppointment,
-} from '../domain/appointment.types';
+import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 const VALID_STATUSES: AppointmentStatus[] = [
   'scheduled',
@@ -22,9 +18,7 @@ function validateStatus(status: any): AppointmentStatus {
   return 'scheduled';
 }
 
-export function normalizeUserAppointmentFromSubcollection(
-  d: QDoc,
-): UserAppointment | null {
+export function normalizeUserAppointmentFromSubcollection(d: QDoc): UserAppointment | null {
   const v = d.data() as any;
 
   if (typeof v?.whenMs !== 'number') return null;
@@ -41,9 +35,7 @@ export function normalizeUserAppointmentFromSubcollection(
   };
 }
 
-export function normalizeUserAppointmentFromGlobal(
-  d: QDoc,
-): UserAppointment | null {
+export function normalizeUserAppointmentFromGlobal(d: QDoc): UserAppointment | null {
   const v = d.data() as any;
 
   const startAtMs = Number(v?.startAtMs ?? 0);

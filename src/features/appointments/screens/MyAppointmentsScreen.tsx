@@ -28,10 +28,7 @@ import { useShop } from '@features/shops/context/ShopContext';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';
-import {
-  cancelAppointment,
-  getAppointmentRules,
-} from '../services/appointment.service';
+import { cancelAppointment, getAppointmentRules } from '../services/appointment.service';
 
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
@@ -59,42 +56,31 @@ export default function MyAppointmentsScreen() {
     const rules = getAppointmentRules(item);
 
     if (!rules.canCancel) {
-      Alert.alert(
-        'Não é possível cancelar',
-        rules.message || 'Cancelamento não permitido.',
-      );
+      Alert.alert('Não é possível cancelar', rules.message || 'Cancelamento não permitido.');
       return;
     }
 
-    Alert.alert(
-      'Cancelar agendamento',
-      'Tem certeza que deseja cancelar este agendamento?',
-      [
-        { text: 'Não', style: 'cancel' },
-        {
-          text: 'Sim, cancelar',
-          style: 'destructive',
-          onPress: () => executeCancel(item),
-        },
-      ],
-    );
+    Alert.alert('Cancelar agendamento', 'Tem certeza que deseja cancelar este agendamento?', [
+      { text: 'Não', style: 'cancel' },
+      {
+        text: 'Sim, cancelar',
+        style: 'destructive',
+        onPress: () => executeCancel(item),
+      },
+    ]);
   };
 
   const handleReschedule = (item: UserAppointment) => {
     const rules = getAppointmentRules(item);
 
     if (!rules.canReschedule) {
-      Alert.alert(
-        'Não é possível reagendar',
-        rules.message || 'Reagendamento não permitido.',
-      );
+      Alert.alert('Não é possível reagendar', rules.message || 'Reagendamento não permitido.');
       return;
     }
 
     let message = '';
     if (item.status === 'no_show') {
-      message =
-        'Você não compareceu a este agendamento. Deseja criar um novo agendamento?';
+      message = 'Você não compareceu a este agendamento. Deseja criar um novo agendamento?';
     } else if (rules.isExpired) {
       message =
         'Este agendamento já passou do horário. Deseja criar um novo agendamento baseado neste?';
@@ -112,10 +98,7 @@ export default function MyAppointmentsScreen() {
     ]);
   };
 
-  const executeReschedule = async (
-    item: UserAppointment,
-    isExpired: boolean,
-  ) => {
+  const executeReschedule = async (item: UserAppointment, isExpired: boolean) => {
     setReschedulingId(item.id);
 
     if (!isExpired) {
@@ -124,8 +107,7 @@ export default function MyAppointmentsScreen() {
       if (!cancelResult.ok) {
         Alert.alert(
           'Erro',
-          cancelResult.message ||
-            'Não foi possível cancelar o agendamento atual.',
+          cancelResult.message || 'Não foi possível cancelar o agendamento atual.',
         );
         setReschedulingId(null);
         return;
@@ -188,19 +170,10 @@ export default function MyAppointmentsScreen() {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>
-              {item.serviceLabel ?? 'Serviço'}
-            </Text>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: `${statusColor}10` },
-              ]}
-            >
+            <Text style={styles.serviceName}>{item.serviceLabel ?? 'Serviço'}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}10` }]}>
               <StatusIcon size={14} color={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {statusLabel}
-              </Text>
+              <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
             </View>
           </View>
           <Text style={styles.price}>{formatUtils.currency(item.price)}</Text>
@@ -211,15 +184,11 @@ export default function MyAppointmentsScreen() {
         <View style={styles.cardFooter}>
           <View style={styles.infoRow}>
             <Calendar size={16} color={colors.text.tertiary} />
-            <Text style={styles.infoText}>
-              {dateUtils.formatDate(item.startAtMs)}
-            </Text>
+            <Text style={styles.infoText}>{dateUtils.formatDate(item.startAtMs)}</Text>
           </View>
           <View style={styles.infoRow}>
             <Clock size={16} color={colors.text.tertiary} />
-            <Text style={styles.infoText}>
-              {dateUtils.formatHour(item.startAtMs)}
-            </Text>
+            <Text style={styles.infoText}>{dateUtils.formatHour(item.startAtMs)}</Text>
           </View>
           <View style={styles.vehicleBadge}>
             <Car size={14} color={colors.text.tertiary} />
@@ -232,8 +201,7 @@ export default function MyAppointmentsScreen() {
           <TouchableOpacity
             style={[
               styles.actionButton,
-              (!rules.canReschedule || isLoading) &&
-                styles.actionButtonDisabled,
+              (!rules.canReschedule || isLoading) && styles.actionButtonDisabled,
             ]}
             onPress={() => handleReschedule(item)}
             disabled={!rules.canReschedule || isLoading}
@@ -264,12 +232,7 @@ export default function MyAppointmentsScreen() {
             ) : (
               <>
                 <XCircle size={16} color={colors.status.error} />
-                <Text
-                  style={[
-                    styles.actionButtonText,
-                    styles.actionButtonTextCancel,
-                  ]}
-                >
+                <Text style={[styles.actionButtonText, styles.actionButtonTextCancel]}>
                   Cancelar
                 </Text>
               </>
@@ -301,10 +264,7 @@ export default function MyAppointmentsScreen() {
 
   return (
     <>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={colors.background.main}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {/* Header */}
         <View style={styles.header}>
@@ -338,9 +298,7 @@ export default function MyAppointmentsScreen() {
                   <View style={styles.emptyStateIcon}>
                     <Calendar size={48} color={colors.text.disabled} />
                   </View>
-                  <Text style={styles.emptyStateTitle}>
-                    Nenhum agendamento ativo
-                  </Text>
+                  <Text style={styles.emptyStateTitle}>Nenhum agendamento ativo</Text>
                   <Text style={styles.emptyStateText}>
                     Você não tem serviços agendados no momento.{'\n'}
                     Que tal agendar agora mesmo?
@@ -350,9 +308,7 @@ export default function MyAppointmentsScreen() {
                     onPress={() => navigation.navigate('Appointment', {})}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.emptyStateButtonText}>
-                      Agendar serviço
-                    </Text>
+                    <Text style={styles.emptyStateButtonText}>Agendar serviço</Text>
                   </TouchableOpacity>
                 </View>
               }

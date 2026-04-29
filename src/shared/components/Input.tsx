@@ -45,7 +45,7 @@ export function Input({
     : colors.border.main;
 
   const handleFocus = () => setIsFocused(true);
-  
+
   const handleBlur = (e: any) => {
     setIsFocused(false);
     if (onBlur) onBlur(e);
@@ -55,17 +55,17 @@ export function Input({
   const inputStyle = [
     styles.input,
     leftIcon ? styles.inputWithLeftIcon : null,
-    (isPassword || rightIcon) ? styles.inputWithRightIcon : null,
+    isPassword || rightIcon ? styles.inputWithRightIcon : null,
     style,
   ].filter(Boolean);
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
-      
+
       <View style={[styles.wrapper, { borderColor }]}>
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
-        
+
         <TextInput
           style={inputStyle}
           placeholderTextColor={colors.text.disabled}
@@ -74,7 +74,7 @@ export function Input({
           onBlur={handleBlur}
           {...props}
         />
-        
+
         {isPassword && (
           <TouchableOpacity
             style={styles.rightIcon}
@@ -88,12 +88,10 @@ export function Input({
             )}
           </TouchableOpacity>
         )}
-        
-        {rightIcon && !isPassword && (
-          <View style={styles.rightIcon}>{rightIcon}</View>
-        )}
+
+        {rightIcon && !isPassword && <View style={styles.rightIcon}>{rightIcon}</View>}
       </View>
-      
+
       {showError && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );

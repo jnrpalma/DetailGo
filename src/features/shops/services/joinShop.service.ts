@@ -17,9 +17,7 @@ export async function joinShop(uid: string, inviteCode: string): Promise<void> {
     throw new Error('O código deve ter 6 caracteres.');
   }
 
-  const snap = await getDocs(
-    query(collection(db, 'shops'), where('code', '==', code), limit(1)),
-  );
+  const snap = await getDocs(query(collection(db, 'shops'), where('code', '==', code), limit(1)));
 
   if (snap.empty) {
     throw new Error('Código inválido. Verifique com a estética e tente novamente.');

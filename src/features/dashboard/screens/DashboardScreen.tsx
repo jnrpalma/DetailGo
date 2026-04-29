@@ -19,17 +19,9 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LinearGradient from 'react-native-linear-gradient';
 
-import {
-  launchImageLibrary,
-  type ImageLibraryOptions,
-} from 'react-native-image-picker';
+import { launchImageLibrary, type ImageLibraryOptions } from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
-import {
-  doc,
-  getFirestore,
-  onSnapshot,
-  setDoc,
-} from '@react-native-firebase/firestore';
+import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/firestore';
 
 import { colors, spacing, radii } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
@@ -85,12 +77,11 @@ export default function DashboardScreen() {
   const [joinCode, setJoinCode] = useState('');
   const [joiningShop, setJoiningShop] = useState(false);
 
-  const { loading: loadingAppointments, items: appointments } =
-    useDashboardAppointments({
-      uid,
-      shopId: shopId ?? '',
-      limitN: 30,
-    });
+  const { loading: loadingAppointments, items: appointments } = useDashboardAppointments({
+    uid,
+    shopId: shopId ?? '',
+    limitN: 30,
+  });
 
   useEffect(() => {
     const db = getFirestore();
@@ -136,11 +127,7 @@ export default function DashboardScreen() {
       if (!b64) return;
 
       setSaving('avatar');
-      await setDoc(
-        doc(getFirestore(), 'users', uid),
-        { photoB64: b64 },
-        { merge: true },
-      );
+      await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
       setProfile(p => ({ ...p, photoB64: b64 }));
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível atualizar a foto');
@@ -194,7 +181,10 @@ export default function DashboardScreen() {
       await joinShop(uid, joinCode);
       setJoinModalVisible(false);
       setJoinCode('');
-      Alert.alert('Vinculado!', 'Sua conta foi vinculada à estética. Agora você pode agendar serviços!');
+      Alert.alert(
+        'Vinculado!',
+        'Sua conta foi vinculada à estética. Agora você pode agendar serviços!',
+      );
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Código inválido. Tente novamente.');
     } finally {
@@ -204,11 +194,9 @@ export default function DashboardScreen() {
 
   // TODO AQUI
   const handleNotifications = () => {
-    Alert.alert(
-      'Notificações',
-      'Em breve você receberá notificações sobre seus agendamentos!',
-      [{ text: 'OK' }],
-    );
+    Alert.alert('Notificações', 'Em breve você receberá notificações sobre seus agendamentos!', [
+      { text: 'OK' },
+    ]);
   };
 
   const fullName = profile.firstName
@@ -225,10 +213,7 @@ export default function DashboardScreen() {
 
   return (
     <>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={colors.primary.main}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.container}>
           <LinearGradient
@@ -238,11 +223,7 @@ export default function DashboardScreen() {
             style={styles.header}
           >
             <View style={styles.headerTop}>
-              <TouchableOpacity
-                onPress={toggleMenu}
-                style={styles.menuButton}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
                 <View style={styles.menuIcon}>
                   <View style={styles.menuBar} />
                   <View style={[styles.menuBar, { width: 20 }]} />
@@ -340,9 +321,7 @@ export default function DashboardScreen() {
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Próximos serviços</Text>
                 {appointments.length > 3 && (
-                  <TouchableOpacity
-                    onPress={() => navigateDirect('MyAppointments')}
-                  >
+                  <TouchableOpacity onPress={() => navigateDirect('MyAppointments')}>
                     <Text style={styles.sectionLink}>Ver todos</Text>
                   </TouchableOpacity>
                 )}
@@ -364,9 +343,7 @@ export default function DashboardScreen() {
               ) : (
                 <View style={styles.emptyState}>
                   <Calendar size={48} color={colors.text.disabled} />
-                  <Text style={styles.emptyStateTitle}>
-                    Nenhum serviço agendado
-                  </Text>
+                  <Text style={styles.emptyStateTitle}>Nenhum serviço agendado</Text>
                   <Text style={styles.emptyStateText}>
                     Agende seu primeiro serviço de estética automotiva
                   </Text>
@@ -380,12 +357,7 @@ export default function DashboardScreen() {
         {menuVisible && (
           <>
             <Pressable style={styles.overlay} onPress={toggleMenu} />
-            <Animated.View
-              style={[
-                styles.drawer,
-                { transform: [{ translateX: slideAnim }] },
-              ]}
-            >
+            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
               <View style={styles.drawerHeader}>
                 <View style={styles.drawerUserInfo}>
                   <Text style={styles.drawerUserName}>{fullName}</Text>
@@ -418,7 +390,6 @@ export default function DashboardScreen() {
                   <Text style={styles.drawerItemText}>Histórico</Text>
                 </TouchableOpacity>
 
-
                 <View style={styles.drawerDivider} />
 
                 <TouchableOpacity
@@ -426,11 +397,7 @@ export default function DashboardScreen() {
                   onPress={handleSignOut}
                 >
                   <LogOut size={22} color={colors.status.error} />
-                  <Text
-                    style={[styles.drawerItemText, styles.drawerLogoutText]}
-                  >
-                    Sair
-                  </Text>
+                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -463,15 +430,19 @@ export default function DashboardScreen() {
               editable={!joiningShop}
             />
             <TouchableOpacity
-              style={[styles.modalBtn, (joinCode.trim().length !== 6 || joiningShop) && styles.modalBtnDisabled]}
+              style={[
+                styles.modalBtn,
+                (joinCode.trim().length !== 6 || joiningShop) && styles.modalBtnDisabled,
+              ]}
               onPress={handleJoinShop}
               disabled={joinCode.trim().length !== 6 || joiningShop}
               activeOpacity={0.8}
             >
-              {joiningShop
-                ? <ActivityIndicator color={colors.text.white} />
-                : <Text style={styles.modalBtnText}>Vincular minha conta</Text>
-              }
+              {joiningShop ? (
+                <ActivityIndicator color={colors.text.white} />
+              ) : (
+                <Text style={styles.modalBtnText}>Vincular minha conta</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setJoinModalVisible(false)} style={styles.modalCancel}>
               <Text style={styles.modalCancelText}>Cancelar</Text>

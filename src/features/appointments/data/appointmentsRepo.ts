@@ -10,18 +10,14 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import type {
-  AppointmentStatus,
-  UserAppointment,
-} from '../domain/appointment.types';
+import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
 
 import {
   normalizeUserAppointmentFromGlobal,
   normalizeUserAppointmentFromSubcollection,
 } from './appointment.normalizers';
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 export function watchUserAppointmentsWithFallback(params: {
   uid: string;

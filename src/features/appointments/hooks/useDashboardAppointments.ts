@@ -16,15 +16,11 @@ import {
   normalizeUserAppointmentFromGlobal,
   normalizeUserAppointmentFromSubcollection,
 } from '../data/appointment.normalizers';
-import {
-  getEffectiveStatus,
-  filterActiveAppointments,
-} from '../domain/appointment.helpers';
+import { getEffectiveStatus, filterActiveAppointments } from '../domain/appointment.helpers';
 
 export type DashboardAppointment = UserAppointment;
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 type Params = {
   uid: string;

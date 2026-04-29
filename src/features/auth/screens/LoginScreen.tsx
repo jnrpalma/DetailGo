@@ -44,11 +44,9 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (!result.ok) {
-      Alert.alert(
-        'Erro ao acessar',
-        result.message || 'Email ou senha incorretos',
-        [{ text: 'Tentar novamente' }],
-      );
+      Alert.alert('Erro ao acessar', result.message || 'Email ou senha incorretos', [
+        { text: 'Tentar novamente' },
+      ]);
     }
   };
 
@@ -61,10 +59,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={colors.background.main}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -118,7 +113,12 @@ export default function LoginScreen() {
             editable={!loading}
             rightIcon={
               <TouchableOpacity
-                onPress={() => Alert.alert('Recuperar senha', 'Enviaremos um link de recuperação para seu e-mail.')}
+                onPress={() =>
+                  Alert.alert(
+                    'Recuperar senha',
+                    'Enviaremos um link de recuperação para seu e-mail.',
+                  )
+                }
               >
                 <Text style={styles.forgotLink}>Esqueceu?</Text>
               </TouchableOpacity>
@@ -138,9 +138,7 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          <Text style={styles.terms}>
-            Ao entrar, você acessa seus agendamentos e histórico.
-          </Text>
+          <Text style={styles.terms}>Ao entrar, você acessa seus agendamentos e histórico.</Text>
         </View>
 
         <View style={styles.footer}>
@@ -148,10 +146,7 @@ export default function LoginScreen() {
 
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Não tem conta? </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Register')}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
               <Text style={styles.signupLink}>Criar conta</Text>
             </TouchableOpacity>
           </View>

@@ -1,13 +1,6 @@
 // src/shared/components/SelectModal.tsx
 import React from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-} from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { colors, spacing, radii } from '@shared/theme';
 
 type Option<T extends string> = { label: string; value: T };
@@ -30,12 +23,7 @@ export default function SelectModal<T extends string>({
   onSelect,
 }: Props<T>) {
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -48,7 +36,7 @@ export default function SelectModal<T extends string>({
 
           <FlatList
             data={options}
-            keyExtractor={(it) => it.value}
+            keyExtractor={it => it.value}
             ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
             contentContainerStyle={{ paddingBottom: spacing.lg }}
             renderItem={({ item }) => {
@@ -62,12 +50,7 @@ export default function SelectModal<T extends string>({
                   }}
                   activeOpacity={0.85}
                 >
-                  <Text
-                    style={[
-                      styles.itemText,
-                      selected && styles.itemTextSelected,
-                    ]}
-                  >
+                  <Text style={[styles.itemText, selected && styles.itemTextSelected]}>
                     {item.label}
                   </Text>
                 </TouchableOpacity>
@@ -101,15 +84,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  title: { 
-    fontSize: 16, 
-    fontWeight: '900', 
-    color: colors.text.primary 
+  title: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text.primary,
   },
-  close: { 
-    fontSize: 14, 
-    fontWeight: '900', 
-    color: colors.primary.main 
+  close: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: colors.primary.main,
   },
 
   item: {
@@ -120,15 +103,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: colors.background.card,
   },
-  itemSelected: { 
-    backgroundColor: colors.primary.main, 
-    borderColor: colors.primary.main 
+  itemSelected: {
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
   },
-  itemText: { 
-    color: colors.text.primary, 
-    fontWeight: '800' 
+  itemText: {
+    color: colors.text.primary,
+    fontWeight: '800',
   },
-  itemTextSelected: { 
-    color: colors.text.white 
+  itemTextSelected: {
+    color: colors.text.white,
   },
 });

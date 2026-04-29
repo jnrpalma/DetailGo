@@ -35,8 +35,7 @@ import { useAuth } from '@features/auth';
 const PIX_NAME = 'DetailGo';
 const PLAN_PRICE = 'R$ 0,01/mês'; // DEV: mudar para R$ 89,00/mês antes de lançar
 const WHATSAPP_NUMBER = '5511996784399';
-const CREATE_PIX_URL =
-  'https://us-central1-magic-auto.cloudfunctions.net/createPixCharge';
+const CREATE_PIX_URL = 'https://us-central1-magic-auto.cloudfunctions.net/createPixCharge';
 // ───────────────────────────────────────────────────────────────────────────
 
 const FEATURES = [
@@ -83,7 +82,7 @@ export default function SubscriptionScreen() {
         body: JSON.stringify({ shopId: shop.id }),
       });
 
-      const result = await response.json() as Record<string, any>;
+      const result = (await response.json()) as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(result?.error ?? 'Erro ao gerar PIX.');
@@ -122,10 +121,7 @@ export default function SubscriptionScreen() {
     <>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary.main} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* ── Header ── */}
           <LinearGradient
             colors={[colors.primary.main, colors.secondary.main]}
@@ -145,8 +141,8 @@ export default function SubscriptionScreen() {
                 <View style={styles.trialBadge}>
                   <Clock size={14} color="#F97316" />
                   <Text style={styles.trialBadgeText}>
-                    Trial gratuito · {trialDaysLeft}{' '}
-                    {trialDaysLeft === 1 ? 'dia' : 'dias'} restantes
+                    Trial gratuito · {trialDaysLeft} {trialDaysLeft === 1 ? 'dia' : 'dias'}{' '}
+                    restantes
                   </Text>
                 </View>
                 <Text style={styles.headerTitle}>Seu trial está ativo</Text>
@@ -202,9 +198,8 @@ export default function SubscriptionScreen() {
             {!pixData ? (
               <>
                 <Text style={styles.pixIntro}>
-                  Clique para gerar um QR Code PIX exclusivo para sua loja.
-                  Assim que o pagamento for confirmado, seu acesso é liberado
-                  automaticamente em segundos.
+                  Clique para gerar um QR Code PIX exclusivo para sua loja. Assim que o pagamento
+                  for confirmado, seu acesso é liberado automaticamente em segundos.
                 </Text>
 
                 <TouchableOpacity
@@ -216,7 +211,9 @@ export default function SubscriptionScreen() {
                   {loadingPix ? (
                     <ActivityIndicator color={colors.text.white} />
                   ) : (
-                    <Text style={styles.generateBtnText}>Gerar QR Code PIX — {PLAN_PRICE.replace('/mês','')}</Text>
+                    <Text style={styles.generateBtnText}>
+                      Gerar QR Code PIX — {PLAN_PRICE.replace('/mês', '')}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -294,9 +291,7 @@ export default function SubscriptionScreen() {
           {/* ── Nota ── */}
           <View style={styles.noteBox}>
             <TrendingUp size={14} color={colors.text.tertiary} />
-            <Text style={styles.noteText}>
-              Renovação mensal. Cancele quando quiser sem multa.
-            </Text>
+            <Text style={styles.noteText}>Renovação mensal. Cancele quando quiser sem multa.</Text>
           </View>
 
           <View style={{ height: spacing.xl }} />

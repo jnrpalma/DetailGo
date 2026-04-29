@@ -3,8 +3,7 @@ import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 
-type QDoc =
-  FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
+type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
 export function normalizeAdminAppointmentFromGlobal(d: QDoc): AdminAppointment | null {
   const v = d.data() as any;

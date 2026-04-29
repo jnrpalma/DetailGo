@@ -47,22 +47,37 @@ export default function RegisterScreen() {
   const validationRules = {
     firstName: [
       { validate: (v: string) => validationUtils.name(v), message: validationMessages.name },
-      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+      {
+        validate: (v: string) => validationUtils.required(v),
+        message: validationMessages.required,
+      },
     ],
     lastName: [
       { validate: (v: string) => validationUtils.name(v), message: validationMessages.lastName },
-      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+      {
+        validate: (v: string) => validationUtils.required(v),
+        message: validationMessages.required,
+      },
     ],
     email: [
       { validate: (v: string) => validationUtils.email(v), message: validationMessages.email },
-      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+      {
+        validate: (v: string) => validationUtils.required(v),
+        message: validationMessages.required,
+      },
     ],
     phone: [
       { validate: (v: string) => validationUtils.phone(v), message: validationMessages.phone },
     ],
     password: [
-      { validate: (v: string) => validationUtils.password(v), message: validationMessages.password },
-      { validate: (v: string) => validationUtils.required(v), message: validationMessages.required },
+      {
+        validate: (v: string) => validationUtils.password(v),
+        message: validationMessages.password,
+      },
+      {
+        validate: (v: string) => validationUtils.required(v),
+        message: validationMessages.required,
+      },
     ],
     confirmPassword: [] as { validate: (v: string) => boolean; message: string }[],
     shopName: [],
@@ -253,9 +268,7 @@ export default function RegisterScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.brand}>DETAILGO</Text>
-          <Text style={styles.title}>
-            {isOwner ? 'Cadastrar estética' : 'Criar conta'}
-          </Text>
+          <Text style={styles.title}>{isOwner ? 'Cadastrar estética' : 'Criar conta'}</Text>
           <Text style={styles.subtitle}>
             {isOwner
               ? 'Preencha os dados da sua estética e conta'
@@ -268,9 +281,7 @@ export default function RegisterScreen() {
           onPress={() => setAccountType(null)}
           activeOpacity={0.7}
         >
-          <Text style={styles.backTypeText}>
-            ← {isOwner ? 'Proprietário' : 'Cliente'} · Trocar
-          </Text>
+          <Text style={styles.backTypeText}>← {isOwner ? 'Proprietário' : 'Cliente'} · Trocar</Text>
         </TouchableOpacity>
 
         <View style={styles.form}>
@@ -288,7 +299,6 @@ export default function RegisterScreen() {
               returnKeyType="next"
             />
           )}
-
 
           <View style={styles.row}>
             <Input
