@@ -1,0 +1,8 @@
+node_modules/
+android/
+ios/
+functions/lib/
+coverage/
+*.jsbundle
+*.lock
+package-lock.json

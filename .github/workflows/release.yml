@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Dispara apenas em tags de versão (v1.0.0, v1.2.3...)
+
+# Permissão para criar releases no GitHub
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Cria GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Extrai versão da tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Extrai notas do CHANGELOG
+        id: changelog
+        run: |
+          # Extrai apenas a seção da versão atual do CHANGELOG
+          VERSION=${{ steps.version.outputs.VERSION }}
+          NOTES=$(awk "/^## \[${VERSION#v}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
+          # Salva as notas em arquivo temporário (evita problemas com caracteres especiais)
+          echo "$NOTES" > /tmp/release_notes.md
+          echo "NOTES_FILE=/tmp/release_notes.md" >> $GITHUB_OUTPUT
+
+      - name: Cria GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "DetailGo ${{ steps.version.outputs.VERSION }}"
+          body_path: ${{ steps.changelog.outputs.NOTES_FILE }}
+          draft: false
+          prerelease: false
+        env:
+          # Usa o token padrão do GitHub — sem secrets extras necessários
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
