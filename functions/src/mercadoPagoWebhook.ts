@@ -1,27 +1,25 @@
-import * as functions from 'firebase-functions';
+import { onRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
+import { logger } from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 
-function getMpClient(): MercadoPagoConfig {
-  const token = process.env.MP_ACCESS_TOKEN;
-  if (!token) throw new Error('MP_ACCESS_TOKEN não configurado.');
-  return new MercadoPagoConfig({ accessToken: token });
-}
+const mpAccessToken = defineSecret('MP_ACCESS_TOKEN');
 
-export const mercadoPagoWebhook = functions
-  .runWith({ secrets: ['MP_ACCESS_TOKEN'] })
-  .https.onRequest(async (req, res) => {
-
-    // Mercado Pago só envia POST
+export const mercadoPagoWebhook = onRequest(
+  { secrets: [mpAccessToken] },
+  async (req, res) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method Not Allowed');
       return;
     }
 
     try {
-      const { type, data } = req.body;
+      const { type, data } = req.body as {
+        type?: string;
+        data?: { id?: string };
+      };
 
-      // Só processa notificações de pagamento
       if (type !== 'payment' || !data?.id) {
         res.status(200).send('ok');
         return;
@@ -29,18 +27,19 @@ export const mercadoPagoWebhook = functions
 
       const paymentId = data.id.toString();
 
-      // Busca detalhes do pagamento no Mercado Pago
-      const mpClient = getMpClient();
+      const mpClient = new MercadoPagoConfig({
+        accessToken: mpAccessToken.value(),
+      });
       const paymentClient = new Payment(mpClient);
       const paymentData = await paymentClient.get({ id: paymentId });
 
       const status = paymentData.status;
-      const shopIdFromMeta = paymentData.metadata?.shop_id as string | undefined;
+      const shopIdFromMeta = paymentData.metadata?.shop_id as
+        | string
+        | undefined;
 
-      // Atualiza status do pagamento no Firestore
       const db = admin.firestore();
 
-      // Tenta encontrar o shopId via metadata do MP ou via coleção payments
       let shopId = shopIdFromMeta;
       if (!shopId) {
         const paymentDoc = await db.doc(`payments/${paymentId}`).get();
@@ -49,15 +48,15 @@ export const mercadoPagoWebhook = functions
         }
       }
 
-      // Atualiza o documento de pagamento
-      if (await db.doc(`payments/${paymentId}`).get().then(s => s.exists)) {
-        await db.doc(`payments/${paymentId}`).update({
+      const paymentDocRef = db.doc(`payments/${paymentId}`);
+      const paymentDocSnap = await paymentDocRef.get();
+      if (paymentDocSnap.exists) {
+        await paymentDocRef.update({
           status: status ?? 'unknown',
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
 
-      // Se pagamento aprovado → ativa assinatura
       if (status === 'approved' && shopId) {
         const activeUntil = new Date();
         activeUntil.setDate(activeUntil.getDate() + 30);
@@ -69,13 +68,15 @@ export const mercadoPagoWebhook = functions
           lastPaymentAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        functions.logger.info(`✅ Assinatura ativada para shop: ${shopId} até ${activeUntil.toISOString()}`);
+        logger.info(
+          `✅ Assinatura ativada: shop=${shopId} até ${activeUntil.toISOString()}`,
+        );
       }
 
       res.status(200).send('ok');
     } catch (error) {
-      functions.logger.error('Erro no webhook MP:', error);
-      // Retorna 200 para o MP não retentar infinitamente
+      logger.error('Erro no webhook MP:', error);
       res.status(200).send('error handled');
     }
-  });
+  },
+);
