@@ -1,4 +1,12 @@
-// src/shared/theme/colors.ts
+// ─────────────────────────────────────────────────────────────────────────────
+// DETAILGO — Sistema de cores centralizado
+//
+// Duas paletas:
+//   colors      → Heritage Teal (telas admin e cliente ainda não redesenhadas)
+//   darkColors  → Garage Dark   (novo redesign — Login, Register e futuras telas)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── 1. Heritage Teal ─────────────────────────────────────────────────────────
 export const colors = {
   primary: {
     main: '#0F7173',
@@ -38,3 +46,43 @@ export const colors = {
 } as const;
 
 export type ColorPalette = typeof colors;
+
+// ── 2. Garage Dark ───────────────────────────────────────────────────────────
+// Paleta do novo redesign — escuro, neon amarelo-verde, acento laranja
+export const darkColors = {
+  // Fundos
+  bg: '#0B0D0E', // fundo principal — quase preto
+  surface: '#121517', // superfície intermediária
+  card: '#191D20', // cards e inputs
+
+  // Texto
+  ink: '#F5F7F8', // texto principal — branco suave
+  ink2: '#A8B0B4', // texto secundário — cinza claro
+  ink3: '#6B7378', // texto terciário / labels / placeholders
+
+  // Cor primária — verde-neon
+  primary: '#D4FF3D',
+  primaryDark: '#B6E300',
+  primaryLight: 'rgba(212,255,61,0.12)',
+
+  // Borda
+  border: 'rgba(255,255,255,0.08)',
+  borderStrong: 'rgba(255,255,255,0.15)',
+  borderFocus: 'rgba(212,255,61,0.45)',
+
+  // Acento — laranja-vermelho (erros, cancelamentos)
+  accent: '#FF5C39',
+
+  // Status
+  status: {
+    success: '#22C55E',
+    error: '#FF5C39',
+    warning: '#F59E0B',
+    info: '#3B82F6',
+  },
+
+  // Overlay
+  overlay: 'rgba(0,0,0,0.65)',
+} as const;
+
+export type DarkColorPalette = typeof darkColors;

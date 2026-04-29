@@ -20,20 +20,7 @@ import Svg, { Path as SvgPath } from 'react-native-svg';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
-
-// ── Garage Dark palette ───────────────────────────────────────
-const D = {
-  bg: '#0B0D0E',
-  card: '#191D20',
-  ink: '#F5F7F8',
-  ink2: '#A8B0B4',
-  ink3: '#6B7378',
-  primary: '#D4FF3D',
-  primaryL: 'rgba(212,255,61,0.12)',
-  border: 'rgba(255,255,255,0.08)',
-  accent: '#FF5C39',
-} as const;
-// ─────────────────────────────────────────────────────────────
+import { darkColors as D } from '@shared/theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const HERO_H = Math.round(SCREEN_H * 0.52);
@@ -318,7 +305,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: D.primaryL,
+    backgroundColor: D.primaryLight,
     alignSelf: 'flex-start',
     marginBottom: 14,
   },

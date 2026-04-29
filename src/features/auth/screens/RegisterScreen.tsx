@@ -33,21 +33,7 @@ import type { RegisterInput, UserRole } from '@features/auth/services/auth.servi
 import { useForm } from '@shared/hooks/useForm';
 import { validationUtils, validationMessages } from '@shared/utils/validation.utils';
 import { formatUtils } from '@shared/utils/format.utils';
-
-// ── Garage Dark palette ───────────────────────────────────────
-const D = {
-  bg: '#0B0D0E',
-  card: '#191D20',
-  ink: '#F5F7F8',
-  ink2: '#A8B0B4',
-  ink3: '#6B7378',
-  primary: '#D4FF3D',
-  primaryL: 'rgba(212,255,61,0.12)',
-  border: 'rgba(255,255,255,0.08)',
-  borderFocus: 'rgba(212,255,61,0.5)',
-  accent: '#FF5C39',
-} as const;
-// ─────────────────────────────────────────────────────────────
+import { darkColors as D } from '@shared/theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -565,7 +551,7 @@ const styles = StyleSheet.create({
     borderColor: D.border,
   },
   typeCardSel: {
-    backgroundColor: D.primaryL,
+    backgroundColor: D.primaryLight,
     borderColor: D.primary,
   },
   typeIconWrap: {
@@ -664,7 +650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: D.primaryL,
+    backgroundColor: D.primaryLight,
     borderWidth: 1,
     borderColor: 'rgba(212,255,61,0.2)',
   },
