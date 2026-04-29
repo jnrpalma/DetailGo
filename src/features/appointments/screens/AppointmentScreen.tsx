@@ -46,7 +46,7 @@ import {
   getAvailableSlotsForDay,
   createAppointmentWithCapacityCheck,
   type Slot,
-} from '@features/scheduling/services/availability.service';
+} from '@features/appointments/services/availability.service';
 import type {
   VehicleType,
   CarCategory,

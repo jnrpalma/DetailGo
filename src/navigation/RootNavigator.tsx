@@ -6,7 +6,7 @@ import type { RootStackParamList } from '@app/types';
 
 import { useAuth, LoginScreen, RegisterScreen } from '@features/auth';
 import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
-import AppointmentScreen from '@features/scheduling/screens/AppointmentScreen';
+import AppointmentScreen from '@features/appointments/screens/AppointmentScreen';
 import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
 import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
 import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
