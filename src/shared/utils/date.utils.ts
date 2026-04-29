@@ -91,4 +91,13 @@ export const dateUtils = {
   isExpired: (startAtMs: number, graceMs: number = 15 * 60 * 1000): boolean => {
     return Date.now() > startAtMs + graceMs;
   },
+
+  isToday: (date: Date): boolean => {
+    const now = new Date();
+    return (
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  },
 } as const;

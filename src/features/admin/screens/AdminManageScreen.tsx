@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 
 import { colors, spacing, radii } from '@shared/theme';
+import { formatUtils } from '@shared/utils/format.utils';
 import { useShop } from '@features/shops/context/ShopContext';
 import { updateShopName } from '@features/shops/services/shop.service';
 import {
@@ -163,7 +164,7 @@ export default function AdminManageScreen() {
           <ChevronDown size={18} color={colors.primary.main} />
         </TouchableOpacity>
         <Text style={styles.stepperValue}>
-          {String(settings?.[field] ?? 0).padStart(2, '0')}:00
+          {formatUtils.padZero(settings?.[field] ?? 0)}:00
         </Text>
         <TouchableOpacity
           style={styles.stepperBtn}

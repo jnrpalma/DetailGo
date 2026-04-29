@@ -51,6 +51,7 @@ import type {
   VehicleType,
   CarCategory,
 } from '@features/appointments/domain/appointment.types';
+import { CAR_CATEGORIES } from '@features/appointments/domain/appointment.constants';
 import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 import { colors, spacing, radii, borders } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
@@ -66,13 +67,6 @@ const SERVICE_ICONS = {
 } as const;
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
-
-const CAR_CATEGORIES: CarCategory[] = [
-  'Hatch',
-  'Sedan',
-  'SUV',
-  'Picape cabine dupla',
-];
 
 const SERVICES = [
   {

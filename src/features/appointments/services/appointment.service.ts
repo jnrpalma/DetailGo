@@ -8,25 +8,11 @@ import {
 import { getAuth } from '@react-native-firebase/auth';
 import type { AppointmentStatus } from '../domain/appointment.types';
 import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
+import { mapFirestoreError } from '@shared/utils/firebase.utils';
 
 export type CancelAppointmentResult =
   | { ok: true; message: string; data?: any }
   | { ok: false; message: string; code?: string };
-
-function mapFirebaseError(error: any): string {
-  const code = error?.code || '';
-
-  switch (code) {
-    case 'permission-denied':
-      return 'Você não tem permissão para isso.';
-    case 'not-found':
-      return 'Agendamento não encontrado.';
-    case 'deadline-exceeded':
-      return 'Tempo limite excedido. Tente novamente.';
-    default:
-      return error?.message || 'Erro ao processar agendamento. Tente novamente.';
-  }
-}
 
 export function getAppointmentRules(appointment: {
   status: AppointmentStatus;
@@ -157,6 +143,6 @@ export async function cancelAppointment(
     return { ok: true, message: 'Agendamento cancelado com sucesso!' };
   } catch (error: any) {
     console.error('Erro ao cancelar agendamento:', error);
-    return { ok: false, message: mapFirebaseError(error) };
+    return { ok: false, message: mapFirestoreError(error) };
   }
 }

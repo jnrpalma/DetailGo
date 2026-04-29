@@ -1,4 +1,5 @@
 import { AppointmentStatus } from '@features/appointments';
+import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
 import {
   doc,
   getDoc,
@@ -11,9 +12,6 @@ import {
   where,
 } from '@react-native-firebase/firestore';
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-
-const NO_SHOW_GRACE_MIN = 15;
-const NO_SHOW_GRACE_MS = NO_SHOW_GRACE_MIN * 60 * 1000;
 
 export async function updateAppointmentStatus(params: {
   shopId: string;

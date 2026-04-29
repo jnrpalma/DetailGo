@@ -21,6 +21,7 @@ import type {
   AppointmentStatus,
 } from '@features/appointments/domain/appointment.types';
 import { APPOINTMENT } from '@features/appointments/domain/appointment.constants';
+import { dateUtils } from '@shared/utils/date.utils';
 
 type QDoc =
   FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
@@ -58,26 +59,6 @@ export class AvailabilityError extends Error {
     this.name = 'AvailabilityError';
     this.code = code;
   }
-}
-
-function toDayKey(dateOrMs: Date | number): string {
-  const d = typeof dateOrMs === 'number' ? new Date(dateOrMs) : dateOrMs;
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function startOfDay(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function endOfDay(date: Date): number {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d.getTime();
 }
 
 function overlaps(
@@ -194,9 +175,9 @@ export async function getAvailableSlotsForDay(
   shopId: string,
 ): Promise<Slot[]> {
   const settings = await getShopSettings(shopId);
-  const dayKey = toDayKey(day);
-  const dayStart = startOfDay(day);
-  const dayEnd = endOfDay(day);
+  const dayKey = dateUtils.toDayKey(day);
+  const dayStart = dateUtils.startOfDay(day);
+  const dayEnd = dateUtils.endOfDay(day);
 
   const appointments = await getScheduledAppointmentsForDay(
     shopId,
@@ -239,7 +220,7 @@ export async function createAppointmentWithCapacityCheck(
   const { shopId } = input;
   const settings = await getShopSettings(shopId);
   const customerName = await getCustomerName(input.customerUid);
-  const dayKey = toDayKey(input.startAtMs);
+  const dayKey = dateUtils.toDayKey(input.startAtMs);
 
   const slot: Slot = {
     startAtMs: input.startAtMs,
@@ -330,7 +311,7 @@ export async function checkSlotAvailability(
   shopId: string,
 ): Promise<{ available: boolean; reason?: string }> {
   const settings = await getShopSettings(shopId);
-  const dayKey = toDayKey(startAtMs);
+  const dayKey = dateUtils.toDayKey(startAtMs);
   const endAtMs = startAtMs + durationMin * 60 * 1000;
 
   const slot: Slot = { startAtMs, endAtMs, durationMin };

@@ -19,6 +19,8 @@ import {
   limit,
   Timestamp,
 } from '@react-native-firebase/firestore';
+import { mapFirebaseAuthError } from '@shared/utils/firebase.utils';
+import { stringUtils } from '@shared/utils/string.utils';
 
 export type UserRole = 'owner' | 'customer';
 
@@ -42,35 +44,6 @@ export type AuthResult =
     }
   | { ok: false; message: string; code?: string };
 
-function mapFirebaseError(
-  code?: string,
-  fallback = 'Ocorreu um erro. Tente novamente.',
-) {
-  switch (code) {
-    case 'auth/invalid-email':
-      return 'E-mail inválido.';
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-      return 'E-mail ou senha inválidos.';
-    case 'auth/email-already-in-use':
-      return 'Este e-mail já está em uso.';
-    case 'auth/weak-password':
-      return 'A senha é muito fraca (mínimo 6 caracteres).';
-    case 'permission-denied':
-      return 'Sem permissão para acessar o banco de dados.';
-    default:
-      return fallback;
-  }
-}
-
-function generateInviteCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
 
 async function findShopByCode(inviteCode: string): Promise<string | null> {
   const db = getFirestore();
@@ -91,7 +64,7 @@ async function registerAsOwner(
   const db = getFirestore();
   const shopRef = doc(collection(db, 'shops'));
   const shopId = shopRef.id;
-  const code = generateInviteCode();
+  const code = stringUtils.generateRandomCode();
   const shopName = data.shopName?.trim() || 'Minha Estética';
 
   const trialEndsAt = Timestamp.fromMillis(Date.now() + 14 * 24 * 60 * 60 * 1000);
@@ -165,7 +138,7 @@ export async function signIn(
   } catch (e: any) {
     return {
       ok: false,
-      message: mapFirebaseError(e?.code, 'Erro ao autenticar.'),
+      message: mapFirebaseAuthError(e?.code, 'Erro ao autenticar.'),
       code: e?.code,
     };
   }
@@ -193,7 +166,7 @@ export async function register(data: RegisterInput): Promise<AuthResult> {
   } catch (e: any) {
     return {
       ok: false,
-      message: e?.message ?? mapFirebaseError(e?.code, 'Erro ao criar conta.'),
+      message: e?.message ?? mapFirebaseAuthError(e?.code, 'Erro ao criar conta.'),
       code: e?.code,
     };
   }
