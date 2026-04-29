@@ -1,7 +1,6 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@app/*": ["src/app/*"],
