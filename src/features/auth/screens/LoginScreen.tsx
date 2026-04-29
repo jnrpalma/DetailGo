@@ -16,7 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react-native';
-import Svg, { Defs, Pattern, Path as SvgPath, Rect } from 'react-native-svg';
+import Svg, { Path as SvgPath } from 'react-native-svg';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
@@ -84,14 +84,67 @@ export default function LoginScreen() {
       >
         {/* ── Hero ──────────────────────────────────────────── */}
         <View style={[styles.hero, { height: HERO_H }]}>
-          {/* Grid SVG */}
-          <Svg style={StyleSheet.absoluteFill} opacity={0.15}>
-            <Defs>
-              <Pattern id="grid" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-                <SvgPath d="M 32 0 L 0 0 0 32" fill="none" stroke="#fff" strokeWidth={0.5} />
-              </Pattern>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#grid)" />
+          {/* Pista em curva — perspectiva aérea de circuito */}
+          <Svg style={StyleSheet.absoluteFill} viewBox="0 0 360 520" preserveAspectRatio="none">
+            {/* Superfície da pista (fill muito sutil) */}
+            <SvgPath
+              d="M 420 520 C 390 370, 260 240, 130 160 C 60 118, -30 90, -70 55 L -70 -5 C -20 32, 80 68, 170 122 C 300 200, 410 360, 420 520 Z"
+              fill="rgba(255,255,255,0.025)"
+            />
+
+            {/* Borda externa da pista */}
+            <SvgPath
+              d="M 420 520 C 390 370, 260 240, 130 160 C 60 118, -30 90, -70 55"
+              stroke="rgba(255,255,255,0.22)"
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+            />
+
+            {/* Borda interna da pista */}
+            <SvgPath
+              d="M 240 520 C 220 390, 155 280, 75 215 C 28 180, -18 162, -70 148"
+              stroke="rgba(255,255,255,0.10)"
+              strokeWidth={1.5}
+              fill="none"
+              strokeLinecap="round"
+            />
+
+            {/* Linha de corrida — tracejada neon */}
+            <SvgPath
+              d="M 325 520 C 305 380, 210 260, 103 188 C 48 155, -22 138, -70 102"
+              stroke="rgba(212,255,61,0.28)"
+              strokeWidth={1.2}
+              strokeDasharray="26 14"
+              fill="none"
+              strokeLinecap="round"
+            />
+
+            {/* Marcadores de kerb externos (3 traços curtos) */}
+            <SvgPath
+              d="M 370 490 L 358 488"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+            <SvgPath
+              d="M 330 420 L 320 412"
+              stroke="rgba(255,255,255,0.2)"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+            <SvgPath
+              d="M 270 340 L 260 328"
+              stroke="rgba(255,255,255,0.15)"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+            />
+            <SvgPath
+              d="M 190 268 L 180 256"
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+            />
           </Svg>
 
           {/* Glows */}
