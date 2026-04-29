@@ -20,8 +20,8 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
         with:
-          # Sem tokens extras — apenas leitura do repo
           persist-credentials: false
+          submodules: false  # ignora worktrees e submodulos do Claude
 
       - name: Configura Node.js
         uses: actions/setup-node@v4
@@ -31,15 +31,12 @@ jobs:
 
       - name: Instala dependências
         run: npm ci
-        # npm ci é mais seguro que npm install em CI:
-        # usa package-lock.json exato, não modifica nada
 
       - name: Verifica formatação (Prettier)
         run: npm run format:check
 
       - name: Verifica tipos TypeScript
         run: npx tsc --noEmit
-        # Garante que não há erros de tipo no código
 
   commit-lint:
     name: Valida mensagens de commit
@@ -52,6 +49,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          submodules: false
 
       - name: Configura Node.js
         uses: actions/setup-node@v4
@@ -68,4 +66,3 @@ jobs:
             --from ${{ github.event.pull_request.base.sha }} \
             --to ${{ github.event.pull_request.head.sha }} \
             --verbose
-        # Verifica TODOS os commits do PR, não só o último
