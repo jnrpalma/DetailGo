@@ -47,14 +47,14 @@ export async function updateAppointmentStatus(params: {
   const qy = query(userCol, where('appointmentId', '==', appointmentId));
   const snap = await getDocs(qy);
 
-  const payload: Record<string, unknown> = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: Record<string, any> = {
     status,
     updatedAt: serverTimestamp(),
+    ...(status === 'in_progress' && { startedAt: serverTimestamp() }),
+    ...(status === 'done' && { doneAt: serverTimestamp() }),
+    ...(status === 'no_show' && { noShowAt: serverTimestamp() }),
   };
-
-  if (status === 'in_progress') payload.startedAt = serverTimestamp();
-  if (status === 'done') payload.doneAt = serverTimestamp();
-  if (status === 'no_show') payload.noShowAt = serverTimestamp();
 
   const updates: Promise<void>[] = [updateDoc(globalRef, payload)];
 

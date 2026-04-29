@@ -230,6 +230,7 @@ export default function AdminDashboardScreen() {
               noShowMarkedRef.current.add(it.id);
               try {
                 await updateAppointmentStatus({
+                  shopId: shopId ?? '',
                   appointmentId: it.id,
                   customerUid: it.customerUid,
                   status: 'no_show',

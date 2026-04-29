@@ -11,5 +11,5 @@
     "moduleResolution": "bundler"
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["**/node_modules", "**/Pods"]
+  "exclude": ["**/node_modules", "**/Pods", "functions/**"]
 }
