@@ -31,11 +31,6 @@ O DetailGo permite que o usuário atue em dois perfis:
 
 ---
 
-## 📱 Preview
-📸 Em breve screenshots do app
-
----
-
 ## ✨ Funcionalidades
 
 * 📅 Agendamento de serviços
