@@ -7,6 +7,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,46 +18,54 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LinearGradient from 'react-native-linear-gradient';
 
 import { launchImageLibrary, type ImageLibraryOptions } from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
 import { doc, getFirestore, onSnapshot, setDoc } from '@react-native-firebase/firestore';
+import {
+  Bell,
+  Calendar,
+  History,
+  LogOut,
+  User,
+  ChevronRight,
+  ArrowRight,
+  Droplets,
+  Sparkles,
+  Zap,
+  Wrench,
+  Car,
+  Clock,
+  Link as LinkIcon,
+  Menu,
+} from 'lucide-react-native';
 
-import { colors, spacing, radii } from '@shared/theme';
+import { darkColors as D } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
-
 import { useAuth } from '@features/auth';
 import { useShop } from '@features/shops/context/ShopContext';
 import { joinShop } from '@features/shops/services/joinShop.service';
 import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
-import AppointmentCard from '@features/appointments/ui/components/AppointmentCard';
 import type { RootStackParamList } from '@app/types';
-
-import {
-  Calendar,
-  History,
-  Link as LinkIcon,
-  LogOut,
-  Settings,
-  User,
-  ChevronRight,
-  Camera,
-  Bell,
-} from 'lucide-react-native';
+import type { UserAppointment } from '@features/appointments/domain/appointment.types';
+import { dateUtils } from '@shared/utils/date.utils';
+import { formatUtils } from '@shared/utils/format.utils';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 type UserProfile = {
   firstName?: string;
   lastName?: string;
-  coverUrl?: string;
   photoURL?: string;
-  coverB64?: string;
   photoB64?: string;
 };
 
-const AVATAR_SIZE = UI.AVATAR_SIZE;
+const SERVICES = [
+  { label: 'Lavagem\nsimples', duration: '30min', price: 'R$ 50', Icon: Droplets },
+  { label: 'Lavagem\ncompleta', duration: '60min', price: 'R$ 80', Icon: Sparkles },
+  { label: 'Polimento', duration: '2h', price: 'R$ 220', Icon: Zap },
+  { label: 'Lavagem\nde motor', duration: '45min', price: 'R$ 70', Icon: Wrench },
+];
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NavProp>();
@@ -69,7 +78,7 @@ export default function DashboardScreen() {
   const [profile, setProfile] = useState<UserProfile>({
     photoURL: user.photoURL ?? undefined,
   });
-  const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
+  const [saving, setSaving] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-UI.MENU_WIDTH)).current;
 
@@ -83,59 +92,58 @@ export default function DashboardScreen() {
     limitN: 30,
   });
 
+  const nextAppointment = appointments[0] ?? null;
+  const recentAppointments = appointments.slice(0, 3);
+
   useEffect(() => {
     const db = getFirestore();
-    const userRef = doc(db, 'users', uid);
-
-    const unsubProfile = onSnapshot(userRef, snap => {
+    const unsub = onSnapshot(doc(db, 'users', uid), snap => {
       const data = snap.data() as UserProfile | undefined;
-      if (data) {
-        setProfile(p => ({
-          ...p,
-          ...data,
-          photoURL: data.photoURL ?? p.photoURL ?? user.photoURL ?? undefined,
-        }));
-      }
+      if (data) setProfile(p => ({ ...p, ...data }));
     });
+    return () => unsub();
+  }, [uid]);
 
-    return () => unsubProfile();
-  }, [uid, user.photoURL]);
+  // ── Avatar initials ──
+  const initials = profile.firstName
+    ? `${profile.firstName[0]}${profile.lastName?.[0] ?? ''}`.toUpperCase()
+    : user.displayName
+        ?.split(' ')
+        .map(w => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() ?? 'U';
 
-  const pickImage = async () => {
-    const opts: ImageLibraryOptions = {
-      mediaType: 'photo',
-      selectionLimit: 1,
-      includeBase64: true,
-      quality: 0.7,
-      maxWidth: 500,
-      maxHeight: 500,
-    };
+  const firstName = profile.firstName ?? user.displayName?.split(' ')[0] ?? 'Você';
 
-    const res = await launchImageLibrary(opts);
-    if (res.didCancel) return null;
-
-    const asset = res.assets?.[0];
-    if (!asset?.base64) return null;
-
-    const mime = asset.type?.startsWith('image/') ? asset.type : 'image/jpeg';
-    return `data:${mime};base64,${asset.base64}`;
-  };
-
+  // ── Avatar pick ──
   const saveAvatar = async () => {
     try {
-      const b64 = await pickImage();
-      if (!b64) return;
-
-      setSaving('avatar');
+      const res = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        includeBase64: true,
+        quality: 0.7,
+        maxWidth: 500,
+        maxHeight: 500,
+      } as ImageLibraryOptions);
+      if (res.didCancel) return;
+      const asset = res.assets?.[0];
+      if (!asset?.base64) return;
+      setSaving(true);
+      const b64 = `data:${asset.type?.startsWith('image/') ? asset.type : 'image/jpeg'};base64,${
+        asset.base64
+      }`;
       await setDoc(doc(getFirestore(), 'users', uid), { photoB64: b64 }, { merge: true });
       setProfile(p => ({ ...p, photoB64: b64 }));
-    } catch (error) {
+    } catch {
       Alert.alert('Erro', 'Não foi possível atualizar a foto');
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   };
 
+  // ── Drawer ──
   const toggleMenu = () => {
     if (menuVisible) {
       Animated.timing(slideAnim, {
@@ -153,24 +161,12 @@ export default function DashboardScreen() {
     }
   };
 
-  const navigateFromMenu = (route: keyof RootStackParamList, params?: any) => {
-    toggleMenu();
-    navigation.navigate(route, params);
-  };
-
-  const navigateDirect = (route: keyof RootStackParamList, params?: any) => {
-    navigation.navigate(route, params);
-  };
-
   const handleSignOut = async () => {
-    try {
-      toggleMenu();
-      await signOut();
-    } catch {
-      Alert.alert('Erro', 'Falha ao sair da conta');
-    }
+    toggleMenu();
+    await signOut();
   };
 
+  // ── Join shop ──
   const handleJoinShop = async () => {
     if (joinCode.trim().length !== 6) {
       Alert.alert('Atenção', 'O código deve ter 6 caracteres.');
@@ -181,621 +177,688 @@ export default function DashboardScreen() {
       await joinShop(uid, joinCode);
       setJoinModalVisible(false);
       setJoinCode('');
-      Alert.alert(
-        'Vinculado!',
-        'Sua conta foi vinculada à estética. Agora você pode agendar serviços!',
-      );
+      Alert.alert('Vinculado!', 'Agora você pode agendar serviços!');
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Código inválido. Tente novamente.');
+      Alert.alert('Erro', e?.message ?? 'Código inválido.');
     } finally {
       setJoiningShop(false);
     }
   };
 
-  // TODO AQUI
-  const handleNotifications = () => {
-    Alert.alert('Notificações', 'Em breve você receberá notificações sobre seus agendamentos!', [
-      { text: 'OK' },
-    ]);
+  const goToAppointment = () => {
+    if (!shopId) {
+      setJoinModalVisible(true);
+      return;
+    }
+    navigation.navigate('Appointment');
   };
-
-  const fullName = profile.firstName
-    ? `${profile.firstName} ${profile.lastName || ''}`
-    : user.displayName || 'Usuário';
-
-  const avatarSource = profile.photoB64
-    ? { uri: profile.photoB64 }
-    : profile.photoURL
-    ? { uri: profile.photoURL }
-    : null;
-
-  const recentAppointments = appointments.slice(0, 3);
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary.main} />
+      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        <View style={styles.container}>
-          <LinearGradient
-            colors={[colors.primary.main, colors.secondary.main]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
-            <View style={styles.headerTop}>
-              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
-                <View style={styles.menuIcon}>
-                  <View style={styles.menuBar} />
-                  <View style={[styles.menuBar, { width: 20 }]} />
-                  <View style={[styles.menuBar, { width: 16 }]} />
-                </View>
-              </TouchableOpacity>
-
-              <Text style={styles.brand}>DETAILGO</Text>
-
-              <TouchableOpacity
-                onPress={handleNotifications}
-                style={styles.notificationButton}
-                activeOpacity={0.7}
-              >
-                <Bell size={22} color={colors.text.white} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Perfil do usuário */}
-            <View style={styles.profileSection}>
-              <TouchableOpacity
-                onPress={saveAvatar}
-                style={styles.avatarWrapper}
-                activeOpacity={0.9}
-              >
-                {avatarSource ? (
-                  <Image source={avatarSource} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <User size={40} color={colors.primary.main} />
-                  </View>
-                )}
-                {saving === 'avatar' && (
-                  <View style={styles.avatarLoading}>
-                    <ActivityIndicator color={colors.primary.main} />
-                  </View>
-                )}
-                <View style={styles.cameraBadge}>
-                  <Camera size={14} color={colors.text.white} />
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{fullName}</Text>
-                <Text style={styles.userEmail}>{user.email}</Text>
-              </View>
-            </View>
-          </LinearGradient>
-
-          {/* Conteúdo principal */}
-          <View style={styles.content}>
-            {/* Card de vinculação — só aparece quando sem shopId */}
-            {!shopId && (
-              <TouchableOpacity
-                style={styles.joinCard}
-                onPress={() => setJoinModalVisible(true)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.joinCardIcon}>
-                  <LinkIcon size={22} color={colors.primary.main} />
-                </View>
-                <View style={styles.joinCardText}>
-                  <Text style={styles.joinCardTitle}>Vincule-se a uma estética</Text>
-                  <Text style={styles.joinCardDesc}>Toque aqui e insira o código de convite</Text>
-                </View>
-                <ChevronRight size={18} color={colors.primary.main} />
-              </TouchableOpacity>
-            )}
-
-            {/* Botão de agendamento */}
-            <TouchableOpacity
-              style={[styles.bookingButton, !shopId && styles.bookingButtonDisabled]}
-              onPress={() => {
-                if (!shopId) {
-                  setJoinModalVisible(true);
-                  return;
-                }
-                navigateDirect('Appointment');
-              }}
-              activeOpacity={0.9}
-            >
-              <LinearGradient
-                colors={[colors.primary.main, colors.secondary.main]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.bookingGradient}
-              >
-                <Calendar size={22} color={colors.text.white} />
-                <Text style={styles.bookingText}>Agendar novo serviço</Text>
-                <ChevronRight size={20} color={colors.text.white} />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Próximos serviços</Text>
-                {appointments.length > 3 && (
-                  <TouchableOpacity onPress={() => navigateDirect('MyAppointments')}>
-                    <Text style={styles.sectionLink}>Ver todos</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {loadingAppointments ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator color={colors.primary.main} />
-                </View>
-              ) : recentAppointments.length > 0 ? (
-                <FlatList
-                  data={recentAppointments}
-                  keyExtractor={item => item.id}
-                  renderItem={({ item }) => <AppointmentCard item={item} />}
-                  ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-                  scrollEnabled={false}
-                  style={styles.appointmentsList}
-                />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Header ── */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.avatarWrap} onPress={saveAvatar} activeOpacity={0.8}>
+              {profile.photoB64 ? (
+                <Image source={{ uri: profile.photoB64 }} style={styles.avatarImg} />
               ) : (
-                <View style={styles.emptyState}>
-                  <Calendar size={48} color={colors.text.disabled} />
-                  <Text style={styles.emptyStateTitle}>Nenhum serviço agendado</Text>
-                  <Text style={styles.emptyStateText}>
-                    Agende seu primeiro serviço de estética automotiva
-                  </Text>
+                <View style={styles.avatarInitials}>
+                  <Text style={styles.avatarInitialsText}>{initials}</Text>
                 </View>
               )}
+            </TouchableOpacity>
+
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerGreeting}>OLÁ,</Text>
+              <Text style={styles.headerName}>{firstName}</Text>
+            </View>
+
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => Alert.alert('Notificações', 'Em breve!')}
+                activeOpacity={0.7}
+              >
+                <Bell size={18} color={D.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={toggleMenu} activeOpacity={0.7}>
+                <Menu size={18} color={D.ink} />
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
 
-        {/* Menu lateral */}
+          {/* ── Vincule-se card (sem shopId) ── */}
+          {!shopId && (
+            <TouchableOpacity
+              style={styles.joinCard}
+              onPress={() => setJoinModalVisible(true)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.joinIconWrap}>
+                <LinkIcon size={18} color={D.primary} />
+              </View>
+              <View style={styles.joinCardText}>
+                <Text style={styles.joinCardTitle}>Vincule-se a uma estética</Text>
+                <Text style={styles.joinCardDesc}>Insira o código de convite para agendar</Text>
+              </View>
+              <ChevronRight size={16} color={D.primary} />
+            </TouchableOpacity>
+          )}
+
+          {/* ── Hero card — próximo agendamento ── */}
+          {nextAppointment ? (
+            <View style={styles.heroCard}>
+              <View style={styles.heroGlow} />
+              <Text style={styles.heroLabel}>PRÓXIMO AGENDAMENTO</Text>
+              <Text style={styles.heroTitle}>
+                {nextAppointment.serviceLabel}
+                {'\n'}
+                <Text style={{ color: D.primary }}>
+                  ·{' '}
+                  {dateUtils.isToday(new Date(nextAppointment.startAtMs))
+                    ? 'hoje'
+                    : dateUtils.formatDate(nextAppointment.startAtMs)}
+                  {', '}
+                  {dateUtils.formatHour(nextAppointment.startAtMs)}
+                </Text>
+              </Text>
+
+              <View style={styles.heroTags}>
+                <HeroTag
+                  icon={<Car size={11} color={D.ink3} />}
+                  label={nextAppointment.carCategory ?? nextAppointment.vehicleType}
+                />
+                <HeroTag
+                  icon={<Clock size={11} color={D.ink3} />}
+                  label={`${nextAppointment.durationMin ?? 60} min`}
+                />
+              </View>
+
+              <View style={styles.heroBtns}>
+                <TouchableOpacity
+                  style={styles.heroBtnPrimary}
+                  onPress={() => navigation.navigate('MyAppointments')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.heroBtnPrimaryText}>Ver detalhes</Text>
+                  <ArrowRight size={14} color="#0B0D0E" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.heroBtnGhost}
+                  onPress={() =>
+                    navigation.navigate('Appointment', {
+                      mode: 'reschedule',
+                      originalAppointmentId: nextAppointment.id,
+                      vehicleType: nextAppointment.vehicleType,
+                      carCategory: nextAppointment.carCategory,
+                      serviceLabel: nextAppointment.serviceLabel,
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.heroBtnGhostText}>Reagendar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.heroCardEmpty}>
+              <View style={styles.heroGlow} />
+              <Text style={styles.heroLabel}>PRÓXIMO AGENDAMENTO</Text>
+              <Text style={styles.heroEmptyText}>Nenhum serviço agendado{'\n'}ainda.</Text>
+              <TouchableOpacity
+                style={styles.heroBtnPrimary}
+                onPress={goToAppointment}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.heroBtnPrimaryText}>Agendar agora</Text>
+                <ArrowRight size={14} color="#0B0D0E" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Serviços ── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Serviços</Text>
+              <TouchableOpacity onPress={goToAppointment}>
+                <Text style={styles.sectionLink}>Agendar →</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.servicesRail}
+            >
+              {SERVICES.map((svc, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.serviceCard}
+                  onPress={goToAppointment}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.serviceIconWrap}>
+                    <svc.Icon size={18} color={D.primary} />
+                  </View>
+                  <Text style={styles.serviceLabel}>{svc.label}</Text>
+                  <View style={styles.serviceFooter}>
+                    <Text style={styles.serviceDuration}>{svc.duration}</Text>
+                    <Text style={styles.servicePrice}>{svc.price}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* ── Recente ── */}
+          {loadingAppointments ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={D.primary} size="small" />
+            </View>
+          ) : recentAppointments.length > 0 ? (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recente</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('History')}>
+                  <Text style={styles.sectionLink}>Ver tudo →</Text>
+                </TouchableOpacity>
+              </View>
+
+              {recentAppointments.map((appt, i) => (
+                <RecentRow key={appt.id} appt={appt} last={i === recentAppointments.length - 1} />
+              ))}
+            </View>
+          ) : null}
+
+          <View style={{ height: 32 }} />
+        </ScrollView>
+
+        {/* ── Drawer ── */}
         {menuVisible && (
           <>
             <Pressable style={styles.overlay} onPress={toggleMenu} />
             <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
               <View style={styles.drawerHeader}>
-                <View style={styles.drawerUserInfo}>
-                  <Text style={styles.drawerUserName}>{fullName}</Text>
-                  <Text style={styles.drawerUserEmail}>{user.email}</Text>
+                <View style={styles.drawerAvatar}>
+                  <Text style={styles.drawerAvatarText}>{initials}</Text>
                 </View>
+                <Text style={styles.drawerName}>{firstName}</Text>
+                <Text style={styles.drawerEmail}>{user.email}</Text>
               </View>
 
-              <View style={styles.drawerContent}>
-                <TouchableOpacity
-                  style={styles.drawerItem}
-                  onPress={() => navigateFromMenu('Profile')}
-                >
-                  <User size={22} color={colors.primary.main} />
-                  <Text style={styles.drawerItemText}>Perfil</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.drawerItem}
-                  onPress={() => navigateFromMenu('MyAppointments')}
-                >
-                  <Calendar size={22} color={colors.primary.main} />
-                  <Text style={styles.drawerItemText}>Meus agendamentos</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.drawerItem}
-                  onPress={() => navigateFromMenu('History')}
-                >
-                  <History size={22} color={colors.primary.main} />
-                  <Text style={styles.drawerItemText}>Histórico</Text>
-                </TouchableOpacity>
-
-                <View style={styles.drawerDivider} />
-
-                <TouchableOpacity
-                  style={[styles.drawerItem, styles.drawerLogout]}
-                  onPress={handleSignOut}
-                >
-                  <LogOut size={22} color={colors.status.error} />
-                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
-                </TouchableOpacity>
+              <View style={styles.drawerMenu}>
+                <DrawerItem
+                  icon={<Calendar size={18} color={D.primary} />}
+                  label="Meus agendamentos"
+                  onPress={() => {
+                    toggleMenu();
+                    navigation.navigate('MyAppointments');
+                  }}
+                />
+                <DrawerItem
+                  icon={<History size={18} color={D.primary} />}
+                  label="Histórico"
+                  onPress={() => {
+                    toggleMenu();
+                    navigation.navigate('History');
+                  }}
+                />
+                <DrawerItem
+                  icon={<User size={18} color={D.primary} />}
+                  label="Perfil"
+                  onPress={() => {
+                    toggleMenu();
+                    navigation.navigate('Profile');
+                  }}
+                />
+                {!shopId && (
+                  <DrawerItem
+                    icon={<LinkIcon size={18} color={D.primary} />}
+                    label="Vincular estética"
+                    onPress={() => {
+                      toggleMenu();
+                      setJoinModalVisible(true);
+                    }}
+                  />
+                )}
               </View>
+
+              <View style={styles.drawerDivider} />
+
+              <DrawerItem
+                icon={<LogOut size={18} color={D.accent} />}
+                label="Sair"
+                onPress={handleSignOut}
+                danger
+              />
             </Animated.View>
           </>
         )}
-      </SafeAreaView>
 
-      {/* Modal de vinculação à estética */}
-      <Modal
-        visible={joinModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setJoinModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setJoinModalVisible(false)}>
-          <Pressable style={styles.modalBox} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Código de convite</Text>
-            <Text style={styles.modalDesc}>
-              Peça o código de 6 letras para a estética que deseja usar e insira abaixo.
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={joinCode}
-              onChangeText={t => setJoinCode(t.toUpperCase())}
-              placeholder="Ex: AB34CD"
-              placeholderTextColor={colors.text.disabled}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={6}
-              editable={!joiningShop}
-            />
-            <TouchableOpacity
-              style={[
-                styles.modalBtn,
-                (joinCode.trim().length !== 6 || joiningShop) && styles.modalBtnDisabled,
-              ]}
-              onPress={handleJoinShop}
-              disabled={joinCode.trim().length !== 6 || joiningShop}
-              activeOpacity={0.8}
-            >
-              {joiningShop ? (
-                <ActivityIndicator color={colors.text.white} />
-              ) : (
-                <Text style={styles.modalBtnText}>Vincular minha conta</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setJoinModalVisible(false)} style={styles.modalCancel}>
-              <Text style={styles.modalCancelText}>Cancelar</Text>
-            </TouchableOpacity>
+        {/* ── Modal join shop ── */}
+        <Modal
+          visible={joinModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setJoinModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setJoinModalVisible(false)}>
+            <Pressable style={styles.modalBox} onPress={() => {}}>
+              <Text style={styles.modalTitle}>Código de convite</Text>
+              <Text style={styles.modalDesc}>
+                Peça o código de 6 letras para a estética e insira abaixo.
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                value={joinCode}
+                onChangeText={t => setJoinCode(t.toUpperCase())}
+                placeholder="Ex: AB34CD"
+                placeholderTextColor={D.ink3}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={6}
+                editable={!joiningShop}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  (joinCode.trim().length !== 6 || joiningShop) && styles.modalBtnDisabled,
+                ]}
+                onPress={handleJoinShop}
+                disabled={joinCode.trim().length !== 6 || joiningShop}
+                activeOpacity={0.8}
+              >
+                {joiningShop ? (
+                  <ActivityIndicator color="#0B0D0E" />
+                ) : (
+                  <Text style={styles.modalBtnText}>Vincular minha conta</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setJoinModalVisible(false)}
+                style={styles.modalCancel}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      </SafeAreaView>
     </>
   );
 }
 
+// ── Sub-components ────────────────────────────────────────────
+
+function HeroTag({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <View style={styles.heroTag}>
+      {icon}
+      <Text style={styles.heroTagText}>{label}</Text>
+    </View>
+  );
+}
+
+function RecentRow({ appt, last }: { appt: UserAppointment; last: boolean }) {
+  const statusColor =
+    appt.status === 'done' ? '#22C55E' : appt.status === 'cancelled' ? '#FF5C39' : '#A8B0B4';
+  return (
+    <View style={[styles.recentRow, !last && styles.recentRowBorder]}>
+      <View style={styles.recentIconWrap}>
+        <Sparkles size={14} color={D.primary} />
+      </View>
+      <View style={styles.recentInfo}>
+        <Text style={styles.recentTitle}>{appt.serviceLabel}</Text>
+        <Text style={styles.recentSub}>
+          {appt.carCategory ?? appt.vehicleType} · {dateUtils.formatDate(appt.startAtMs)}
+        </Text>
+      </View>
+      <Text style={[styles.recentPrice, { color: statusColor }]}>
+        {formatUtils.currencyCompact(appt.price)}
+      </Text>
+    </View>
+  );
+}
+
+function DrawerItem({
+  icon,
+  label,
+  onPress,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity style={styles.drawerItem} onPress={onPress} activeOpacity={0.7}>
+      {icon}
+      <Text style={[styles.drawerItemText, danger && styles.drawerItemDanger]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background.main,
-  },
-  container: {
-    flex: 1,
-  },
+  safe: { flex: 1, backgroundColor: D.bg },
+  scroll: { flex: 1 },
+  scrollContent: { paddingTop: 16 },
+
+  // Header
   header: {
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 32,
-    borderBottomLeftRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-  },
-  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    paddingHorizontal: 20,
+    marginBottom: 18,
+    gap: 12,
   },
-  menuButton: {
-    padding: spacing.xs,
-  },
-  menuIcon: {
-    width: 24,
-    height: 20,
-    justifyContent: 'space-between',
-  },
-  menuBar: {
-    height: 2,
-    width: 24,
-    backgroundColor: colors.text.white,
-    borderRadius: 2,
-  },
-  brand: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.white,
-    letterSpacing: 1.5,
-  },
-  notificationButton: {
-    padding: spacing.xs,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  avatarWrapper: {
-    position: 'relative',
-  },
-  avatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    borderWidth: 3,
-    borderColor: colors.text.white,
-  },
-  avatarPlaceholder: {
-    backgroundColor: colors.text.white,
+  avatarWrap: { position: 'relative' },
+  avatarImg: { width: 40, height: 40, borderRadius: 20 },
+  avatarInitials: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: D.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+  avatarInitialsText: { fontSize: 14, fontWeight: '800', color: '#0B0D0E' },
+  headerCenter: { flex: 1 },
+  headerGreeting: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: D.ink3,
+    letterSpacing: 0.5,
+  },
+  headerName: { fontSize: 16, fontWeight: '600', color: D.ink },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: D.card,
+    borderWidth: 1,
+    borderColor: D.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
+
+  // Join card
+  joinCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: D.primaryLight,
     borderRadius: 14,
-    backgroundColor: colors.primary.main,
-    borderWidth: 2,
-    borderColor: colors.text.white,
+    borderWidth: 1.5,
+    borderColor: D.primary,
+    padding: 14,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    gap: 12,
+  },
+  joinIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: D.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.white,
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  bookingButton: {
-    marginBottom: 32,
-    borderRadius: radii.lg,
+  joinCardText: { flex: 1 },
+  joinCardTitle: { fontSize: 14, fontWeight: '700', color: D.primary, marginBottom: 2 },
+  joinCardDesc: { fontSize: 12, color: D.primary, opacity: 0.75 },
+
+  // Hero card
+  heroCard: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    backgroundColor: '#141719',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: D.border,
     overflow: 'hidden',
-    shadowColor: colors.primary.main,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
   },
-  bookingGradient: {
+  heroCardEmpty: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    backgroundColor: '#141719',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: D.border,
+    overflow: 'hidden',
+  },
+  heroGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    top: -60,
+    right: -50,
+    borderRadius: 100,
+    backgroundColor: 'rgba(212,255,61,0.18)',
+  },
+  heroLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: D.ink3,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: D.ink,
+    letterSpacing: -0.5,
+    lineHeight: 28,
+    marginBottom: 12,
+  },
+  heroEmptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: D.ink2,
+    lineHeight: 24,
+    marginBottom: 14,
+  },
+  heroTags: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  heroTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: D.border,
   },
-  bookingText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.white,
-    flex: 1,
-    marginLeft: spacing.md,
+  heroTagText: { fontSize: 11, color: D.ink3, fontWeight: '500' },
+  heroBtns: { flexDirection: 'row', gap: 8 },
+  heroBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: D.primary,
   },
-  section: {
-    marginBottom: 32,
+  heroBtnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#0B0D0E' },
+  heroBtnGhost: {
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: D.border,
+    justifyContent: 'center',
   },
+  heroBtnGhostText: { fontSize: 13, fontWeight: '600', color: D.ink },
+
+  // Section
+  section: { marginBottom: 24 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
+    alignItems: 'baseline',
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  sectionLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary.main,
-  },
-  loadingContainer: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  appointmentsList: {
-    marginTop: spacing.xs,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.lg,
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: D.ink },
+  sectionLink: { fontSize: 12, fontWeight: '600', color: D.primary },
+
+  // Services
+  servicesRail: { paddingHorizontal: 20, gap: 10 },
+  serviceCard: {
+    width: 120,
+    padding: 14,
+    backgroundColor: D.card,
     borderWidth: 1,
-    borderColor: colors.border.main,
+    borderColor: D.border,
+    borderRadius: 16,
   },
-  emptyStateTitle: {
-    fontSize: 16,
+  serviceIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: D.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  serviceLabel: {
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.text.secondary,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
+    color: D.ink,
+    lineHeight: 18,
   },
-  emptyStateText: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    lineHeight: 20,
+  serviceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay,
+  serviceDuration: { fontSize: 11, color: D.ink3 },
+  servicePrice: { fontSize: 11, fontWeight: '700', color: D.ink },
+
+  // Recent
+  loadingWrap: { paddingVertical: 24, alignItems: 'center' },
+  recentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
+  recentRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: D.border,
+  },
+  recentIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: D.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recentInfo: { flex: 1 },
+  recentTitle: { fontSize: 13, fontWeight: '600', color: D.ink },
+  recentSub: { fontSize: 11, color: D.ink3, marginTop: 2 },
+  recentPrice: { fontSize: 13, fontWeight: '700' },
+
+  // Drawer
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
   drawer: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
     width: UI.MENU_WIDTH,
-    backgroundColor: colors.background.main,
-    borderTopRightRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 2, height: 0 },
-    elevation: 8,
+    backgroundColor: '#111416',
+    borderRightWidth: 1,
+    borderRightColor: D.border,
+    paddingTop: 60,
   },
   drawerHeader: {
-    padding: spacing.lg,
-    paddingTop: 48,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.main,
+    borderBottomColor: D.border,
   },
-  drawerUserInfo: {
-    gap: spacing.xs,
+  drawerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: D.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  drawerUserName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  drawerUserEmail: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-  },
-  drawerContent: {
-    padding: spacing.md,
-  },
+  drawerAvatarText: { fontSize: 16, fontWeight: '800', color: '#0B0D0E' },
+  drawerName: { fontSize: 16, fontWeight: '700', color: D.ink, marginBottom: 2 },
+  drawerEmail: { fontSize: 12, color: D.ink3 },
+  drawerMenu: { paddingTop: 12 },
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
     gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
   },
-  drawerItemText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
-  },
-  drawerDivider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginVertical: spacing.md,
-  },
-  drawerLogout: {
-    marginTop: 'auto',
-  },
-  drawerLogoutText: {
-    color: colors.status.error,
-    fontWeight: '600',
-  },
-  bookingButtonDisabled: {
-    opacity: 0.5,
-  },
-  joinCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary.light,
-    borderRadius: radii.lg,
-    borderWidth: 1.5,
-    borderColor: colors.primary.main,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  joinCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.background.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  joinCardText: {
-    flex: 1,
-  },
-  joinCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary.main,
-    marginBottom: 2,
-  },
-  joinCardDesc: {
-    fontSize: 12,
-    color: colors.primary.main,
-    opacity: 0.8,
-  },
+  drawerItemText: { fontSize: 15, fontWeight: '500', color: D.ink },
+  drawerItemDanger: { color: D.accent },
+  drawerDivider: { height: 1, backgroundColor: D.border, marginVertical: 8 },
+
+  // Join modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: 20,
   },
   modalBox: {
-    backgroundColor: colors.background.card,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
+    backgroundColor: '#1A1D20',
+    borderRadius: 20,
+    padding: 24,
     width: '100%',
     maxWidth: 360,
+    borderWidth: 1,
+    borderColor: D.border,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  modalDesc: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: D.ink, marginBottom: 6 },
+  modalDesc: { fontSize: 13, color: D.ink2, lineHeight: 20, marginBottom: 18 },
   modalInput: {
     borderWidth: 1.5,
-    borderColor: colors.border.main,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderColor: D.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 24,
     fontWeight: '800',
-    color: colors.text.primary,
+    color: D.ink,
     textAlign: 'center',
     letterSpacing: 6,
-    marginBottom: spacing.md,
-    backgroundColor: colors.background.surface,
+    marginBottom: 14,
+    backgroundColor: D.card,
   },
   modalBtn: {
     height: 48,
-    backgroundColor: colors.primary.main,
-    borderRadius: radii.md,
+    backgroundColor: D.primary,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 10,
   },
-  modalBtnDisabled: {
-    backgroundColor: colors.text.disabled,
-  },
-  modalBtnText: {
-    color: colors.text.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  modalCancel: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  modalCancelText: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    fontWeight: '600',
-  },
+  modalBtnDisabled: { opacity: 0.35 },
+  modalBtnText: { color: '#0B0D0E', fontSize: 15, fontWeight: '700' },
+  modalCancel: { alignItems: 'center', paddingVertical: 8 },
+  modalCancelText: { fontSize: 14, color: D.ink3, fontWeight: '600' },
 });
