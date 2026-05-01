@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  FlatList,
   Image,
   Modal,
   Pressable,
@@ -204,12 +203,22 @@ export default function DashboardScreen() {
         >
           {/* ── Header ── */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.avatarWrap} onPress={saveAvatar} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.avatarWrap}
+              onPress={saveAvatar}
+              activeOpacity={0.8}
+              disabled={saving}
+            >
               {profile.photoB64 ? (
                 <Image source={{ uri: profile.photoB64 }} style={styles.avatarImg} />
               ) : (
                 <View style={styles.avatarInitials}>
                   <Text style={styles.avatarInitialsText}>{initials}</Text>
+                </View>
+              )}
+              {saving && (
+                <View style={styles.avatarSavingOverlay}>
+                  <ActivityIndicator color={D.primary} size="small" />
                 </View>
               )}
             </TouchableOpacity>
@@ -561,6 +570,13 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { position: 'relative' },
   avatarImg: { width: 40, height: 40, borderRadius: 20 },
+  avatarSavingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarInitials: {
     width: 40,
     height: 40,

@@ -11,6 +11,8 @@ export type UserAppointment = {
   serviceLabel: string | null;
   price: number | null;
   startAtMs: number;
+  endAtMs?: number;
+  durationMin?: number;
   status: AppointmentStatus;
   dayKey?: string;
 };
@@ -25,6 +27,7 @@ export type Appointment = {
   price: number | null;
   startAtMs: number;
   endAtMs?: number;
+  durationMin?: number;
   status: AppointmentStatus;
   dayKey?: string;
 };

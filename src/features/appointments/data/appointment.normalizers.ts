@@ -18,10 +18,26 @@ function validateStatus(status: any): AppointmentStatus {
   return 'scheduled';
 }
 
+function normalizeDuration(
+  v: any,
+  startAtMs: number,
+): Pick<UserAppointment, 'endAtMs' | 'durationMin'> {
+  const endAtMs = typeof v.endAtMs === 'number' ? v.endAtMs : undefined;
+  const durationMin =
+    typeof v.durationMin === 'number'
+      ? v.durationMin
+      : endAtMs
+      ? Math.round((endAtMs - startAtMs) / 60000)
+      : undefined;
+
+  return { endAtMs, durationMin };
+}
+
 export function normalizeUserAppointmentFromSubcollection(d: QDoc): UserAppointment | null {
   const v = d.data() as any;
 
   if (typeof v?.whenMs !== 'number') return null;
+  const startAtMs = v.whenMs;
 
   return {
     id: d.id,
@@ -29,7 +45,8 @@ export function normalizeUserAppointmentFromSubcollection(d: QDoc): UserAppointm
     carCategory: v.carCategory ?? null,
     serviceLabel: v.serviceLabel ?? null,
     price: typeof v.price === 'number' ? v.price : null,
-    startAtMs: v.whenMs,
+    startAtMs,
+    ...normalizeDuration(v, startAtMs),
     status: validateStatus(v.status),
     dayKey: v.dayKey,
   };
@@ -48,6 +65,7 @@ export function normalizeUserAppointmentFromGlobal(d: QDoc): UserAppointment | n
     serviceLabel: v.serviceLabel ?? null,
     price: typeof v.price === 'number' ? v.price : null,
     startAtMs,
+    ...normalizeDuration(v, startAtMs),
     status: validateStatus(v.status),
     dayKey: v.dayKey,
   };

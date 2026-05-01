@@ -20,7 +20,6 @@ import type {
   CarCategory,
   AppointmentStatus,
 } from '@features/appointments/domain/appointment.types';
-import { APPOINTMENT } from '@features/appointments/domain/appointment.constants';
 import { dateUtils } from '@shared/utils/date.utils';
 
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
@@ -264,8 +263,10 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
       vehicleType: input.vehicleType,
       carCategory: input.carCategory,
       serviceLabel: input.serviceLabel,
+      durationMin: input.durationMin,
       price: input.price,
       whenMs: input.startAtMs,
+      endAtMs: input.endAtMs,
       status: 'scheduled',
       createdAt: serverTimestamp(),
     });
