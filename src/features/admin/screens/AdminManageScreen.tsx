@@ -6,6 +6,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,7 +18,6 @@ import { useNavigation } from '@react-navigation/native';
 import {
   ArrowLeft,
   Copy,
-  Share2,
   MessageCircle,
   Store,
   Clock,
@@ -25,6 +25,11 @@ import {
   Check,
   ChevronUp,
   ChevronDown,
+  Scissors,
+  Pencil,
+  Trash2,
+  Plus,
+  X,
 } from 'lucide-react-native';
 
 import { colors, spacing, radii } from '@shared/theme';
@@ -34,7 +39,9 @@ import { updateShopName } from '@features/shops/services/shop.service';
 import {
   getShopSettings,
   updateShopSettings,
+  updateShopServices,
   type ShopSettings,
+  type ShopService,
 } from '@features/settings/services/shopSettings.service';
 
 const SLOT_STEP_OPTIONS = [15, 30, 45, 60];
@@ -54,6 +61,11 @@ export default function AdminManageScreen() {
 
   const [copied, setCopied] = useState(false);
 
+  // ── Serviços ──
+  const [editingService, setEditingService] = useState<string | null>(null);
+  const [savingServices, setSavingServices] = useState(false);
+  const [savedServices, setSavedServices] = useState(false);
+
   useEffect(() => {
     if (shop?.name) setShopName(shop.name);
   }, [shop?.name]);
@@ -66,6 +78,78 @@ export default function AdminManageScreen() {
       .catch(() => Alert.alert('Erro', 'Falha ao carregar configurações.'))
       .finally(() => setLoadingSettings(false));
   }, [shopId]);
+
+  const toggleService = (id: string) => {
+    setSettings(prev =>
+      prev
+        ? {
+            ...prev,
+            services: prev.services.map(s => (s.id === id ? { ...s, enabled: !s.enabled } : s)),
+          }
+        : prev,
+    );
+  };
+
+  const updateServiceField = (id: string, field: keyof ShopService, value: string | number) => {
+    setSettings(prev =>
+      prev
+        ? {
+            ...prev,
+            services: prev.services.map(s => (s.id === id ? { ...s, [field]: value } : s)),
+          }
+        : prev,
+    );
+  };
+
+  const deleteService = (id: string) => {
+    Alert.alert('Excluir serviço', 'Tem certeza que deseja excluir este serviço?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: () => {
+          setSettings(prev =>
+            prev ? { ...prev, services: prev.services.filter(s => s.id !== id) } : prev,
+          );
+          if (editingService === id) setEditingService(null);
+        },
+      },
+    ]);
+  };
+
+  const addService = () => {
+    const newId = `custom_${Date.now()}`;
+    const newService: ShopService = {
+      id: newId,
+      label: 'Novo serviço',
+      description: 'Descrição do serviço',
+      price: 0,
+      durationMin: 30,
+      enabled: true,
+    };
+    setSettings(prev => (prev ? { ...prev, services: [...prev.services, newService] } : prev));
+    setEditingService(newId);
+  };
+
+  const handleSaveServices = async () => {
+    if (!shopId || !settings) return;
+    const hasEmpty = settings.services.some(s => !s.label.trim());
+    if (hasEmpty) {
+      Alert.alert('Atenção', 'Preencha o nome de todos os serviços.');
+      return;
+    }
+    setSavingServices(true);
+    setEditingService(null);
+    try {
+      await updateShopServices(shopId, settings.services);
+      setSavedServices(true);
+      setTimeout(() => setSavedServices(false), 2000);
+    } catch {
+      Alert.alert('Erro', 'Falha ao salvar serviços.');
+    } finally {
+      setSavingServices(false);
+    }
+  };
 
   const handleSaveName = async () => {
     if (!shopId || !shopName.trim()) return;
@@ -370,6 +454,174 @@ export default function AdminManageScreen() {
             ) : null}
           </View>
 
+          {/* ── Serviços disponíveis ── */}
+          <View style={styles.card}>
+            <View style={styles.cardTitleRow}>
+              <View style={[styles.cardIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                <Scissors size={18} color={colors.status.success} />
+              </View>
+              <Text style={styles.cardTitle}>Serviços disponíveis</Text>
+            </View>
+
+            <Text style={styles.svcCardDesc}>
+              Configure os serviços que sua estética oferece. O cliente verá apenas os serviços
+              ativos.
+            </Text>
+
+            {loadingSettings ? (
+              <ActivityIndicator
+                color={colors.primary.main}
+                style={{ marginVertical: spacing.lg }}
+              />
+            ) : (
+              <>
+                {(settings?.services ?? []).map((svc, idx, arr) => (
+                  <View key={svc.id}>
+                    {/* ── Card do serviço ── */}
+                    <View style={styles.svcCard}>
+                      {/* Cabeçalho: toggle + nome + ações */}
+                      <View style={styles.svcHeader}>
+                        <Switch
+                          value={svc.enabled}
+                          onValueChange={() => toggleService(svc.id)}
+                          trackColor={{ false: colors.border.main, true: colors.primary.light }}
+                          thumbColor={svc.enabled ? colors.primary.main : colors.text.disabled}
+                        />
+
+                        {editingService === svc.id ? (
+                          <TextInput
+                            style={styles.svcNameInput}
+                            value={svc.label}
+                            onChangeText={v => updateServiceField(svc.id, 'label', v)}
+                            placeholder="Nome do serviço"
+                            placeholderTextColor={colors.text.disabled}
+                            autoFocus
+                          />
+                        ) : (
+                          <Text
+                            style={[styles.svcName, !svc.enabled && styles.svcNameOff]}
+                            numberOfLines={1}
+                          >
+                            {svc.label}
+                          </Text>
+                        )}
+
+                        <View style={styles.svcActions}>
+                          <TouchableOpacity
+                            style={styles.svcActionBtn}
+                            onPress={() =>
+                              setEditingService(editingService === svc.id ? null : svc.id)
+                            }
+                            activeOpacity={0.7}
+                          >
+                            {editingService === svc.id ? (
+                              <X size={15} color={colors.text.tertiary} />
+                            ) : (
+                              <Pencil size={15} color={colors.primary.main} />
+                            )}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.svcActionBtn}
+                            onPress={() => deleteService(svc.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Trash2 size={15} color={colors.status.error} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Campos de edição */}
+                      {editingService === svc.id ? (
+                        <View style={styles.svcEditFields}>
+                          <View style={styles.svcFieldRow}>
+                            <Text style={styles.svcFieldLabel}>Descrição</Text>
+                            <TextInput
+                              style={styles.svcFieldInput}
+                              value={svc.description}
+                              onChangeText={v => updateServiceField(svc.id, 'description', v)}
+                              placeholder="Ex: Limpeza completa interna e externa"
+                              placeholderTextColor={colors.text.disabled}
+                              multiline
+                            />
+                          </View>
+
+                          <View style={styles.svcFieldsRow}>
+                            <View style={[styles.svcFieldRow, { flex: 1 }]}>
+                              <Text style={styles.svcFieldLabel}>Preço (R$)</Text>
+                              <TextInput
+                                style={styles.svcFieldInput}
+                                value={String(svc.price)}
+                                onChangeText={v =>
+                                  updateServiceField(svc.id, 'price', Number(v) || 0)
+                                }
+                                keyboardType="numeric"
+                                placeholder="0"
+                                placeholderTextColor={colors.text.disabled}
+                              />
+                            </View>
+                            <View style={[styles.svcFieldRow, { flex: 1 }]}>
+                              <Text style={styles.svcFieldLabel}>Duração (min)</Text>
+                              <TextInput
+                                style={styles.svcFieldInput}
+                                value={String(svc.durationMin)}
+                                onChangeText={v =>
+                                  updateServiceField(svc.id, 'durationMin', Number(v) || 0)
+                                }
+                                keyboardType="numeric"
+                                placeholder="30"
+                                placeholderTextColor={colors.text.disabled}
+                              />
+                            </View>
+                          </View>
+                        </View>
+                      ) : (
+                        <Text style={styles.svcSummary}>
+                          {svc.description ? `${svc.description} · ` : ''}
+                          <Text style={{ color: colors.primary.main, fontWeight: '700' }}>
+                            R$ {svc.price}
+                          </Text>
+                          {' · '}
+                          {svc.durationMin}min
+                        </Text>
+                      )}
+                    </View>
+
+                    {idx < arr.length - 1 && <View style={styles.divider} />}
+                  </View>
+                ))}
+
+                {/* Botão adicionar novo serviço */}
+                <TouchableOpacity
+                  style={styles.addServiceBtn}
+                  onPress={addService}
+                  activeOpacity={0.8}
+                >
+                  <Plus size={16} color={colors.primary.main} />
+                  <Text style={styles.addServiceText}>Adicionar serviço</Text>
+                </TouchableOpacity>
+
+                {/* Botão salvar */}
+                <TouchableOpacity
+                  style={[styles.saveBtn, savingServices && styles.saveBtnDisabled]}
+                  onPress={handleSaveServices}
+                  disabled={savingServices}
+                  activeOpacity={0.8}
+                >
+                  {savingServices ? (
+                    <ActivityIndicator size="small" color={colors.text.white} />
+                  ) : savedServices ? (
+                    <>
+                      <Check size={16} color={colors.text.white} />
+                      <Text style={styles.saveBtnText}>Salvo!</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.saveBtnText}>Salvar serviços</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       </SafeAreaView>
@@ -590,5 +842,100 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: colors.text.white,
+  },
+
+  // ── Serviços
+  svcCardDesc: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    lineHeight: 18,
+    marginBottom: spacing.md,
+  },
+  svcCard: {
+    paddingVertical: spacing.sm,
+  },
+  svcHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  svcName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  svcNameOff: {
+    color: colors.text.disabled,
+  },
+  svcNameInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.primary,
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.primary.main,
+    paddingVertical: 2,
+  },
+  svcActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  svcActionBtn: {
+    padding: spacing.xs,
+  },
+  svcSummary: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    lineHeight: 18,
+    paddingLeft: 52,
+  },
+  svcEditFields: {
+    paddingLeft: 52,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  svcFieldsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  svcFieldRow: {
+    gap: 4,
+  },
+  svcFieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.text.tertiary,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  svcFieldInput: {
+    fontSize: 13,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 7,
+    backgroundColor: colors.background.surface,
+  },
+  addServiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.primary.main,
+    borderRadius: radii.md,
+    borderStyle: 'dashed',
+    backgroundColor: colors.primary.light,
+  },
+  addServiceText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary.main,
   },
 });
