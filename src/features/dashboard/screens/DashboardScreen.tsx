@@ -95,7 +95,7 @@ export default function DashboardScreen() {
 
   const nextAppointment = appointments[0] ?? null;
   const upcomingAppointments = appointments.slice(0, 3);
-  const homeServices = shopServices.slice(0, 6);
+  const homeServices = shopServices;
 
   useEffect(() => {
     const db = getFirestore();
@@ -214,7 +214,7 @@ export default function DashboardScreen() {
 
             <View style={styles.topBar}>
               <TouchableOpacity style={styles.squareBtn} onPress={toggleMenu} activeOpacity={0.75}>
-                <Menu size={18} color={D.ink} strokeWidth={2.4} />
+                <Menu size={20} color={D.ink} strokeWidth={2.4} />
               </TouchableOpacity>
 
               <Text style={styles.brand}>DETAILGO</Text>
@@ -224,7 +224,7 @@ export default function DashboardScreen() {
                 onPress={() => Alert.alert('Notificações', 'Em breve!')}
                 activeOpacity={0.75}
               >
-                <Bell size={18} color={D.ink} strokeWidth={2} />
+                <Bell size={20} color={D.ink} strokeWidth={2} />
                 <View style={styles.notificationDot} />
               </TouchableOpacity>
             </View>
@@ -247,7 +247,7 @@ export default function DashboardScreen() {
                   {saving ? (
                     <ActivityIndicator color={D.primary} size="small" />
                   ) : (
-                    <Camera size={10} color={D.primary} strokeWidth={2.4} />
+                    <Camera size={12} color={D.primary} strokeWidth={2.4} />
                   )}
                 </View>
               </TouchableOpacity>
@@ -286,22 +286,19 @@ export default function DashboardScreen() {
             activeOpacity={0.88}
           >
             <View style={styles.scheduleIcon}>
-              <Calendar size={22} color={D.primary} strokeWidth={2.1} />
+              <Calendar size={24} color={D.primary} strokeWidth={2.1} />
             </View>
             <View style={styles.scheduleTextWrap}>
               <Text style={styles.scheduleTitle}>Agendar serviço</Text>
               <Text style={styles.scheduleSubtitle}>30s · sem ligar</Text>
             </View>
             <View style={styles.scheduleArrow}>
-              <ArrowRight size={20} color={D.primary} strokeWidth={2.1} />
+              <ArrowRight size={22} color={D.primary} strokeWidth={2.1} />
             </View>
           </TouchableOpacity>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionKicker}>SERVIÇOS</Text>
-            <TouchableOpacity onPress={goToAppointment}>
-              <Text style={styles.sectionAction}>ver tudo</Text>
-            </TouchableOpacity>
           </View>
 
           {loadingServices ? (
@@ -325,7 +322,7 @@ export default function DashboardScreen() {
                     activeOpacity={0.82}
                   >
                     <View style={[styles.serviceIconWrap, isActive && styles.serviceIconActive]}>
-                      <Icon size={19} color={isActive ? D.primary : D.ink2} strokeWidth={2} />
+                      <Icon size={22} color={isActive ? D.primary : D.ink2} strokeWidth={2} />
                     </View>
                     <Text style={styles.serviceLabel} numberOfLines={1}>
                       {svc.name}
@@ -363,7 +360,7 @@ export default function DashboardScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <View style={styles.emptyIconWrap}>
-                <Calendar size={30} color={D.primary} strokeWidth={2.1} />
+                <Calendar size={32} color={D.primary} strokeWidth={2.1} />
                 <View style={styles.emptyPlus}>
                   <Text style={styles.emptyPlusText}>+</Text>
                 </View>
@@ -593,13 +590,13 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 16 },
 
   heroSurface: {
-    minHeight: 176,
+    minHeight: 190,
     borderBottomWidth: 1,
     borderBottomColor: D.borderStrong,
     overflow: 'hidden',
     paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 18,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
   heroGlow: {
     position: 'absolute',
@@ -614,12 +611,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 20,
   },
   squareBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.035)',
@@ -628,7 +625,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: D.ink,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '900',
     letterSpacing: 4,
     marginLeft: 4,
@@ -645,28 +642,28 @@ const styles = StyleSheet.create({
   profileBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
   },
   avatarWrap: {
-    width: 60,
-    height: 60,
+    width: 72,
+    height: 72,
     position: 'relative',
   },
   avatarImg: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   avatarInitials: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: D.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitialsText: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '900',
     color: '#050708',
   },
@@ -674,9 +671,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -2,
     bottom: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#050708',
     alignItems: 'center',
     justifyContent: 'center',
@@ -686,21 +683,21 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1 },
   greeting: {
     color: D.ink3,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.9,
     marginBottom: 3,
   },
   profileName: {
     color: D.ink,
-    fontSize: 22,
-    lineHeight: 25,
+    fontSize: 25,
+    lineHeight: 29,
     fontWeight: '900',
   },
   profileEmail: {
     color: D.ink3,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '700',
     letterSpacing: 0.2,
     marginTop: 2,
@@ -731,12 +728,12 @@ const styles = StyleSheet.create({
   joinCardDesc: { fontSize: 12, color: D.primary, opacity: 0.78 },
 
   scheduleCard: {
-    minHeight: 66,
+    minHeight: 72,
     marginHorizontal: 20,
-    marginTop: 14,
-    marginBottom: 17,
-    paddingHorizontal: 16,
-    borderRadius: 15,
+    marginTop: 16,
+    marginBottom: 18,
+    paddingHorizontal: 18,
+    borderRadius: 18,
     backgroundColor: D.primary,
     flexDirection: 'row',
     alignItems: 'center',
@@ -748,9 +745,9 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   scheduleIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: '#050708',
     alignItems: 'center',
     justifyContent: 'center',
@@ -758,20 +755,20 @@ const styles = StyleSheet.create({
   scheduleTextWrap: { flex: 1 },
   scheduleTitle: {
     color: '#050708',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
-    lineHeight: 20,
+    lineHeight: 22,
   },
   scheduleSubtitle: {
     color: 'rgba(5,7,8,0.62)',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
   scheduleArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#050708',
     alignItems: 'center',
     justifyContent: 'center',
@@ -782,23 +779,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 9,
+    marginBottom: 11,
   },
   sectionKicker: {
     color: D.ink3,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.2,
   },
-  sectionAction: {
-    color: D.primary,
-    fontSize: 12,
-    fontWeight: '900',
-  },
   servicesRail: {
     paddingHorizontal: 20,
-    gap: 9,
-    paddingBottom: 17,
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 18,
   },
   servicesLoading: {
     height: 100,
@@ -822,9 +815,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   serviceCard: {
-    width: 74,
-    height: 83,
-    borderRadius: 15,
+    width: 104,
+    height: 104,
+    borderRadius: 18,
     backgroundColor: D.card,
     borderWidth: 1.5,
     borderColor: D.borderStrong,
@@ -832,21 +825,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   serviceIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: D.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   serviceIconActive: {
     borderColor: D.primary,
   },
   serviceLabel: {
     color: D.ink2,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
   },
 
@@ -859,13 +852,13 @@ const styles = StyleSheet.create({
   },
   upcomingTitle: {
     color: D.ink,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
-    lineHeight: 20,
+    lineHeight: 22,
   },
   upcomingCount: {
     color: D.ink3,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.1,
   },
@@ -921,8 +914,8 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     marginHorizontal: 20,
-    minHeight: 228,
-    borderRadius: 17,
+    minHeight: 224,
+    borderRadius: 20,
     backgroundColor: D.card,
     borderWidth: 1.5,
     borderStyle: 'dashed',
@@ -932,9 +925,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
   },
   emptyIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    width: 68,
+    height: 68,
+    borderRadius: 20,
     backgroundColor: '#050708',
     alignItems: 'center',
     justifyContent: 'center',
@@ -959,21 +952,21 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: D.ink,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
     marginBottom: 10,
   },
   emptyText: {
     color: D.ink2,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
     lineHeight: 18,
     textAlign: 'center',
   },
   emptyButton: {
-    height: 32,
-    minWidth: 104,
-    borderRadius: 16,
+    height: 36,
+    minWidth: 120,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: D.primary,
     flexDirection: 'row',
@@ -984,7 +977,7 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: D.primary,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
   },
 
