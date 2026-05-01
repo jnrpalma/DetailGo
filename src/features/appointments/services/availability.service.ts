@@ -264,7 +264,6 @@ export async function createAppointmentWithCapacityCheck(input: AppointmentCreat
       vehicleType: input.vehicleType,
       carCategory: input.carCategory,
       serviceLabel: input.serviceLabel,
-      durationMin: input.durationMin,
       price: input.price,
       whenMs: input.startAtMs,
       status: 'scheduled',

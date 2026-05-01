@@ -3,19 +3,14 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
   serverTimestamp,
 } from '@react-native-firebase/firestore';
-import { type ShopService, DEFAULT_SHOP_SERVICES } from '../domain/shopService.types';
-
-export type { ShopService };
 
 export type ShopSettings = {
   openHour: number;
   closeHour: number;
   slotStepMin: number;
   parallelCapacity: number;
-  services: ShopService[];
 };
 
 const DEFAULT_SETTINGS: ShopSettings = {
@@ -23,7 +18,6 @@ const DEFAULT_SETTINGS: ShopSettings = {
   closeHour: 18,
   slotStepMin: 30,
   parallelCapacity: 2,
-  services: DEFAULT_SHOP_SERVICES,
 };
 
 export class ShopSettingsError extends Error {
@@ -51,23 +45,28 @@ function validateAndMergeSettings(data: Partial<ShopSettings>): ShopSettings {
     closeHour: validateHour(data?.closeHour) ?? DEFAULT_SETTINGS.closeHour,
     slotStepMin: validateSlotStep(data?.slotStepMin) ?? DEFAULT_SETTINGS.slotStepMin,
     parallelCapacity: validateCapacity(data?.parallelCapacity) ?? DEFAULT_SETTINGS.parallelCapacity,
-    services:
-      Array.isArray(data?.services) && data.services.length > 0
-        ? data.services
-        : DEFAULT_SHOP_SERVICES,
   };
+}
+
+function hasSettingsChanged(old: Partial<ShopSettings>, newSettings: ShopSettings): boolean {
+  return (Object.keys(newSettings) as Array<keyof ShopSettings>).some(
+    key => old[key] !== newSettings[key],
+  );
 }
 
 function settingsRef(shopId: string) {
   return doc(getFirestore(), 'shops', shopId, 'settings', 'config');
 }
 
-export async function ensureShopSettings(
-  shopId: string,
-): Promise<{ created: boolean; settings: ShopSettings }> {
+export async function ensureShopSettings(shopId: string): Promise<{
+  created: boolean;
+  settings: ShopSettings;
+}> {
   const ref = settingsRef(shopId);
+
   try {
     const snap = await getDoc(ref);
+
     if (!snap.exists) {
       await setDoc(ref, {
         ...DEFAULT_SETTINGS,
@@ -76,8 +75,14 @@ export async function ensureShopSettings(
       });
       return { created: true, settings: DEFAULT_SETTINGS };
     }
+
     const data = snap.data() as Partial<ShopSettings>;
     const merged = validateAndMergeSettings(data);
+
+    if (hasSettingsChanged(data, merged)) {
+      await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
+    }
+
     return { created: false, settings: merged };
   } catch (error) {
     console.error('❌ Erro ao garantir configurações:', error);
@@ -97,14 +102,8 @@ export async function updateShopSettings(
   const ref = settingsRef(shopId);
   const current = await getShopSettings(shopId);
   const merged = validateAndMergeSettings({ ...current, ...updates });
-  await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
-  return merged;
-}
 
-// Atualiza apenas a lista de serviços
-export async function updateShopServices(shopId: string, services: ShopService[]): Promise<void> {
-  await updateDoc(settingsRef(shopId), {
-    services,
-    updatedAt: serverTimestamp(),
-  });
+  await setDoc(ref, { ...merged, updatedAt: serverTimestamp() }, { merge: true });
+
+  return merged;
 }

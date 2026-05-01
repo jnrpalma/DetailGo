@@ -45,7 +45,6 @@ import { UI } from '@shared/constants/app.constants';
 import { useAuth } from '@features/auth';
 import { useShop } from '@features/shops/context/ShopContext';
 import { joinShop } from '@features/shops/services/joinShop.service';
-import { useShopServices } from '@features/settings/hooks/useShopServices';
 import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
 import type { RootStackParamList } from '@app/types';
 import type { UserAppointment } from '@features/appointments/domain/appointment.types';
@@ -61,13 +60,12 @@ type UserProfile = {
   photoB64?: string;
 };
 
-// Mapa de ícones por ID de serviço (espelha o AppointmentScreen)
-const SERVICE_ICON_MAP: Record<string, React.ComponentType<any>> = {
-  lavagem_simples: Droplets,
-  lavagem_completa: Sparkles,
-  polimento: Zap,
-  lavagem_motor: Wrench,
-};
+const SERVICES = [
+  { label: 'Lavagem\nsimples', duration: '30min', price: 'R$ 50', Icon: Droplets },
+  { label: 'Lavagem\ncompleta', duration: '60min', price: 'R$ 80', Icon: Sparkles },
+  { label: 'Polimento', duration: '2h', price: 'R$ 220', Icon: Zap },
+  { label: 'Lavagem\nde motor', duration: '45min', price: 'R$ 70', Icon: Wrench },
+];
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NavProp>();
@@ -76,7 +74,6 @@ export default function DashboardScreen() {
   const uid = user.uid;
   const { signOut } = useAuth();
   const { shopId } = useShop();
-  const { enabledServices } = useShopServices(shopId ?? null);
 
   const [profile, setProfile] = useState<UserProfile>({
     photoURL: user.photoURL ?? undefined,
@@ -339,26 +336,23 @@ export default function DashboardScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.servicesRail}
             >
-              {enabledServices.map(svc => {
-                const SvcIcon = SERVICE_ICON_MAP[svc.id] ?? Sparkles;
-                return (
-                  <TouchableOpacity
-                    key={svc.id}
-                    style={styles.serviceCard}
-                    onPress={goToAppointment}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.serviceIconWrap}>
-                      <SvcIcon size={18} color={D.primary} />
-                    </View>
-                    <Text style={styles.serviceLabel}>{svc.label}</Text>
-                    <View style={styles.serviceFooter}>
-                      <Text style={styles.serviceDuration}>{svc.durationMin}min</Text>
-                      <Text style={styles.servicePrice}>R$ {svc.price}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+              {SERVICES.map((svc, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.serviceCard}
+                  onPress={goToAppointment}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.serviceIconWrap}>
+                    <svc.Icon size={18} color={D.primary} />
+                  </View>
+                  <Text style={styles.serviceLabel}>{svc.label}</Text>
+                  <View style={styles.serviceFooter}>
+                    <Text style={styles.serviceDuration}>{svc.duration}</Text>
+                    <Text style={styles.servicePrice}>{svc.price}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           </View>
 

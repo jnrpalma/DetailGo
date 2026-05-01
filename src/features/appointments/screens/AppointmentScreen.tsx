@@ -40,7 +40,6 @@ import {
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops/context/ShopContext';
-import { useShopServices } from '@features/settings/hooks/useShopServices';
 import {
   getAvailableSlotsForDay,
   createAppointmentWithCapacityCheck,
@@ -48,24 +47,19 @@ import {
 } from '@features/appointments/services/availability.service';
 import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
 import { CAR_CATEGORIES } from '@features/appointments/domain/appointment.constants';
+import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
 import { colors, spacing, radii, borders } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
 import { dateUtils } from '@shared/utils/date.utils';
 
 const { width, height } = Dimensions.get('window');
 
-// Mapa de ícones por ID de serviço
-const SERVICE_ICON_MAP: Record<string, React.ComponentType<any>> = {
-  lavagem_simples: Droplets,
-  lavagem_completa: Sparkles,
-  polimento: Zap,
-  lavagem_motor: Wrench,
-};
-
-// Ícone fallback quando não há correspondência
-function getServiceIcon(id: string) {
-  return SERVICE_ICON_MAP[id] ?? Sparkles;
-}
+const SERVICE_ICONS = {
+  'Lavagem simples': Droplets,
+  'Lavagem completa': Sparkles,
+  Polimento: Zap,
+  'Lavagem de motor': Wrench,
+} as const;
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -184,7 +178,7 @@ function ServiceDetailsModal({
   onClose,
 }: {
   visible: boolean;
-  serviceLabel: string | null;
+  serviceLabel: ServiceLabel | null;
   price: number;
   onClose: () => void;
 }) {
@@ -223,12 +217,8 @@ function ServiceDetailsModal({
 
   if (!visible || !serviceLabel) return null;
 
-  // Tenta buscar details hardcoded; caso não encontre, usa dados básicos da loja
-  const details = SERVICE_DETAILS[serviceLabel as keyof typeof SERVICE_DETAILS] ?? null;
-  const iconKey = Object.keys(SERVICE_ICON_MAP).find(k =>
-    serviceLabel.toLowerCase().includes(k.replace('_', ' ')),
-  );
-  const Icon = iconKey ? SERVICE_ICON_MAP[iconKey] : Sparkles;
+  const details = SERVICE_DETAILS[serviceLabel];
+  const Icon = SERVICE_ICONS[serviceLabel];
 
   return (
     <Modal transparent visible={visible} onRequestClose={onClose}>
@@ -253,8 +243,8 @@ function ServiceDetailsModal({
                 <Icon size={28} color={colors.primary.main} />
               </View>
               <View style={styles.detailsTitleContainer}>
-                <Text style={styles.detailsTitle}>{details?.title ?? serviceLabel}</Text>
-                <Text style={styles.detailsSubtitle}>{details?.description ?? ''}</Text>
+                <Text style={styles.detailsTitle}>{details.title}</Text>
+                <Text style={styles.detailsSubtitle}>{details.description}</Text>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <X size={18} color={colors.text.tertiary} />
@@ -268,7 +258,7 @@ function ServiceDetailsModal({
               </View>
               <View style={styles.durationBadge}>
                 <Clock size={14} color={colors.text.secondary} />
-                <Text style={styles.durationBadgeText}>{details?.duration ?? ''}</Text>
+                <Text style={styles.durationBadgeText}>{details.duration}</Text>
               </View>
             </View>
 
@@ -282,7 +272,7 @@ function ServiceDetailsModal({
                 <Text style={styles.sectionHeaderTitle}>Inclui</Text>
               </View>
               <View style={styles.itemsGrid}>
-                {(details?.includes ?? []).map((item, idx) => {
+                {details.includes.map((item, idx) => {
                   const ItemIcon = item.icon;
                   return (
                     <View key={`inc-${idx}`} style={styles.includedItem}>
@@ -298,7 +288,7 @@ function ServiceDetailsModal({
               </View>
             </View>
 
-            {details?.notIncluded && details.notIncluded.length > 0 && (
+            {details.notIncluded && details.notIncluded.length > 0 && (
               <View style={styles.detailsSection}>
                 <View style={styles.sectionHeader}>
                   <View
@@ -309,7 +299,7 @@ function ServiceDetailsModal({
                   <Text style={styles.sectionHeaderTitle}>Não inclui</Text>
                 </View>
                 <View style={styles.itemsGrid}>
-                  {(details?.notIncluded ?? []).map((item, idx) => {
+                  {details.notIncluded.map((item, idx) => {
                     const ItemIcon = item.icon;
                     return (
                       <View key={`exc-${idx}`} style={styles.excludedItem}>
@@ -326,7 +316,7 @@ function ServiceDetailsModal({
               </View>
             )}
 
-            {details?.recommendedFor && (
+            {details.recommendedFor && (
               <View style={styles.detailsSection}>
                 <View style={styles.sectionHeader}>
                   <View
@@ -337,7 +327,7 @@ function ServiceDetailsModal({
                   <Text style={styles.sectionHeaderTitle}>Recomendado</Text>
                 </View>
                 <View style={styles.recommendedTags}>
-                  {(details?.recommendedFor ?? []).map((item, idx) => (
+                  {details.recommendedFor.map((item, idx) => (
                     <View key={`rec-${idx}`} style={styles.recommendedTag}>
                       <Text style={styles.recommendedTagText}>{item}</Text>
                     </View>
@@ -348,7 +338,7 @@ function ServiceDetailsModal({
 
             <View style={styles.noteContainer}>
               <Info size={14} color={colors.text.tertiary} />
-              <Text style={styles.noteText}>{details?.note ?? ''}</Text>
+              <Text style={styles.noteText}>{details.note}</Text>
             </View>
 
             <TouchableOpacity
@@ -428,12 +418,9 @@ export default function AppointmentScreen() {
   const uid = auth.currentUser?.uid;
   const { shopId } = useShop();
 
-  // Serviços da loja — carregados do Firestore em tempo real
-  const { enabledServices, loading: loadingServices } = useShopServices(shopId ?? null);
-
   const [vehicleType, setVehicleType] = useState<VehicleType>('Carro');
   const [carCategory, setCarCategory] = useState<CarCategory | null>('Hatch');
-  const [serviceLabel, setServiceLabel] = useState<string | null>(null);
+  const [serviceLabel, setServiceLabel] = useState<ServiceLabel | null>(null);
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
@@ -450,14 +437,20 @@ export default function AppointmentScreen() {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Serviço selecionado vem da lista da loja
   const selectedService = useMemo(
-    () => enabledServices.find(s => s.label === serviceLabel) ?? null,
-    [serviceLabel, enabledServices],
+    () => SERVICES.find(s => s.label === serviceLabel) ?? null,
+    [serviceLabel],
   );
 
-  // Preço vem diretamente do serviço da loja
-  const finalPrice = selectedService?.price ?? 0;
+  const basePrice = useMemo(() => {
+    const price = getBasePriceForAppointment(
+      vehicleType,
+      vehicleType === 'Carro' ? carCategory : null,
+    );
+    return typeof price === 'number' ? price : 0;
+  }, [vehicleType, carCategory]);
+
+  const finalPrice = basePrice;
 
   const refreshSlots = useCallback(
     async (nextDay: Date, nextService = selectedService) => {
@@ -498,10 +491,10 @@ export default function AppointmentScreen() {
     await refreshSlots(next, selectedService);
   };
 
-  const handleSelectService = async (service: string) => {
+  const handleSelectService = async (service: ServiceLabel) => {
     setServiceLabel(service);
-    const svc = enabledServices.find(s => s.label === service);
-    if (svc) await refreshSlots(day, svc);
+    const svc = SERVICES.find(s => s.label === service)!;
+    await refreshSlots(day, svc);
   };
 
   const handleSave = async () => {
@@ -558,7 +551,7 @@ export default function AppointmentScreen() {
   }
 
   const canConfirm = !!selectedService && !!selectedSlot && !submitting;
-  const SelectedServiceIcon = selectedService ? getServiceIcon(selectedService.id) : Calendar;
+  const SelectedServiceIcon = selectedService ? selectedService.icon : Calendar;
 
   return (
     <>
@@ -587,7 +580,7 @@ export default function AppointmentScreen() {
         <SelectModal
           visible={serviceModalOpen}
           title="Serviço"
-          options={enabledServices.map(s => s.label)}
+          options={SERVICES.map(s => s.label)}
           selected={serviceLabel}
           onSelect={handleSelectService}
           onClose={() => setServiceModalOpen(false)}
