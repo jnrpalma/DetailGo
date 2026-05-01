@@ -27,23 +27,21 @@ import {
   Calendar,
   Camera,
   CircleUserRound,
-  Droplets,
   History,
   Home,
   Link as LinkIcon,
   LogOut,
   Menu,
-  Shield,
-  Sparkles,
   User,
-  Zap,
 } from 'lucide-react-native';
 
 import { darkColors as D } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
 import { useAuth } from '@features/auth';
 import { useShop } from '@features/shops/context/ShopContext';
+import { useShopServices } from '@features/shops/hooks/useShopServices';
 import { joinShop } from '@features/shops/services/joinShop.service';
+import { getShopServiceIcon } from '@features/shops/utils/shopServiceIcons';
 import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
 import type { RootStackParamList } from '@app/types';
 import type { UserAppointment } from '@features/appointments/domain/appointment.types';
@@ -58,13 +56,6 @@ type UserProfile = {
   photoURL?: string;
   photoB64?: string;
 };
-
-const SERVICE_CATEGORIES = [
-  { label: 'Lavagem', Icon: Droplets, active: true },
-  { label: 'Polimento', Icon: Sparkles },
-  { label: 'Cera', Icon: Shield },
-  { label: 'Express', Icon: Zap },
-];
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -97,9 +88,14 @@ export default function DashboardScreen() {
     shopId: shopId ?? '',
     limitN: 30,
   });
+  const { loading: loadingServices, items: shopServices } = useShopServices({
+    shopId,
+    activeOnly: true,
+  });
 
   const nextAppointment = appointments[0] ?? null;
   const upcomingAppointments = appointments.slice(0, 3);
+  const homeServices = shopServices.slice(0, 6);
 
   useEffect(() => {
     const db = getFirestore();
@@ -308,25 +304,41 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.servicesRail}
-          >
-            {SERVICE_CATEGORIES.map(svc => (
-              <TouchableOpacity
-                key={svc.label}
-                style={styles.serviceCard}
-                onPress={goToAppointment}
-                activeOpacity={0.82}
-              >
-                <View style={[styles.serviceIconWrap, svc.active && styles.serviceIconActive]}>
-                  <svc.Icon size={19} color={svc.active ? D.primary : D.ink2} strokeWidth={2} />
-                </View>
-                <Text style={styles.serviceLabel}>{svc.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {loadingServices ? (
+            <View style={styles.servicesLoading}>
+              <ActivityIndicator color={D.primary} size="small" />
+            </View>
+          ) : homeServices.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.servicesRail}
+            >
+              {homeServices.map((svc, index) => {
+                const Icon = getShopServiceIcon(svc);
+                const isActive = index === 0;
+                return (
+                  <TouchableOpacity
+                    key={svc.id}
+                    style={styles.serviceCard}
+                    onPress={goToAppointment}
+                    activeOpacity={0.82}
+                  >
+                    <View style={[styles.serviceIconWrap, isActive && styles.serviceIconActive]}>
+                      <Icon size={19} color={isActive ? D.primary : D.ink2} strokeWidth={2} />
+                    </View>
+                    <Text style={styles.serviceLabel} numberOfLines={1}>
+                      {svc.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={styles.servicesEmpty}>
+              <Text style={styles.servicesEmptyText}>Nenhum serviço disponível</Text>
+            </View>
+          )}
 
           <View style={styles.upcomingHeader}>
             <Text style={styles.upcomingTitle}>Próximos serviços</Text>
@@ -787,6 +799,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 9,
     paddingBottom: 17,
+  },
+  servicesLoading: {
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  servicesEmpty: {
+    marginHorizontal: 20,
+    height: 72,
+    borderRadius: 15,
+    backgroundColor: D.card,
+    borderWidth: 1,
+    borderColor: D.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 17,
+  },
+  servicesEmptyText: {
+    color: D.ink3,
+    fontSize: 12,
+    fontWeight: '800',
   },
   serviceCard: {
     width: 74,

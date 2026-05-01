@@ -6,6 +6,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,7 +18,6 @@ import { useNavigation } from '@react-navigation/native';
 import {
   ArrowLeft,
   Copy,
-  Share2,
   MessageCircle,
   Store,
   Clock,
@@ -25,12 +25,21 @@ import {
   Check,
   ChevronUp,
   ChevronDown,
+  Pencil,
+  Trash2,
 } from 'lucide-react-native';
 
 import { colors, spacing, radii } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useShop } from '@features/shops/context/ShopContext';
+import { useShopServices } from '@features/shops/hooks/useShopServices';
+import type { ShopService } from '@features/shops/domain/shopService.types';
 import { updateShopName } from '@features/shops/services/shop.service';
+import {
+  deleteShopService,
+  updateShopService,
+} from '@features/shops/services/shopServices.service';
+import { getShopServiceIcon } from '@features/shops/utils/shopServiceIcons';
 import {
   getShopSettings,
   updateShopSettings,
@@ -38,6 +47,37 @@ import {
 } from '@features/settings/services/shopSettings.service';
 
 const SLOT_STEP_OPTIONS = [15, 30, 45, 60];
+
+type ServiceDraft = {
+  name: string;
+  title: string;
+  description: string;
+  includes: string;
+  note: string;
+  durationMin: string;
+  price: string;
+  recommendedFor: string;
+};
+
+function toServiceDraft(service: ShopService): ServiceDraft {
+  return {
+    name: service.name,
+    title: service.title ?? service.name,
+    description: service.description ?? '',
+    includes: (service.includes ?? []).join('\n'),
+    note: service.note ?? '',
+    durationMin: String(service.durationMin),
+    price: String(service.price),
+    recommendedFor: (service.recommendedFor ?? []).join('\n'),
+  };
+}
+
+function parseLines(value: string): string[] {
+  return value
+    .split('\n')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
 
 export default function AdminManageScreen() {
   const navigation = useNavigation();
@@ -53,6 +93,14 @@ export default function AdminManageScreen() {
   const [savedName, setSavedName] = useState(false);
 
   const [copied, setCopied] = useState(false);
+  const { loading: loadingServices, items: services } = useShopServices({
+    shopId,
+    ensureDefaults: true,
+  });
+  const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceDraft>>({});
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [savingServiceId, setSavingServiceId] = useState<string | null>(null);
+  const [savedServiceId, setSavedServiceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (shop?.name) setShopName(shop.name);
@@ -66,6 +114,16 @@ export default function AdminManageScreen() {
       .catch(() => Alert.alert('Erro', 'Falha ao carregar configurações.'))
       .finally(() => setLoadingSettings(false));
   }, [shopId]);
+
+  useEffect(() => {
+    setServiceDrafts(prev => {
+      const next = { ...prev };
+      services.forEach(service => {
+        if (!next[service.id]) next[service.id] = toServiceDraft(service);
+      });
+      return next;
+    });
+  }, [services]);
 
   const handleSaveName = async () => {
     if (!shopId || !shopName.trim()) return;
@@ -132,6 +190,115 @@ export default function AdminManageScreen() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleToggleService = async (serviceId: string, active: boolean) => {
+    if (!shopId) return;
+    try {
+      await updateShopService(shopId, serviceId, { active });
+    } catch {
+      Alert.alert('Erro', 'Falha ao atualizar serviço.');
+    }
+  };
+
+  const handleEditService = (service: ShopService) => {
+    setServiceDrafts(prev => ({
+      ...prev,
+      [service.id]: toServiceDraft(service),
+    }));
+    setEditingServiceId(service.id);
+  };
+
+  const updateServiceDraft = (serviceId: string, field: keyof ServiceDraft, value: string) => {
+    setServiceDrafts(prev => ({
+      ...prev,
+      [serviceId]: {
+        ...(prev[serviceId] ?? {
+          name: '',
+          title: '',
+          description: '',
+          includes: '',
+          note: '',
+          durationMin: '',
+          price: '',
+          recommendedFor: '',
+        }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSaveService = async (service: ShopService) => {
+    if (!shopId) return;
+    const draft = serviceDrafts[service.id] ?? toServiceDraft(service);
+    const name = draft.name.trim();
+    const title = draft.title.trim();
+    const description = draft.description.trim();
+    const includes = parseLines(draft.includes);
+    const note = draft.note.trim();
+    const durationMin = Number(draft.durationMin.replace(',', '.'));
+    const price = Number(draft.price.replace(',', '.'));
+    const recommendedFor = parseLines(draft.recommendedFor);
+
+    if (!name) {
+      Alert.alert('Atenção', 'Informe o nome do serviço.');
+      return;
+    }
+
+    if (!durationMin || durationMin < 5) {
+      Alert.alert('Atenção', 'Informe uma duração válida para o serviço.');
+      return;
+    }
+
+    if (Number.isNaN(price) || price < 0) {
+      Alert.alert('Atenção', 'Informe um preço válido para o serviço.');
+      return;
+    }
+
+    setSavingServiceId(service.id);
+    try {
+      await updateShopService(shopId, service.id, {
+        name,
+        title: title || name,
+        description: description || null,
+        includes,
+        note: note || null,
+        durationMin,
+        price,
+        recommendedFor,
+      });
+      setEditingServiceId(null);
+      setSavedServiceId(service.id);
+      setTimeout(() => setSavedServiceId(null), 2000);
+    } catch {
+      Alert.alert('Erro', 'Falha ao salvar serviço.');
+    } finally {
+      setSavingServiceId(null);
+    }
+  };
+
+  const handleDeleteService = (service: ShopService) => {
+    if (!shopId) return;
+
+    Alert.alert(
+      'Excluir serviço',
+      `Deseja excluir "${service.name}"? Clientes não verão mais este serviço para novos agendamentos.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteShopService(shopId, service.id);
+              setEditingServiceId(current => (current === service.id ? null : current));
+            } catch {
+              Alert.alert('Erro', 'Falha ao excluir serviço.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const stepHour = (field: 'openHour' | 'closeHour', dir: 1 | -1) => {
     if (!settings) return;
     const val = settings[field] + dir;
@@ -146,7 +313,7 @@ export default function AdminManageScreen() {
     setSettings(prev => (prev ? { ...prev, parallelCapacity: val } : prev));
   };
 
-  const HourStepper = ({ label, field }: { label: string; field: 'openHour' | 'closeHour' }) => (
+  const renderHourStepper = (label: string, field: 'openHour' | 'closeHour') => (
     <View style={styles.stepperRow}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <View style={styles.stepper}>
@@ -292,9 +459,9 @@ export default function AdminManageScreen() {
               />
             ) : settings ? (
               <>
-                <HourStepper label="Abertura" field="openHour" />
+                {renderHourStepper('Abertura', 'openHour')}
                 <View style={styles.divider} />
-                <HourStepper label="Fechamento" field="closeHour" />
+                {renderHourStepper('Fechamento', 'closeHour')}
 
                 <View style={styles.divider} />
 
@@ -368,6 +535,229 @@ export default function AdminManageScreen() {
                 </TouchableOpacity>
               </>
             ) : null}
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardTitleRow}>
+              <View style={[styles.cardIconWrap, { backgroundColor: colors.primary.light }]}>
+                <Store size={18} color={colors.primary.main} />
+              </View>
+              <Text style={styles.cardTitle}>Serviços disponíveis</Text>
+            </View>
+            <Text style={styles.cardDesc}>
+              Escolha quais serviços aparecem para os clientes vinculados à sua estética.
+            </Text>
+
+            {loadingServices ? (
+              <ActivityIndicator
+                color={colors.primary.main}
+                style={{ marginVertical: spacing.lg }}
+              />
+            ) : (
+              <View style={styles.servicesList}>
+                {services.map(service => {
+                  const ServiceIcon = getShopServiceIcon(service);
+                  const draft = serviceDrafts[service.id] ?? toServiceDraft(service);
+                  const isSavingService = savingServiceId === service.id;
+                  const isSavedService = savedServiceId === service.id;
+                  const isEditingService = editingServiceId === service.id;
+                  return (
+                    <View key={service.id} style={styles.serviceEditor}>
+                      <View style={styles.serviceEditorHeader}>
+                        <View style={styles.serviceRowLeft}>
+                          <View style={styles.serviceIconWrap}>
+                            <ServiceIcon size={18} color={colors.primary.main} />
+                          </View>
+                          <View style={styles.serviceTexts}>
+                            <Text style={styles.serviceName}>{service.name}</Text>
+                            <Text style={styles.serviceMeta}>
+                              {service.durationMin}min · {formatUtils.currency(service.price)}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.serviceStatus}>
+                          <Text style={styles.serviceStatusText}>
+                            {service.active ? 'Ativo' : 'Oculto'}
+                          </Text>
+                          <Switch
+                            value={service.active}
+                            onValueChange={active => handleToggleService(service.id, active)}
+                            thumbColor={service.active ? colors.primary.main : colors.text.disabled}
+                            trackColor={{
+                              false: colors.border.main,
+                              true: colors.primary.light,
+                            }}
+                          />
+                        </View>
+                      </View>
+
+                      {isEditingService ? (
+                        <View style={styles.serviceForm}>
+                          <Text style={styles.inputLabel}>Nome na home</Text>
+                          <TextInput
+                            style={styles.serviceInput}
+                            value={draft.name}
+                            onChangeText={value => updateServiceDraft(service.id, 'name', value)}
+                            placeholder="Ex: Lavagem premium"
+                            placeholderTextColor={colors.text.disabled}
+                            editable={!isSavingService}
+                            maxLength={40}
+                          />
+
+                          <Text style={styles.inputLabel}>Título do serviço</Text>
+                          <TextInput
+                            style={styles.serviceInput}
+                            value={draft.title}
+                            onChangeText={value => updateServiceDraft(service.id, 'title', value)}
+                            placeholder="Ex: Lavagem completa premium"
+                            placeholderTextColor={colors.text.disabled}
+                            editable={!isSavingService}
+                            maxLength={60}
+                          />
+
+                          <Text style={styles.inputLabel}>Descrição</Text>
+                          <TextInput
+                            style={[styles.serviceInput, styles.serviceTextarea]}
+                            value={draft.description}
+                            onChangeText={value =>
+                              updateServiceDraft(service.id, 'description', value)
+                            }
+                            placeholder="Descreva o que está incluso neste serviço"
+                            placeholderTextColor={colors.text.disabled}
+                            editable={!isSavingService}
+                            multiline
+                            maxLength={160}
+                          />
+
+                          <Text style={styles.inputLabel}>Inclui</Text>
+                          <TextInput
+                            style={[styles.serviceInput, styles.serviceTextarea]}
+                            value={draft.includes}
+                            onChangeText={value =>
+                              updateServiceDraft(service.id, 'includes', value)
+                            }
+                            placeholder={'Um item por linha\nEx: Lavagem externa\nAspiração rápida'}
+                            placeholderTextColor={colors.text.disabled}
+                            editable={!isSavingService}
+                            multiline
+                            maxLength={260}
+                          />
+
+                          <Text style={styles.inputLabel}>Recomendado para</Text>
+                          <TextInput
+                            style={[styles.serviceInput, styles.serviceTextareaSmall]}
+                            value={draft.recommendedFor}
+                            onChangeText={value =>
+                              updateServiceDraft(service.id, 'recommendedFor', value)
+                            }
+                            placeholder={'Um item por linha\nEx: Uso diário\nManutenção'}
+                            placeholderTextColor={colors.text.disabled}
+                            editable={!isSavingService}
+                            multiline
+                            maxLength={180}
+                          />
+
+                          <Text style={styles.inputLabel}>Observação</Text>
+                          <TextInput
+                            style={styles.serviceInput}
+                            value={draft.note}
+                            onChangeText={value => updateServiceDraft(service.id, 'note', value)}
+                            placeholder="Ex: Ideal para manutenção semanal"
+                            placeholderTextColor={colors.text.disabled}
+                            editable={!isSavingService}
+                            maxLength={120}
+                          />
+
+                          <View style={styles.serviceInlineFields}>
+                            <View style={styles.inlineField}>
+                              <Text style={styles.inputLabel}>Duração</Text>
+                              <TextInput
+                                style={styles.serviceInput}
+                                value={draft.durationMin}
+                                onChangeText={value =>
+                                  updateServiceDraft(service.id, 'durationMin', value)
+                                }
+                                placeholder="30"
+                                placeholderTextColor={colors.text.disabled}
+                                keyboardType="numeric"
+                                editable={!isSavingService}
+                              />
+                            </View>
+                            <View style={styles.inlineField}>
+                              <Text style={styles.inputLabel}>Preço</Text>
+                              <TextInput
+                                style={styles.serviceInput}
+                                value={draft.price}
+                                onChangeText={value =>
+                                  updateServiceDraft(service.id, 'price', value)
+                                }
+                                placeholder="80"
+                                placeholderTextColor={colors.text.disabled}
+                                keyboardType="numeric"
+                                editable={!isSavingService}
+                              />
+                            </View>
+                          </View>
+
+                          <View style={styles.serviceEditActions}>
+                            <TouchableOpacity
+                              style={styles.serviceCancelBtn}
+                              onPress={() => setEditingServiceId(null)}
+                              disabled={isSavingService}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.serviceCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.serviceSaveBtn,
+                                isSavingService && styles.saveBtnDisabled,
+                              ]}
+                              onPress={() => handleSaveService(service)}
+                              disabled={isSavingService}
+                              activeOpacity={0.8}
+                            >
+                              {isSavingService ? (
+                                <ActivityIndicator size="small" color={colors.text.white} />
+                              ) : isSavedService ? (
+                                <>
+                                  <Check size={16} color={colors.text.white} />
+                                  <Text style={styles.serviceSaveText}>Salvo!</Text>
+                                </>
+                              ) : (
+                                <Text style={styles.serviceSaveText}>Salvar serviço</Text>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={styles.serviceActions}>
+                          <TouchableOpacity
+                            style={styles.serviceEditBtn}
+                            onPress={() => handleEditService(service)}
+                            activeOpacity={0.8}
+                          >
+                            <Pencil size={14} color={colors.primary.main} />
+                            <Text style={styles.serviceEditText}>Editar serviço</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.serviceDeleteBtn}
+                            onPress={() => handleDeleteService(service)}
+                            activeOpacity={0.8}
+                          >
+                            <Trash2 size={14} color={colors.status.error} />
+                            <Text style={styles.serviceDeleteText}>Excluir</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={{ height: spacing.xl }} />
@@ -528,6 +918,170 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border.main,
     marginVertical: spacing.md,
+  },
+  servicesList: {
+    gap: spacing.md,
+  },
+  serviceEditor: {
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    backgroundColor: colors.background.surface,
+  },
+  serviceEditorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  serviceRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  serviceIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primary.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceTexts: {
+    flex: 1,
+  },
+  serviceName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  serviceMeta: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '600',
+  },
+  serviceStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  serviceStatusText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '700',
+  },
+  serviceForm: {
+    gap: spacing.xs,
+  },
+  serviceActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  serviceEditBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: radii.sm,
+    borderWidth: 1.5,
+    borderColor: colors.primary.main,
+    backgroundColor: colors.background.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  serviceEditText: {
+    color: colors.primary.main,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  serviceDeleteBtn: {
+    height: 40,
+    borderRadius: radii.sm,
+    borderWidth: 1.5,
+    borderColor: colors.status.error,
+    backgroundColor: colors.background.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  serviceDeleteText: {
+    color: colors.status.error,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+  },
+  serviceInput: {
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+    color: colors.text.primary,
+    backgroundColor: colors.background.card,
+  },
+  serviceTextarea: {
+    minHeight: 78,
+    textAlignVertical: 'top',
+  },
+  serviceTextareaSmall: {
+    minHeight: 62,
+    textAlignVertical: 'top',
+  },
+  serviceInlineFields: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  inlineField: {
+    flex: 1,
+  },
+  serviceSaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    height: 42,
+    backgroundColor: colors.primary.main,
+    borderRadius: radii.sm,
+    marginTop: spacing.sm,
+  },
+  serviceEditActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  serviceCancelBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    backgroundColor: colors.background.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceCancelText: {
+    color: colors.text.secondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  serviceSaveText: {
+    color: colors.text.white,
+    fontSize: 14,
+    fontWeight: '700',
   },
   stepperRow: {
     flexDirection: 'row',

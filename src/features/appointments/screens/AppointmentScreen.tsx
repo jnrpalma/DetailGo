@@ -30,16 +30,14 @@ import {
   ChevronRight,
   X,
   Check,
-  AlertCircle,
-  Shield,
   Sparkles,
-  Droplets,
-  Wrench,
-  Zap,
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops/context/ShopContext';
+import { useShopServices } from '@features/shops/hooks/useShopServices';
+import type { ShopService } from '@features/shops/domain/shopService.types';
+import { getShopServiceIcon } from '@features/shops/utils/shopServiceIcons';
 import {
   getAvailableSlotsForDay,
   createAppointmentWithCapacityCheck,
@@ -47,138 +45,50 @@ import {
 } from '@features/appointments/services/availability.service';
 import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
 import { CAR_CATEGORIES } from '@features/appointments/domain/appointment.constants';
-import { getBasePriceForAppointment } from '@features/appointments/domain/appointment.pricing';
-import { colors, spacing, radii, borders } from '@shared/theme';
+import { colors, spacing, radii } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
 import { dateUtils } from '@shared/utils/date.utils';
 
-const { width, height } = Dimensions.get('window');
-
-const SERVICE_ICONS = {
-  'Lavagem simples': Droplets,
-  'Lavagem completa': Sparkles,
-  Polimento: Zap,
-  'Lavagem de motor': Wrench,
-} as const;
+const { height } = Dimensions.get('window');
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const SERVICES = [
-  {
-    label: 'Lavagem simples',
-    durationMin: 30,
-    icon: Droplets,
-    description: 'Limpeza rápida e essencial',
-  },
-  {
-    label: 'Lavagem completa',
-    durationMin: 60,
-    icon: Sparkles,
-    description: 'Limpeza detalhada completa',
-  },
-  {
-    label: 'Polimento',
-    durationMin: 120,
-    icon: Zap,
-    description: 'Recuperação de brilho da pintura',
-  },
-  {
-    label: 'Lavagem de motor',
-    durationMin: 45,
-    icon: Wrench,
-    description: 'Limpeza especializada do motor',
-  },
-] as const;
-
-type ServiceLabel = (typeof SERVICES)[number]['label'];
-
-const SERVICE_DETAILS: Record<
-  ServiceLabel,
-  {
-    title: string;
-    description: string;
-    duration: string;
-    includes: Array<{ text: string; icon: any }>;
-    notIncluded?: Array<{ text: string; icon: any }>;
-    note: string;
-    recommendedFor: string[];
-  }
-> = {
-  'Lavagem simples': {
-    title: 'Lavagem Simples',
-    description: 'Manutenção diária',
-    duration: '30 min',
-    includes: [
-      { text: 'Lavagem externa', icon: Droplets },
-      { text: 'Limpeza de vidros', icon: Sparkles },
-      { text: 'Aspiração rápida', icon: Zap },
-      { text: 'Acabamento nos pneus', icon: Check },
-    ],
-    notIncluded: [
-      { text: 'Higienização profunda', icon: AlertCircle },
-      { text: 'Remoção de manchas', icon: AlertCircle },
-    ],
-    note: 'Ideal para manutenção semanal.',
-    recommendedFor: ['Uso diário', 'Manutenção'],
-  },
-  'Lavagem completa': {
-    title: 'Lavagem Completa',
-    description: 'Limpeza profunda',
-    duration: '60 min',
-    includes: [
-      { text: 'Lavagem externa detalhada', icon: Droplets },
-      { text: 'Limpeza de rodas', icon: Sparkles },
-      { text: 'Aspiração completa', icon: Zap },
-      { text: 'Acabamento premium', icon: Check },
-      { text: 'Limpeza de soleiras', icon: Check },
-    ],
-    notIncluded: [
-      { text: 'Polimento técnico', icon: AlertCircle },
-      { text: 'Higienização com extração', icon: AlertCircle },
-    ],
-    note: 'Perfeito para ocasiões especiais.',
-    recommendedFor: ['Eventos', 'Viagens', 'Showroom'],
-  },
-  Polimento: {
-    title: 'Polimento Técnico',
-    description: 'Recuperação de brilho',
-    duration: '120 min',
-    includes: [
-      { text: 'Correção de swirls', icon: Zap },
-      { text: 'Remoção de riscos leves', icon: Sparkles },
-      { text: 'Proteção da pintura', icon: Shield },
-      { text: 'Alta camada de brilho', icon: Check },
-    ],
-    notIncluded: [
-      { text: 'Repintura', icon: AlertCircle },
-      { text: 'Danos profundos', icon: AlertCircle },
-    ],
-    note: 'Recomendado a cada 6 meses.',
-    recommendedFor: ['Carros +1 ano', 'Pré-venda'],
-  },
-  'Lavagem de motor': {
-    title: 'Lavagem de Motor',
-    description: 'Limpeza especializada',
-    duration: '45 min',
-    includes: [
-      { text: 'Proteção elétrica', icon: Shield },
-      { text: 'Desengraxante', icon: Droplets },
-      { text: 'Secagem técnica', icon: Zap },
-      { text: 'Acabamento', icon: Check },
-    ],
-    note: 'Cuidado especial com partes elétricas.',
-    recommendedFor: ['Acúmulo de óleo', 'Prevenção'],
-  },
+type ServiceDetails = {
+  title: string;
+  description: string;
+  duration: string;
+  includes: Array<{ text: string; icon: any }>;
+  note: string;
+  recommendedFor: string[];
 };
+
+function getServiceDetails(service: ShopService): ServiceDetails {
+  const includes =
+    service.includes && service.includes.length > 0
+      ? service.includes.map(text => ({ text, icon: Check }))
+      : [{ text: service.description ?? 'Execução do serviço selecionado', icon: Check }];
+
+  return {
+    title: service.name,
+    description: service.description ?? 'Serviço da estética',
+    duration: `${service.durationMin} min`,
+    includes,
+    note: service.note ?? 'Os detalhes deste serviço são definidos pela estética.',
+    recommendedFor:
+      service.recommendedFor && service.recommendedFor.length > 0
+        ? service.recommendedFor
+        : ['Cliente vinculado'],
+  };
+}
 
 function ServiceDetailsModal({
   visible,
-  serviceLabel,
+  service,
   price,
   onClose,
 }: {
   visible: boolean;
-  serviceLabel: ServiceLabel | null;
+  service: ShopService | null;
   price: number;
   onClose: () => void;
 }) {
@@ -213,12 +123,13 @@ function ServiceDetailsModal({
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [fadeAnim, slideAnim, visible]);
 
-  if (!visible || !serviceLabel) return null;
+  if (!visible || !service) return null;
 
-  const details = SERVICE_DETAILS[serviceLabel];
-  const Icon = SERVICE_ICONS[serviceLabel];
+  const details = getServiceDetails(service);
+  const durationText = `${service.durationMin} min`;
+  const Icon = getShopServiceIcon(service);
 
   return (
     <Modal transparent visible={visible} onRequestClose={onClose}>
@@ -258,7 +169,7 @@ function ServiceDetailsModal({
               </View>
               <View style={styles.durationBadge}>
                 <Clock size={14} color={colors.text.secondary} />
-                <Text style={styles.durationBadgeText}>{details.duration}</Text>
+                <Text style={styles.durationBadgeText}>{durationText}</Text>
               </View>
             </View>
 
@@ -287,34 +198,6 @@ function ServiceDetailsModal({
                 })}
               </View>
             </View>
-
-            {details.notIncluded && details.notIncluded.length > 0 && (
-              <View style={styles.detailsSection}>
-                <View style={styles.sectionHeader}>
-                  <View
-                    style={[styles.sectionIcon, { backgroundColor: colors.status.error + '20' }]}
-                  >
-                    <AlertCircle size={14} color={colors.status.error} />
-                  </View>
-                  <Text style={styles.sectionHeaderTitle}>Não inclui</Text>
-                </View>
-                <View style={styles.itemsGrid}>
-                  {details.notIncluded.map((item, idx) => {
-                    const ItemIcon = item.icon;
-                    return (
-                      <View key={`exc-${idx}`} style={styles.excludedItem}>
-                        <View
-                          style={[styles.itemIcon, { backgroundColor: colors.status.error + '10' }]}
-                        >
-                          <ItemIcon size={12} color={colors.status.error} />
-                        </View>
-                        <Text style={styles.excludedItemText}>{item.text}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
 
             {details.recommendedFor && (
               <View style={styles.detailsSection}>
@@ -417,10 +300,14 @@ export default function AppointmentScreen() {
   const navigation = useNavigation<NavProp>();
   const uid = auth.currentUser?.uid;
   const { shopId } = useShop();
+  const { loading: loadingServices, items: services } = useShopServices({
+    shopId,
+    activeOnly: true,
+  });
 
   const [vehicleType, setVehicleType] = useState<VehicleType>('Carro');
   const [carCategory, setCarCategory] = useState<CarCategory | null>('Hatch');
-  const [serviceLabel, setServiceLabel] = useState<ServiceLabel | null>(null);
+  const [serviceLabel, setServiceLabel] = useState<string | null>(null);
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
@@ -438,19 +325,11 @@ export default function AppointmentScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const selectedService = useMemo(
-    () => SERVICES.find(s => s.label === serviceLabel) ?? null,
-    [serviceLabel],
+    () => services.find(s => s.name === serviceLabel) ?? null,
+    [serviceLabel, services],
   );
 
-  const basePrice = useMemo(() => {
-    const price = getBasePriceForAppointment(
-      vehicleType,
-      vehicleType === 'Carro' ? carCategory : null,
-    );
-    return typeof price === 'number' ? price : 0;
-  }, [vehicleType, carCategory]);
-
-  const finalPrice = basePrice;
+  const finalPrice = selectedService?.price ?? 0;
 
   const refreshSlots = useCallback(
     async (nextDay: Date, nextService = selectedService) => {
@@ -474,7 +353,7 @@ export default function AppointmentScreen() {
         setLoadingSlots(false);
       }
     },
-    [selectedService],
+    [selectedService, shopId],
   );
 
   const handleDayChange = async (event: DateTimePickerEvent, selected?: Date) => {
@@ -491,9 +370,10 @@ export default function AppointmentScreen() {
     await refreshSlots(next, selectedService);
   };
 
-  const handleSelectService = async (service: ServiceLabel) => {
-    setServiceLabel(service);
-    const svc = SERVICES.find(s => s.label === service)!;
+  const handleSelectService = async (serviceName: string) => {
+    setServiceLabel(serviceName);
+    const svc = services.find(s => s.name === serviceName);
+    if (!svc) return;
     await refreshSlots(day, svc);
   };
 
@@ -520,7 +400,7 @@ export default function AppointmentScreen() {
         customerUid: uid!,
         vehicleType,
         carCategory: vehicleType === 'Carro' ? carCategory : null,
-        serviceLabel: selectedService.label,
+        serviceLabel: selectedService.name,
         durationMin: selectedService.durationMin,
         price: finalPrice,
         startAtMs: selectedSlot.startAtMs,
@@ -551,7 +431,7 @@ export default function AppointmentScreen() {
   }
 
   const canConfirm = !!selectedService && !!selectedSlot && !submitting;
-  const SelectedServiceIcon = selectedService ? selectedService.icon : Calendar;
+  const SelectedServiceIcon = selectedService ? getShopServiceIcon(selectedService) : Calendar;
 
   return (
     <>
@@ -580,7 +460,7 @@ export default function AppointmentScreen() {
         <SelectModal
           visible={serviceModalOpen}
           title="Serviço"
-          options={SERVICES.map(s => s.label)}
+          options={services.map(s => s.name)}
           selected={serviceLabel}
           onSelect={handleSelectService}
           onClose={() => setServiceModalOpen(false)}
@@ -588,7 +468,7 @@ export default function AppointmentScreen() {
 
         <ServiceDetailsModal
           visible={serviceDetailsOpen}
-          serviceLabel={serviceLabel}
+          service={selectedService}
           price={finalPrice}
           onClose={() => setServiceDetailsOpen(false)}
         />
@@ -684,7 +564,7 @@ export default function AppointmentScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>SERVIÇO</Text>
 
-            {serviceLabel ? (
+            {selectedService ? (
               <TouchableOpacity
                 style={styles.serviceCard}
                 onPress={() => setServiceModalOpen(true)}
@@ -694,7 +574,7 @@ export default function AppointmentScreen() {
                     <SelectedServiceIcon size={18} color={colors.primary.main} />
                   </View>
                   <View style={styles.serviceInfo}>
-                    <Text style={styles.serviceName}>{serviceLabel}</Text>
+                    <Text style={styles.serviceName}>{selectedService.name}</Text>
                     <Text style={styles.serviceDuration}>
                       {selectedService?.durationMin}min • {formatUtils.currency(finalPrice)}
                     </Text>
@@ -709,11 +589,22 @@ export default function AppointmentScreen() {
                   <Text style={styles.detailsBadgeText}>Detalhes</Text>
                 </TouchableOpacity>
               </TouchableOpacity>
+            ) : loadingServices ? (
+              <View style={styles.loadingState}>
+                <ActivityIndicator size="small" color={colors.primary.main} />
+                <Text style={styles.loadingText}>Carregando serviços...</Text>
+              </View>
             ) : (
-              <TouchableOpacity style={styles.selector} onPress={() => setServiceModalOpen(true)}>
+              <TouchableOpacity
+                style={[styles.selector, services.length === 0 && styles.selectorDisabled]}
+                onPress={() => services.length > 0 && setServiceModalOpen(true)}
+                disabled={services.length === 0}
+              >
                 <View style={styles.selectorContent}>
                   <Clock size={16} color={colors.text.secondary} />
-                  <Text style={styles.selectorPlaceholder}>Selecione um serviço</Text>
+                  <Text style={styles.selectorPlaceholder}>
+                    {services.length > 0 ? 'Selecione um serviço' : 'Nenhum serviço disponível'}
+                  </Text>
                 </View>
                 <ChevronRight size={16} color={colors.text.tertiary} />
               </TouchableOpacity>
@@ -920,6 +811,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.main,
     paddingHorizontal: spacing.md,
+  },
+  selectorDisabled: {
+    opacity: 0.6,
   },
   selectorContent: {
     flexDirection: 'row',
