@@ -10,6 +10,7 @@ export type UserAppointment = {
   carCategory: CarCategory | null;
   serviceLabel: string | null;
   price: number | null;
+  durationMin?: number;
   startAtMs: number;
   status: AppointmentStatus;
   dayKey?: string;
@@ -23,6 +24,7 @@ export type Appointment = {
   carCategory: CarCategory | null;
   serviceLabel: string | null;
   price: number | null;
+  durationMin?: number;
   startAtMs: number;
   endAtMs?: number;
   status: AppointmentStatus;
