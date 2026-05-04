@@ -1,13 +1,14 @@
-// src/features/profile/screens/ProfileScreen.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   StatusBar,
@@ -15,17 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import {
-  ArrowLeft,
-  Mail,
-  Phone,
-  Save,
-  Check,
-  X,
-  RefreshCw,
-  Pencil,
-  User,
-} from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, RefreshCw, X } from 'lucide-react-native';
 
 import { getAuth } from '@react-native-firebase/auth';
 import {
@@ -37,10 +28,10 @@ import {
 } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
-import { colors, spacing, radii } from '@shared/theme';
+import { darkColors as D } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
-import { Input } from '@shared/components/Input';
 import { formatUtils } from '@shared/utils/format.utils';
+import { useAuth } from '@features/auth';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 
@@ -50,6 +41,7 @@ type UserProfile = {
   email?: string;
   phone?: string;
   photoURL?: string;
+  photoB64?: string;
   pendingEmail?: string;
 };
 
@@ -66,6 +58,7 @@ export default function ProfileScreen() {
   const db = getFirestore();
   const authInstance = getAuth();
   const user = authInstance.currentUser;
+  const { signOut } = useAuth();
 
   const uid = user?.uid ?? null;
 
@@ -79,8 +72,10 @@ export default function ProfileScreen() {
     email: user?.email || '',
     phone: '',
     pendingEmail: '',
+    photoURL: user?.photoURL ?? undefined,
   });
 
+  const [editingName, setEditingName] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -94,6 +89,28 @@ export default function ProfileScreen() {
     if (!uid) return null;
     return doc(db, 'users', uid);
   }, [db, uid]);
+
+  const displayName = useMemo(() => {
+    const profileName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+    return profileName || user?.displayName || 'Cliente DetailGo';
+  }, [profile.firstName, profile.lastName, user?.displayName]);
+
+  const initials = useMemo(() => {
+    const source = displayName.trim() || user?.email || 'Cliente';
+    return source
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  }, [displayName, user?.email]);
+
+  const avatarSource = profile.photoB64
+    ? { uri: profile.photoB64 }
+    : profile.photoURL
+    ? { uri: profile.photoURL }
+    : null;
 
   useEffect(() => {
     if (!userRef || !user) {
@@ -118,6 +135,8 @@ export default function ProfileScreen() {
         phone: phoneValue,
         email: authEmail || data.email || '',
         pendingEmail: shouldClearPending ? '' : pendingFromFirestore,
+        photoURL: data.photoURL || user.photoURL || undefined,
+        photoB64: data.photoB64,
       });
 
       setNewPhone(phoneValue);
@@ -143,6 +162,7 @@ export default function ProfileScreen() {
         lastName: profile.lastName.trim(),
       });
 
+      setEditingName(false);
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
     } catch (error) {
       console.error(error);
@@ -238,8 +258,8 @@ export default function ProfileScreen() {
       });
 
       Alert.alert(
-        '📧 Link enviado!',
-        'Verifique seu novo email e clique no link de confirmação.\n\n⚠️ IMPORTANTE: Após confirmar, você precisará fazer login novamente.',
+        'Link enviado',
+        'Verifique seu novo email e clique no link de confirmação. Após confirmar, você precisará fazer login novamente.',
         [
           {
             text: 'Entendi',
@@ -252,7 +272,7 @@ export default function ProfileScreen() {
         ],
       );
     } catch (error: any) {
-      console.error('❌ verifyBeforeUpdateEmail error:', error);
+      console.error('verifyBeforeUpdateEmail error:', error);
 
       const code = error?.code;
 
@@ -304,8 +324,8 @@ export default function ProfileScreen() {
         }));
 
         Alert.alert(
-          '✅ Email confirmado!',
-          'Seu email foi atualizado com sucesso. Por favor, faça login novamente para continuar.',
+          'Email confirmado',
+          'Seu email foi atualizado com sucesso. Faça login novamente para continuar.',
           [
             {
               text: 'OK',
@@ -326,8 +346,8 @@ export default function ProfileScreen() {
 
       if (error.code === 'auth/user-token-expired') {
         Alert.alert(
-          '✅ Sessão expirada',
-          'Seu email foi alterado com sucesso! Por favor, faça login novamente.',
+          'Sessão expirada',
+          'Seu email foi alterado com sucesso. Faça login novamente.',
           [
             {
               text: 'OK',
@@ -351,11 +371,51 @@ export default function ProfileScreen() {
     setPassword('');
   };
 
+  const cancelNameEdit = () => {
+    setEditingName(false);
+  };
+
+  const handlePasswordReset = () => {
+    const email = profile.email || user?.email;
+    if (!email) {
+      Alert.alert('Erro', 'Não encontramos um e-mail para enviar a troca de senha.');
+      return;
+    }
+
+    Alert.alert('Trocar senha', `Enviar link de redefinição para ${email}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Enviar',
+        onPress: async () => {
+          try {
+            await authInstance.sendPasswordResetEmail(email);
+            Alert.alert('Enviado', 'Confira sua caixa de entrada para redefinir a senha.');
+          } catch (error) {
+            console.error(error);
+            Alert.alert('Erro', 'Não foi possível enviar o link agora.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sair da conta', 'Deseja encerrar sua sessão?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: () => signOut(),
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.main} />
+          <ActivityIndicator size="large" color={D.primary} />
         </View>
       </SafeAreaView>
     );
@@ -363,7 +423,7 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.container}
@@ -371,229 +431,237 @@ export default function ProfileScreen() {
         >
           <View style={styles.header}>
             <TouchableOpacity
-              style={styles.backButton}
+              style={styles.squareButton}
               onPress={() => navigation.goBack()}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
             >
-              <ArrowLeft size={22} color={colors.text.primary} />
+              <ArrowLeft size={22} color={D.ink} />
             </TouchableOpacity>
 
-            <Text style={styles.headerTitle}>Meu Perfil</Text>
-
-            <View style={styles.headerPlaceholder} />
+            <Text style={styles.headerTitle}>Perfil</Text>
           </View>
 
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.form}>
-              <View style={styles.row}>
-                <Input
-                  label="Nome *"
-                  value={profile.firstName || ''}
-                  onChangeText={text => setProfile({ ...profile, firstName: text })}
-                  leftIcon={<User size={20} color={colors.text.tertiary} />}
-                  placeholder="Seu nome"
-                  editable={!saving}
-                  containerStyle={styles.col}
-                />
-
-                <Input
-                  label="Sobrenome *"
-                  value={profile.lastName || ''}
-                  onChangeText={text => setProfile({ ...profile, lastName: text })}
-                  leftIcon={<User size={20} color={colors.text.tertiary} />}
-                  placeholder="Seu sobrenome"
-                  editable={!saving}
-                  containerStyle={styles.col}
-                />
+            <View style={styles.hero}>
+              <View style={styles.avatar}>
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{initials}</Text>
+                )}
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>E-mail</Text>
+              <View style={styles.heroInfo}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                <Text style={styles.email} numberOfLines={1}>
+                  {profile.email || user?.email}
+                </Text>
+                <View style={styles.rolePill}>
+                  <Text style={styles.rolePillText}>CLIENTE</Text>
+                </View>
+              </View>
+            </View>
 
-                {!editingEmail ? (
-                  <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>DADOS PESSOAIS</Text>
+            </View>
+
+            <View style={styles.card}>
+              {!editingName ? (
+                <DataRow label="Nome" value={displayName} onPress={() => setEditingName(true)} />
+              ) : (
+                <View style={[styles.editBlock, styles.rowBorder]}>
+                  <ProfileTextInput
+                    label="Nome"
+                    value={profile.firstName || ''}
+                    onChangeText={text => setProfile({ ...profile, firstName: text })}
+                    placeholder="Seu nome"
+                    editable={!saving}
+                    floating
+                  />
+                  <ProfileTextInput
+                    label="Sobrenome"
+                    value={profile.lastName || ''}
+                    onChangeText={text => setProfile({ ...profile, lastName: text })}
+                    placeholder="Seu sobrenome"
+                    editable={!saving}
+                    floating
+                  />
+                  <View style={styles.editActions}>
                     <TouchableOpacity
-                      onPress={() => setEditingEmail(true)}
-                      activeOpacity={0.7}
+                      style={[styles.actionButton, styles.cancelButton]}
+                      onPress={cancelNameEdit}
                       disabled={saving}
                     >
-                      <View style={[styles.inputWrapper, styles.inputEditable]}>
-                        <Mail size={18} color={colors.text.tertiary} />
-                        <Text style={styles.valueText} numberOfLines={1}>
-                          {profile.email || ''}
-                        </Text>
-                        <View style={styles.editBadge}>
-                          <Pencil size={14} color={colors.primary.main} />
-                          <Text style={styles.editText}>Alterar</Text>
-                        </View>
-                      </View>
+                      <X size={16} color={D.ink} />
+                      <Text style={styles.actionText}>Cancelar</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.confirmButton]}
+                      onPress={handleSave}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <ActivityIndicator size="small" color="#050708" />
+                      ) : (
+                        <>
+                          <Check size={16} color="#050708" />
+                          <Text style={styles.confirmText}>Salvar</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              {!editingEmail ? (
+                <DataRow
+                  label="E-mail"
+                  value={profile.email || 'Não informado'}
+                  onPress={() => setEditingEmail(true)}
+                  bordered
+                />
+              ) : (
+                <View style={styles.editBlock}>
+                  <ProfileTextInput
+                    label="Novo e-mail"
+                    value={newEmail}
+                    onChangeText={setNewEmail}
+                    placeholder="novo@email.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!updatingEmail}
+                    floating
+                  />
+                  <ProfileTextInput
+                    label="Senha atual"
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Digite sua senha"
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!updatingEmail}
+                    floating
+                  />
+                  <View style={styles.editActions}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.cancelButton]}
+                      onPress={cancelEmailEdit}
+                      disabled={updatingEmail}
+                    >
+                      <X size={16} color={D.ink} />
+                      <Text style={styles.actionText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.confirmButton]}
+                      onPress={handleEmailUpdate}
+                      disabled={updatingEmail}
+                    >
+                      {updatingEmail ? (
+                        <ActivityIndicator size="small" color="#050708" />
+                      ) : (
+                        <>
+                          <Check size={16} color="#050708" />
+                          <Text style={styles.confirmText}>Confirmar</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
-                    {!!profile.pendingEmail && (
-                      <View style={styles.pendingBox}>
-                        <Text style={styles.pendingTitle}>Pendente de confirmação</Text>
-                        <Text style={styles.pendingEmail}>{profile.pendingEmail}</Text>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.verifyButton,
-                            checkingConfirm && styles.saveButtonDisabled,
-                          ]}
-                          onPress={checkEmailConfirmed}
-                          disabled={checkingConfirm}
-                          activeOpacity={0.7}
-                        >
-                          {checkingConfirm ? (
-                            <ActivityIndicator size="small" color={colors.text.white} />
-                          ) : (
-                            <>
-                              <RefreshCw size={16} color={colors.text.white} />
-                              <Text style={styles.verifyButtonText}>Verificar confirmação</Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    )}
-
-                    <Text style={styles.hintText}>
-                      Ao alterar, você receberá um link de confirmação no novo e-mail.
-                    </Text>
-                  </>
-                ) : (
-                  <View style={styles.emailEditContainer}>
-                    <Input
-                      value={newEmail}
-                      onChangeText={setNewEmail}
-                      placeholder="Novo email"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      editable={!updatingEmail}
-                    />
-
-                    <Input
-                      value={password}
-                      onChangeText={setPassword}
-                      placeholder="Sua senha"
-                      isPassword
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      editable={!updatingEmail}
-                    />
-
-                    <View style={styles.editActions}>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.cancelButton]}
-                        onPress={cancelEmailEdit}
-                        disabled={updatingEmail}
-                      >
-                        <X size={16} color={colors.text.white} />
-                        <Text style={styles.actionText}>Cancelar</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.confirmButton]}
-                        onPress={handleEmailUpdate}
-                        disabled={updatingEmail}
-                      >
-                        {updatingEmail ? (
-                          <ActivityIndicator size="small" color={colors.text.white} />
-                        ) : (
-                          <>
-                            <Check size={16} color={colors.text.white} />
-                            <Text style={styles.actionText}>Confirmar</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={styles.hintText}>
-                      Dica: se o novo e-mail já existir em outro usuário, o Firebase pode não enviar
-                      o link.
+              {!!profile.pendingEmail && (
+                <View style={styles.pendingBox}>
+                  <View style={styles.pendingTextWrap}>
+                    <Text style={styles.pendingTitle}>Confirmação pendente</Text>
+                    <Text style={styles.pendingEmail} numberOfLines={1}>
+                      {profile.pendingEmail}
                     </Text>
                   </View>
-                )}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Telefone</Text>
-
-                {!editingPhone ? (
                   <TouchableOpacity
-                    onPress={() => setEditingPhone(true)}
-                    activeOpacity={0.7}
-                    disabled={saving}
+                    style={[styles.verifyButton, checkingConfirm && styles.disabled]}
+                    onPress={checkEmailConfirmed}
+                    disabled={checkingConfirm}
+                    activeOpacity={0.75}
                   >
-                    <View style={[styles.inputWrapper, styles.inputEditable]}>
-                      <Phone size={18} color={colors.text.tertiary} />
-                      <Text style={styles.valueText}>
-                        {profile.phone ? formatUtils.phoneMask(profile.phone) : 'Não informado'}
-                      </Text>
-                      <View style={styles.editBadge}>
-                        <Pencil size={14} color={colors.primary.main} />
-                        <Text style={styles.editText}>Alterar</Text>
-                      </View>
-                    </View>
+                    {checkingConfirm ? (
+                      <ActivityIndicator size="small" color="#050708" />
+                    ) : (
+                      <RefreshCw size={16} color="#050708" />
+                    )}
                   </TouchableOpacity>
-                ) : (
-                  <View style={styles.phoneEditContainer}>
-                    <Input
-                      value={displayPhone}
-                      onChangeText={handlePhoneChange}
-                      leftIcon={<Phone size={18} color={colors.text.tertiary} />}
-                      placeholder="(11) 91234-5678"
-                      keyboardType="phone-pad"
-                      maxLength={15}
-                      editable={!saving}
-                    />
+                </View>
+              )}
 
-                    <View style={styles.editActions}>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.cancelButton]}
-                        onPress={cancelPhoneEdit}
-                        disabled={saving}
-                      >
-                        <X size={16} color={colors.text.white} />
-                        <Text style={styles.actionText}>Cancelar</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.confirmButton]}
-                        onPress={handlePhoneSave}
-                        disabled={saving}
-                      >
-                        {saving ? (
-                          <ActivityIndicator size="small" color={colors.text.white} />
-                        ) : (
-                          <>
-                            <Check size={16} color={colors.text.white} />
-                            <Text style={styles.actionText}>Salvar</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
+              {!editingPhone ? (
+                <DataRow
+                  label="Telefone"
+                  value={profile.phone ? formatUtils.phoneMask(profile.phone) : 'Não informado'}
+                  onPress={() => setEditingPhone(true)}
+                  bordered
+                  last
+                />
+              ) : (
+                <View style={[styles.editBlock, styles.rowBorder]}>
+                  <ProfileTextInput
+                    label="Telefone"
+                    value={displayPhone}
+                    onChangeText={handlePhoneChange}
+                    placeholder="(11) 91234-5678"
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                    editable={!saving}
+                    floating
+                  />
+                  <View style={styles.editActions}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.cancelButton]}
+                      onPress={cancelPhoneEdit}
+                      disabled={saving}
+                    >
+                      <X size={16} color={D.ink} />
+                      <Text style={styles.actionText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.confirmButton]}
+                      onPress={handlePhoneSave}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <ActivityIndicator size="small" color="#050708" />
+                      ) : (
+                        <>
+                          <Check size={16} color="#050708" />
+                          <Text style={styles.confirmText}>Salvar</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </View>
-                )}
-
-                <Text style={styles.hintText}>Informe seu WhatsApp para receber notificações</Text>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.saveButtonBottom, saving && styles.saveButtonDisabled]}
-                onPress={handleSave}
-                disabled={saving || editingEmail || editingPhone}
-                activeOpacity={0.7}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={colors.text.white} />
-                ) : (
-                  <>
-                    <Save size={18} color={colors.text.white} />
-                    <Text style={styles.saveButtonText}>Salvar nome</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                </View>
+              )}
             </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>CONTA</Text>
+            </View>
+
+            <View style={styles.card}>
+              <SettingsRow label="Trocar senha" onPress={handlePasswordReset} />
+              <SettingsRow
+                label="Notificações"
+                onPress={() => Alert.alert('Notificações', 'Preferências em breve.')}
+              />
+              <SettingsRow
+                label="Suporte"
+                onPress={() => Alert.alert('Suporte', 'Fale com a equipe DetailGo pelo suporte.')}
+              />
+              <SettingsRow label="Sair" onPress={handleSignOut} danger last />
+            </View>
+
+            <View style={styles.footerSpace} />
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -601,10 +669,91 @@ export default function ProfileScreen() {
   );
 }
 
+function ProfileTextInput({
+  label,
+  last,
+  floating,
+  ...props
+}: React.ComponentProps<typeof TextInput> & {
+  label: string;
+  last?: boolean;
+  floating?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.inputRow,
+        !last && !floating && styles.rowBorder,
+        floating && styles.floatingInput,
+      ]}
+    >
+      <View style={styles.inputTextWrap}>
+        <Text style={styles.dataLabel}>{label}</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholderTextColor={D.ink3}
+          selectionColor={D.primary}
+          {...props}
+        />
+      </View>
+    </View>
+  );
+}
+
+function DataRow({
+  label,
+  value,
+  onPress,
+  bordered,
+  last,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+  bordered?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.summaryRow, bordered && styles.rowBorder, last && styles.lastSummaryRow]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function SettingsRow({
+  label,
+  onPress,
+  danger,
+  last,
+}: {
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.settingsRow, !last && styles.rowBorder]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={[styles.settingsLabel, danger && styles.dangerText]}>{label}</Text>
+      <ChevronRight size={18} color={D.ink3} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background.main,
+    backgroundColor: '#090D0D',
   },
   container: {
     flex: 1,
@@ -616,188 +765,333 @@ const styles = StyleSheet.create({
   },
 
   header: {
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.background.main,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+    gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.main,
+    borderBottomColor: D.border,
   },
-  backButton: {
+  squareButton: {
     width: 40,
     height: 40,
-    borderRadius: radii.md,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background.surface,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
+  },
+  squareButtonGhost: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: D.primaryLight,
     borderWidth: 1,
-    borderColor: colors.border.main,
+    borderColor: D.borderFocus,
+  },
+  headerTextWrap: {
+    flex: 1,
+  },
+  headerKicker: {
+    color: D.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   headerTitle: {
+    color: D.ink,
     fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  headerPlaceholder: {
-    width: 40,
+    fontWeight: '900',
   },
 
   content: {
-    padding: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
-  form: {
-    gap: spacing.lg,
-  },
-
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  col: {
-    flex: 1,
-  },
-
-  inputGroup: {
-    marginBottom: spacing.xs,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-
-  inputWrapper: {
+  hero: {
+    minHeight: 74,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border.main,
+    gap: 14,
+    marginBottom: 4,
   },
-  inputEditable: {
-    borderColor: colors.primary.main,
-    borderWidth: 1,
+  heroGlow: {
+    position: 'absolute',
+    width: 170,
+    height: 110,
+    right: -54,
+    top: -34,
+    borderRadius: 85,
+    backgroundColor: 'rgba(212,255,61,0.13)',
   },
-
-  valueText: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-
-  editBadge: {
-    flexDirection: 'row',
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
+    justifyContent: 'center',
+    backgroundColor: D.primary,
   },
-  editText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary.main,
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
-
-  hintText: {
+  avatarText: {
+    color: '#050708',
+    fontSize: 25,
+    fontWeight: '900',
+  },
+  heroInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    color: D.ink,
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  email: {
+    color: D.ink2,
     fontSize: 12,
-    color: colors.text.tertiary,
-    marginTop: spacing.xs,
-    marginLeft: 4,
+    lineHeight: 16,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  rolePill: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: D.primaryLight,
+    borderWidth: 1,
+    borderColor: D.borderFocus,
+  },
+  rolePillText: {
+    color: D.primary,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 
-  emailEditContainer: {
-    gap: spacing.sm,
+  sectionHeader: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
   },
-  phoneEditContainer: {
-    gap: spacing.sm,
+  sectionLabel: {
+    color: D.ink3,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  card: {
+    borderRadius: 14,
+    backgroundColor: D.card,
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
+    overflow: 'hidden',
+  },
+  rowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: D.border,
+  },
+  summaryRow: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 16,
+  },
+  lastSummaryRow: {
+    minHeight: 45,
+  },
+  summaryLabel: {
+    width: 92,
+    color: D.ink3,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  summaryValue: {
+    flex: 1,
+    color: D.ink,
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'right',
   },
 
+  inputRow: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  floatingInput: {
+    minHeight: 64,
+    borderRadius: 14,
+    backgroundColor: D.surface,
+    borderWidth: 1,
+    borderColor: D.borderStrong,
+    marginBottom: 10,
+  },
+  inputTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  textInput: {
+    minHeight: 31,
+    color: D.ink,
+    fontSize: 16,
+    fontWeight: '800',
+    padding: 0,
+  },
+  dataRow: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dataTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dataLabel: {
+    color: D.ink3,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  dataValue: {
+    color: D.ink,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  editBlock: {
+    padding: 14,
+  },
   editActions: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    gap: 10,
   },
-
   actionButton: {
     flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
+    gap: 8,
   },
-  actionText: {
-    color: colors.text.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   cancelButton: {
-    backgroundColor: colors.status.error,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: D.borderStrong,
   },
   confirmButton: {
-    backgroundColor: colors.primary.main,
+    backgroundColor: D.primary,
+  },
+  actionText: {
+    color: D.ink,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  confirmText: {
+    color: '#050708',
+    fontSize: 14,
+    fontWeight: '900',
   },
 
   pendingBox: {
-    marginTop: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.md,
+    marginHorizontal: 14,
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: D.primaryLight,
     borderWidth: 1,
-    borderColor: colors.border.main,
-    backgroundColor: colors.background.surface,
-    gap: spacing.xs,
+    borderColor: D.borderFocus,
+  },
+  pendingTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   pendingTitle: {
+    color: D.primary,
     fontSize: 13,
-    fontWeight: '700',
-    color: colors.text.primary,
+    fontWeight: '900',
   },
   pendingEmail: {
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-
-  verifyButton: {
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: colors.primary.main,
-  },
-  verifyButtonText: {
-    color: colors.text.white,
-    fontSize: 14,
+    color: D.ink,
+    fontSize: 12,
+    marginTop: 2,
     fontWeight: '700',
   },
-
-  saveButtonBottom: {
-    flexDirection: 'row',
+  verifyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary.main,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    gap: 8,
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    backgroundColor: D.primary,
   },
-  saveButtonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600',
+
+  settingsRow: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
   },
-  saveButtonDisabled: {
+  settingsLabel: {
+    flex: 1,
+    color: D.ink,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  dangerText: {
+    color: D.accent,
+  },
+
+  saveMiniButton: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    backgroundColor: D.primary,
+  },
+  saveMiniText: {
+    color: '#050708',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  disabled: {
     opacity: 0.6,
+  },
+  footerSpace: {
+    height: 38,
   },
 });
