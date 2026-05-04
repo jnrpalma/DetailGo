@@ -1,40 +1,77 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  StatusBar,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  StatusBar,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  CalendarCheck,
-  Car,
-  XCircle,
-  CalendarRange,
-} from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops';
+import { darkColors as D, typography as T } from '@shared/theme';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';
 import { cancelAppointment, getAppointmentRules } from '../services/appointment.service';
 
-import { dateUtils } from '@shared/utils/date.utils';
-import { formatUtils } from '@shared/utils/format.utils';
-import { colors } from '@shared/theme/colors';
-
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
+
+function getDuration(item: UserAppointment) {
+  if (item.durationMin) return `${item.durationMin} min`;
+  if (item.endAtMs)
+    return `${Math.max(1, Math.round((item.endAtMs - item.startAtMs) / 60000))} min`;
+  return '--';
+}
+
+function getVehicleLabel(item: UserAppointment) {
+  if (item.vehicleType === 'Carro') return item.carCategory ?? 'Carro';
+  return item.vehicleType;
+}
+
+function getPrice(value: number | null) {
+  if (value === null || value === undefined) return 'R$ --';
+  return `R$ ${value.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
+}
+
+function getTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function isToday(timestamp: number) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
+}
+
+function getDateLabel(timestamp: number) {
+  if (isToday(timestamp)) return 'HOJE';
+
+  const date = new Date(timestamp);
+  const weekday = date
+    .toLocaleDateString('pt-BR', { weekday: 'short' })
+    .replace('.', '')
+    .toUpperCase();
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+
+  return `${weekday} ${day}/${month}`;
+}
 
 export default function MyAppointmentsScreen() {
   const navigation = useNavigation<NavProp>();
@@ -43,7 +80,6 @@ export default function MyAppointmentsScreen() {
   const { shopId } = useShop();
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
 
   const { loading, items, mutate } = useUserAppointments({
     uid,
@@ -51,6 +87,11 @@ export default function MyAppointmentsScreen() {
     statusIn: ACTIVE_APPOINTMENT_SET,
     limitN: 50,
   });
+
+  const inProgressCount = useMemo(
+    () => items.filter(item => item.status === 'in_progress').length,
+    [items],
+  );
 
   const handleCancel = (item: UserAppointment) => {
     const rules = getAppointmentRules(item);
@@ -70,62 +111,6 @@ export default function MyAppointmentsScreen() {
     ]);
   };
 
-  const handleReschedule = (item: UserAppointment) => {
-    const rules = getAppointmentRules(item);
-
-    if (!rules.canReschedule) {
-      Alert.alert('Não é possível reagendar', rules.message || 'Reagendamento não permitido.');
-      return;
-    }
-
-    let message = '';
-    if (item.status === 'no_show') {
-      message = 'Você não compareceu a este agendamento. Deseja criar um novo agendamento?';
-    } else if (rules.isExpired) {
-      message =
-        'Este agendamento já passou do horário. Deseja criar um novo agendamento baseado neste?';
-    } else {
-      message =
-        'Ao reagendar, o agendamento atual será cancelado e você poderá escolher um novo horário. Deseja continuar?';
-    }
-
-    Alert.alert('Reagendar', message, [
-      { text: 'Não', style: 'cancel' },
-      {
-        text: 'Sim, continuar',
-        onPress: () => executeReschedule(item, rules.isExpired),
-      },
-    ]);
-  };
-
-  const executeReschedule = async (item: UserAppointment, isExpired: boolean) => {
-    setReschedulingId(item.id);
-
-    if (!isExpired) {
-      const cancelResult = await cancelAppointment(item.id, uid!, shopId ?? '');
-
-      if (!cancelResult.ok) {
-        Alert.alert(
-          'Erro',
-          cancelResult.message || 'Não foi possível cancelar o agendamento atual.',
-        );
-        setReschedulingId(null);
-        return;
-      }
-    }
-
-    navigation.navigate('Appointment', {
-      mode: 'reschedule',
-      originalAppointmentId: item.id,
-      vehicleType: item.vehicleType,
-      carCategory: item.carCategory,
-      serviceLabel: item.serviceLabel,
-      isExpired,
-    });
-
-    setReschedulingId(null);
-  };
-
   const executeCancel = async (item: UserAppointment) => {
     setCancellingId(item.id);
 
@@ -141,122 +126,12 @@ export default function MyAppointmentsScreen() {
     setCancellingId(null);
   };
 
-  const renderItem = ({ item }: { item: UserAppointment }) => {
-    const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory
-        ? `${item.vehicleType} • ${item.carCategory}`
-        : item.vehicleType;
-
-    const isInProgress = item.status === 'in_progress';
-    const statusLabel = isInProgress
-      ? 'Em andamento'
-      : item.status === 'cancelled'
-      ? 'Cancelado'
-      : 'Agendado';
-    const statusColor = isInProgress
-      ? colors.status.warning
-      : item.status === 'cancelled'
-      ? colors.text.disabled
-      : colors.text.tertiary;
-    const StatusIcon = isInProgress ? CalendarCheck : Calendar;
-
-    const isCancelling = cancellingId === item.id;
-    const isRescheduling = reschedulingId === item.id;
-    const isLoading = isCancelling || isRescheduling;
-
-    const rules = getAppointmentRules(item);
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>{item.serviceLabel ?? 'Serviço'}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}10` }]}>
-              <StatusIcon size={14} color={statusColor} />
-              <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
-            </View>
-          </View>
-          <Text style={styles.price}>{formatUtils.currency(item.price)}</Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.cardFooter}>
-          <View style={styles.infoRow}>
-            <Calendar size={16} color={colors.text.tertiary} />
-            <Text style={styles.infoText}>{dateUtils.formatDate(item.startAtMs)}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Clock size={16} color={colors.text.tertiary} />
-            <Text style={styles.infoText}>{dateUtils.formatHour(item.startAtMs)}</Text>
-          </View>
-          <View style={styles.vehicleBadge}>
-            <Car size={14} color={colors.text.tertiary} />
-            <Text style={styles.vehicleText}>{subtitle}</Text>
-          </View>
-        </View>
-
-        {/* Ações do agendamento */}
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              (!rules.canReschedule || isLoading) && styles.actionButtonDisabled,
-            ]}
-            onPress={() => handleReschedule(item)}
-            disabled={!rules.canReschedule || isLoading}
-            activeOpacity={0.7}
-          >
-            {isRescheduling ? (
-              <ActivityIndicator size="small" color={colors.text.secondary} />
-            ) : (
-              <>
-                <CalendarRange size={16} color={colors.text.secondary} />
-                <Text style={styles.actionButtonText}>Reagendar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.actionButtonCancel,
-              (!rules.canCancel || isLoading) && styles.actionButtonDisabled,
-            ]}
-            onPress={() => handleCancel(item)}
-            disabled={!rules.canCancel || isLoading}
-            activeOpacity={0.7}
-          >
-            {isCancelling ? (
-              <ActivityIndicator size="small" color={colors.status.error} />
-            ) : (
-              <>
-                <XCircle size={16} color={colors.status.error} />
-                <Text style={[styles.actionButtonText, styles.actionButtonTextCancel]}>
-                  Cancelar
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Mensagens de status */}
-        {rules.isExpired && item.status === 'scheduled' && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              ⏰ Horário já passou. Você pode reagendar, mas não cancelar.
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  };
-
   if (!uid) {
     return (
       <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.main} />
+          <ActivityIndicator size="large" color={D.primary} />
         </View>
       </SafeAreaView>
     );
@@ -264,44 +139,49 @@ export default function MyAppointmentsScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <ArrowLeft size={22} color={colors.text.primary} />
+            <ArrowLeft size={20} color={D.ink} strokeWidth={2.4} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Meus agendamentos</Text>
-          <View style={styles.headerRight} />
+
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerTitle}>Agendamentos</Text>
+            <Text style={styles.headerMeta} numberOfLines={1}>
+              {String(items.length).padStart(2, '0')} ativos · {inProgressCount} em andamento
+            </Text>
+          </View>
         </View>
 
-        {/* Content */}
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary.main} />
+              <ActivityIndicator size="large" color={D.primary} />
             </View>
           ) : (
             <FlatList
               data={items}
               keyExtractor={item => item.id}
-              renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+              renderItem={({ item }) => (
+                <AppointmentCard
+                  item={item}
+                  isCancelling={cancellingId === item.id}
+                  onCancel={() => handleCancel(item)}
+                />
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
-                  <View style={styles.emptyStateIcon}>
-                    <Calendar size={48} color={colors.text.disabled} />
-                  </View>
                   <Text style={styles.emptyStateTitle}>Nenhum agendamento ativo</Text>
                   <Text style={styles.emptyStateText}>
-                    Você não tem serviços agendados no momento.{'\n'}
-                    Que tal agendar agora mesmo?
+                    Você não tem serviços agendados no momento.
                   </Text>
                   <TouchableOpacity
                     style={styles.emptyStateButton}
@@ -320,228 +200,301 @@ export default function MyAppointmentsScreen() {
   );
 }
 
+function AppointmentCard({
+  item,
+  isCancelling,
+  onCancel,
+}: {
+  item: UserAppointment;
+  isCancelling: boolean;
+  onCancel: () => void;
+}) {
+  const isInProgress = item.status === 'in_progress';
+  const rules = getAppointmentRules(item);
+
+  return (
+    <View style={[styles.card, isInProgress && styles.cardInProgress]}>
+      <View style={styles.cardTop}>
+        <View style={[styles.statusPill, isInProgress && styles.statusPillActive]}>
+          {isInProgress && <View style={styles.statusDot} />}
+          <Text style={[styles.statusText, isInProgress && styles.statusTextActive]}>
+            {isInProgress ? 'EM ANDAMENTO' : 'AGENDADO'}
+          </Text>
+        </View>
+
+        <View style={styles.timeWrap}>
+          <Text style={styles.time}>{getTime(item.startAtMs)}</Text>
+          <Text style={styles.dateLabel}>{getDateLabel(item.startAtMs)}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.serviceName} numberOfLines={1}>
+        {item.serviceLabel ?? 'Serviço'}
+      </Text>
+      <Text style={styles.serviceMeta} numberOfLines={1}>
+        {getVehicleLabel(item)} · {getDuration(item)}
+      </Text>
+
+      <View style={styles.cardDivider} />
+
+      <View style={styles.cardBottom}>
+        <Text style={styles.price}>{getPrice(item.price)}</Text>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.cancelButton,
+              (!rules.canCancel || isCancelling) && styles.disabled,
+            ]}
+            onPress={onCancel}
+            disabled={!rules.canCancel || isCancelling}
+            activeOpacity={0.75}
+          >
+            {isCancelling ? (
+              <ActivityIndicator size="small" color={D.accent} />
+            ) : (
+              <Text style={styles.cancelText}>Cancelar</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background.main,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.background.main,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.main,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background.surface,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerRight: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    backgroundColor: '#090D0D',
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listContent: {
+
+  header: {
+    minHeight: 96,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingHorizontal: 20,
+    paddingTop: 14,
     paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: D.border,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: D.card,
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitle: {
+    color: D.ink,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
+    lineHeight: T.lineHeight.titleLarge,
+    fontWeight: '900',
+  },
+  headerMeta: {
+    color: D.ink3,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
+    marginTop: 2,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+  },
+  listContent: {
+    paddingBottom: 40,
+  },
+  separator: {
+    height: 20,
   },
   card: {
-    backgroundColor: colors.background.card,
+    minHeight: 188,
     borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: D.card,
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
   },
-  cardHeader: {
+  cardInProgress: {
+    borderLeftWidth: 4,
+    borderLeftColor: D.primary,
+  },
+  cardTop: {
+    minHeight: 40,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  serviceInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  serviceName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  statusBadge: {
+  statusPill: {
+    minHeight: 30,
+    borderRadius: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
+    gap: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
+    backgroundColor: 'rgba(255,255,255,0.035)',
+  },
+  statusPillActive: {
+    borderColor: D.primary,
+    backgroundColor: 'rgba(212,255,61,0.08)',
+  },
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: D.primary,
   },
   statusText: {
-    fontSize: 13,
-    fontWeight: '600',
+    color: D.ink3,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  statusTextActive: {
+    color: D.primary,
+  },
+  timeWrap: {
+    alignItems: 'flex-end',
+    marginTop: -3,
+  },
+  time: {
+    color: D.primary,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
+    lineHeight: T.lineHeight.titleLarge,
+    fontWeight: '900',
+  },
+  dateLabel: {
+    color: D.ink3,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  serviceName: {
+    color: D.ink,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
+    lineHeight: T.lineHeight.bodyLarge,
+    fontWeight: '900',
+  },
+  serviceMeta: {
+    color: D.ink2,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
+    fontWeight: '700',
+  },
+  cardDivider: {
+    height: 1,
+    marginTop: 18,
+    marginBottom: 16,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.075)',
+  },
+  cardBottom: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   price: {
-    fontSize: 18,
+    color: D.ink2,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '700',
-    color: colors.primary.main,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginBottom: 12,
-  },
-  cardFooter: {
+  actions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  vehicleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    gap: 6,
-  },
-  vehicleText: {
-    fontSize: 13,
-    color: colors.text.tertiary,
-    fontWeight: '500',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.main,
-    paddingTop: 16,
+    justifyContent: 'flex-end',
   },
   actionButton: {
-    flex: 1,
-    flexDirection: 'row',
+    minWidth: 118,
+    minHeight: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.background.surface,
-    borderRadius: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.border.main,
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
   },
-  actionButtonCancel: {
-    backgroundColor: colors.background.main,
-    borderColor: colors.status.error,
+  cancelButton: {
+    borderColor: 'rgba(255,92,57,0.55)',
+    backgroundColor: 'rgba(255,92,57,0.07)',
   },
-  actionButtonDisabled: {
-    opacity: 0.5,
+  cancelText: {
+    color: D.accent,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
+    fontWeight: '900',
   },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary,
+  disabled: {
+    opacity: 0.48,
   },
-  actionButtonTextCancel: {
-    color: colors.status.error,
-  },
-  warningBox: {
-    marginTop: 12,
-    padding: 10,
-    backgroundColor: colors.status.warning + '10',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.status.warning,
-  },
-  warningText: {
-    fontSize: 12,
-    color: colors.status.warning,
-    textAlign: 'center',
-  },
+
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 72,
     paddingHorizontal: 24,
   },
-  emptyStateIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.background.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-  },
   emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.primary,
+    color: D.ink,
+    fontFamily: T.family.medium,
+    fontSize: T.size.title,
+    lineHeight: T.lineHeight.title,
+    fontWeight: '900',
     marginBottom: 8,
   },
   emptyStateText: {
-    fontSize: 15,
-    color: colors.text.tertiary,
+    color: D.ink3,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     textAlign: 'center',
-    lineHeight: 22,
     marginBottom: 24,
   },
   emptyStateButton: {
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    minHeight: 44,
     borderRadius: 14,
-    shadowColor: colors.primary.main,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    backgroundColor: D.primary,
   },
   emptyStateButtonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '700',
+    color: '#050708',
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    fontWeight: '900',
   },
 });
