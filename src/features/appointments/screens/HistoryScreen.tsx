@@ -16,7 +16,7 @@ import { ArrowLeft } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops';
-import { darkColors as D } from '@shared/theme';
+import { darkColors as D, typography as T } from '@shared/theme';
 import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
 import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
 import { useUserAppointments } from '../hooks/useUserAppointments';
@@ -297,14 +297,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: D.ink,
-    fontSize: 24,
-    lineHeight: 29,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
+    lineHeight: T.lineHeight.titleLarge,
     fontWeight: '900',
   },
   headerMeta: {
     color: D.ink3,
-    fontSize: 15,
-    lineHeight: 20,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     marginTop: 2,
     fontWeight: '800',
     letterSpacing: 1,
@@ -334,7 +336,8 @@ const styles = StyleSheet.create({
   },
   filterText: {
     color: D.ink2,
-    fontSize: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
   },
   filterTextActive: {
@@ -351,8 +354,9 @@ const styles = StyleSheet.create({
   },
   monthLabel: {
     color: D.ink3,
-    fontSize: 14,
-    lineHeight: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     fontWeight: '800',
     letterSpacing: 2,
     marginBottom: 20,
@@ -371,8 +375,9 @@ const styles = StyleSheet.create({
   day: {
     width: 44,
     color: D.ink2,
-    fontSize: 24,
-    lineHeight: 29,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
+    lineHeight: T.lineHeight.titleLarge,
     fontWeight: '900',
   },
   rowBody: {
@@ -382,14 +387,16 @@ const styles = StyleSheet.create({
   },
   serviceName: {
     color: D.ink,
-    fontSize: 17,
-    lineHeight: 21,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
+    lineHeight: T.lineHeight.bodyLarge,
     fontWeight: '900',
   },
   serviceMeta: {
     color: D.ink3,
-    fontSize: 15,
-    lineHeight: 19,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     marginTop: 1,
     fontWeight: '800',
     letterSpacing: 1,
@@ -401,16 +408,18 @@ const styles = StyleSheet.create({
   },
   price: {
     color: D.primary,
-    fontSize: 17,
-    lineHeight: 21,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
+    lineHeight: T.lineHeight.bodyLarge,
     fontWeight: '900',
   },
   priceMuted: {
     color: D.ink3,
   },
   status: {
-    fontSize: 10,
-    lineHeight: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     marginTop: 2,
     fontWeight: '800',
     textAlign: 'right',
@@ -432,14 +441,16 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: D.ink,
-    fontSize: 22,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
     fontWeight: '900',
     marginBottom: 8,
   },
   emptyText: {
     color: D.ink3,
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     textAlign: 'center',
     fontWeight: '700',
   },

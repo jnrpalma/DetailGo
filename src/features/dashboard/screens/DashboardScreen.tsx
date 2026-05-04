@@ -35,7 +35,7 @@ import {
   User,
 } from 'lucide-react-native';
 
-import { darkColors as D } from '@shared/theme';
+import { darkColors as D, typography as T } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
 import { useAuth } from '@features/auth';
 import { useShop, useShopServices, joinShop, getShopServiceIcon } from '@features/shops';
@@ -622,7 +622,8 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: D.ink,
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
     letterSpacing: 4,
     marginLeft: 4,
@@ -660,7 +661,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarInitialsText: {
-    fontSize: 26,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
     fontWeight: '900',
     color: '#050708',
   },
@@ -680,21 +682,24 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1 },
   greeting: {
     color: D.ink3,
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '700',
     letterSpacing: 0.9,
     marginBottom: 3,
   },
   profileName: {
     color: D.ink,
-    fontSize: 25,
-    lineHeight: 29,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
+    lineHeight: T.lineHeight.titleLarge,
     fontWeight: '900',
   },
   profileEmail: {
     color: D.ink3,
-    fontSize: 12,
-    lineHeight: 16,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     fontWeight: '700',
     letterSpacing: 0.2,
     marginTop: 2,
@@ -721,8 +726,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   joinCardText: { flex: 1 },
-  joinCardTitle: { fontSize: 15, fontWeight: '800', color: D.primary, marginBottom: 2 },
-  joinCardDesc: { fontSize: 12, color: D.primary, opacity: 0.78 },
+  joinCardTitle: {
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    fontWeight: '800',
+    color: D.primary,
+    marginBottom: 2,
+  },
+  joinCardDesc: {
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    color: D.primary,
+    opacity: 0.78,
+  },
 
   scheduleCard: {
     minHeight: 72,
@@ -752,13 +768,15 @@ const styles = StyleSheet.create({
   scheduleTextWrap: { flex: 1 },
   scheduleTitle: {
     color: '#050708',
-    fontSize: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
     fontWeight: '900',
-    lineHeight: 22,
+    lineHeight: T.lineHeight.bodyLarge,
   },
   scheduleSubtitle: {
     color: 'rgba(5,7,8,0.62)',
-    fontSize: 13,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -780,7 +798,8 @@ const styles = StyleSheet.create({
   },
   sectionKicker: {
     color: D.ink3,
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '700',
     letterSpacing: 1.2,
   },
@@ -808,7 +827,8 @@ const styles = StyleSheet.create({
   },
   servicesEmptyText: {
     color: D.ink3,
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '800',
   },
   serviceCard: {
@@ -836,7 +856,8 @@ const styles = StyleSheet.create({
   },
   serviceLabel: {
     color: D.ink2,
-    fontSize: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
   },
 
@@ -849,13 +870,15 @@ const styles = StyleSheet.create({
   },
   upcomingTitle: {
     color: D.ink,
-    fontSize: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
     fontWeight: '900',
-    lineHeight: 22,
+    lineHeight: T.lineHeight.bodyLarge,
   },
   upcomingCount: {
     color: D.ink3,
-    fontSize: 11,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '800',
     letterSpacing: 1.1,
   },
@@ -895,18 +918,21 @@ const styles = StyleSheet.create({
   appointmentInfo: { flex: 1 },
   appointmentTitle: {
     color: D.ink,
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
     fontWeight: '900',
     marginBottom: 4,
   },
   appointmentMeta: {
     color: D.ink3,
-    fontSize: 11,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
     fontWeight: '700',
   },
   appointmentPrice: {
     color: D.primary,
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
   },
   emptyCard: {
@@ -943,21 +969,24 @@ const styles = StyleSheet.create({
   },
   emptyPlusText: {
     color: '#050708',
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
     lineHeight: 16,
   },
   emptyTitle: {
     color: D.ink,
-    fontSize: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
     fontWeight: '900',
     marginBottom: 10,
   },
   emptyText: {
     color: D.ink2,
-    fontSize: 14,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
     fontWeight: '500',
-    lineHeight: 18,
+    lineHeight: T.lineHeight.body,
     textAlign: 'center',
   },
   emptyButton: {
@@ -974,7 +1003,8 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: D.primary,
-    fontSize: 15,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
     fontWeight: '900',
   },
 
@@ -1000,7 +1030,8 @@ const styles = StyleSheet.create({
   bottomNavLabel: {
     marginTop: 4,
     color: D.ink3,
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '900',
   },
   bottomNavLabelActive: {
@@ -1034,9 +1065,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-  drawerAvatarText: { fontSize: 16, fontWeight: '800', color: '#0B0D0E' },
-  drawerName: { fontSize: 16, fontWeight: '700', color: D.ink, marginBottom: 2 },
-  drawerEmail: { fontSize: 12, color: D.ink3 },
+  drawerAvatarText: {
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    fontWeight: '800',
+    color: '#0B0D0E',
+  },
+  drawerName: {
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    fontWeight: '700',
+    color: D.ink,
+    marginBottom: 2,
+  },
+  drawerEmail: { fontFamily: T.family.regular, fontSize: T.size.secondary, color: D.ink3 },
   drawerMenu: { paddingTop: 12 },
   drawerItem: {
     flexDirection: 'row',
@@ -1045,7 +1087,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
   },
-  drawerItemText: { fontSize: 15, fontWeight: '500', color: D.ink },
+  drawerItemText: {
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    fontWeight: '500',
+    color: D.ink,
+  },
   drawerItemDanger: { color: D.accent },
   drawerDivider: { height: 1, backgroundColor: D.border, marginVertical: 8 },
 
@@ -1065,15 +1112,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: D.border,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: D.ink, marginBottom: 6 },
-  modalDesc: { fontSize: 13, color: D.ink2, lineHeight: 20, marginBottom: 18 },
+  modalTitle: {
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
+    fontWeight: '800',
+    color: D.ink,
+    marginBottom: 6,
+  },
+  modalDesc: {
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    color: D.ink2,
+    lineHeight: T.lineHeight.secondary,
+    marginBottom: 18,
+  },
   modalInput: {
     borderWidth: 1.5,
     borderColor: D.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 24,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
     fontWeight: '800',
     color: D.ink,
     textAlign: 'center',
@@ -1090,7 +1150,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   modalBtnDisabled: { opacity: 0.35 },
-  modalBtnText: { color: '#0B0D0E', fontSize: 15, fontWeight: '700' },
+  modalBtnText: {
+    color: '#0B0D0E',
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    fontWeight: '700',
+  },
   modalCancel: { alignItems: 'center', paddingVertical: 8 },
-  modalCancelText: { fontSize: 14, color: D.ink3, fontWeight: '600' },
+  modalCancelText: {
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    color: D.ink3,
+    fontWeight: '600',
+  },
 });
