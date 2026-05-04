@@ -42,7 +42,7 @@ import {
   type Slot,
 } from '@features/appointments';
 import { CAR_CATEGORIES, type VehicleType, type CarCategory } from '@features/appointments';
-import { colors, spacing, radii } from '@shared/theme';
+import { colors, spacing, radii, typography as T } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
 import { dateUtils } from '@shared/utils/date.utils';
 
@@ -712,7 +712,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border.main,
   },
   headerTitle: {
-    fontSize: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.title,
+    lineHeight: T.lineHeight.title,
     fontWeight: '700',
     color: colors.text.primary,
     textAlign: 'center',
@@ -739,7 +741,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     fontWeight: '700',
     color: colors.text.tertiary,
     marginBottom: spacing.xs,
@@ -763,7 +767,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   dateSelectorText: {
-    fontSize: 15,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '500',
     color: colors.text.primary,
   },
@@ -790,7 +796,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary.main,
   },
   vehicleLabel: {
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     fontWeight: '600',
     color: colors.text.secondary,
   },
@@ -818,12 +826,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   selectorText: {
-    fontSize: 15,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     color: colors.text.primary,
     fontWeight: '500',
   },
   selectorPlaceholder: {
-    fontSize: 15,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     color: colors.text.disabled,
   },
 
@@ -855,13 +867,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceName: {
-    fontSize: 15,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '600',
     color: colors.text.primary,
     marginBottom: 2,
   },
   serviceDuration: {
-    fontSize: 13,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     color: colors.text.tertiary,
   },
   detailsBadge: {
@@ -874,7 +890,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   detailsBadgeText: {
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     fontWeight: '600',
     color: colors.primary.main,
   },
@@ -896,7 +914,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary.main,
   },
   slotTime: {
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     fontWeight: '600',
     color: colors.text.secondary,
   },
@@ -910,7 +930,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   slotCountText: {
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     fontWeight: '600',
     color: colors.primary.main,
   },
@@ -927,7 +949,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border.main,
   },
   emptyStateTitle: {
-    fontSize: 14,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     color: colors.text.tertiary,
     fontWeight: '500',
   },
@@ -943,7 +967,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border.main,
   },
   loadingText: {
-    fontSize: 14,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     color: colors.text.secondary,
   },
 
@@ -958,12 +984,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   totalLabel: {
-    fontSize: 15,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '600',
     color: colors.primary.main,
   },
   totalValue: {
-    fontSize: 20,
+    fontFamily: T.family.medium,
+    fontSize: T.size.title,
+    lineHeight: T.lineHeight.title,
     fontWeight: '800',
     color: colors.primary.main,
   },
@@ -985,7 +1015,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
   },
   confirmButtonText: {
-    fontSize: 16,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '700',
     color: colors.text.white,
   },
@@ -1013,7 +1045,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border.main,
   },
   modalTitle: {
-    fontSize: 16,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '700',
     color: colors.text.primary,
   },
@@ -1031,7 +1065,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.light,
   },
   modalItemText: {
-    fontSize: 15,
+    fontFamily: T.family.regular,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '500',
     color: colors.text.primary,
   },
@@ -1085,13 +1121,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailsTitle: {
-    fontSize: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.bodyLarge,
+    lineHeight: T.lineHeight.bodyLarge,
     fontWeight: '700',
     color: colors.text.primary,
     marginBottom: 2,
   },
   detailsSubtitle: {
-    fontSize: 13,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     color: colors.text.tertiary,
   },
   closeButton: {
@@ -1115,7 +1155,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   priceBadgeLabel: {
-    fontSize: 11,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     fontWeight: '600',
     color: colors.primary.main,
     marginBottom: 2,
@@ -1123,7 +1165,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   priceBadgeValue: {
-    fontSize: 22,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
+    lineHeight: T.lineHeight.titleLarge,
     fontWeight: '800',
     color: colors.primary.main,
   },
@@ -1139,7 +1183,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border.main,
   },
   durationBadgeText: {
-    fontSize: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     fontWeight: '600',
     color: colors.text.secondary,
   },
@@ -1153,7 +1199,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sectionHeaderTitle: {
-    fontSize: 15,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '700',
     color: colors.text.primary,
   },
@@ -1190,13 +1238,17 @@ const styles = StyleSheet.create({
   },
   includedItemText: {
     flex: 1,
-    fontSize: 13,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     color: colors.text.primary,
     fontWeight: '500',
   },
   excludedItemText: {
     flex: 1,
-    fontSize: 13,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     color: colors.text.tertiary,
   },
   recommendedTags: {
@@ -1213,7 +1265,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border.main,
   },
   recommendedTagText: {
-    fontSize: 12,
+    fontFamily: T.family.regular,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     fontWeight: '500',
     color: colors.text.secondary,
   },
@@ -1228,9 +1282,10 @@ const styles = StyleSheet.create({
   },
   noteText: {
     flex: 1,
-    fontSize: 13,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
     color: colors.text.tertiary,
-    lineHeight: 18,
+    lineHeight: T.lineHeight.secondary,
   },
   detailsActionButton: {
     backgroundColor: colors.primary.main,
@@ -1239,7 +1294,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   detailsActionButtonText: {
-    fontSize: 15,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '700',
     color: colors.text.white,
   },

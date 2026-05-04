@@ -972,7 +972,7 @@ const styles = StyleSheet.create({
     fontFamily: T.family.medium,
     fontSize: T.size.secondary,
     fontWeight: '900',
-    lineHeight: 16,
+    lineHeight: T.lineHeight.secondary,
   },
   emptyTitle: {
     color: D.ink,

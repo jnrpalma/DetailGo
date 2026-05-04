@@ -806,7 +806,9 @@ const styles = StyleSheet.create({
   },
   headerKicker: {
     color: D.primary,
-    fontSize: 11,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
+    lineHeight: T.lineHeight.caption,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
