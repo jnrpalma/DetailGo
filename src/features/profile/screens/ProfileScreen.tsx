@@ -32,6 +32,7 @@ import { darkColors as D } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useAuth } from '@features/auth';
+import { useShop } from '@features/shops';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 
@@ -59,6 +60,7 @@ export default function ProfileScreen() {
   const authInstance = getAuth();
   const user = authInstance.currentUser;
   const { signOut } = useAuth();
+  const { shop, loading: loadingShop } = useShop();
 
   const uid = user?.uid ?? null;
 
@@ -111,6 +113,8 @@ export default function ProfileScreen() {
     : profile.photoURL
     ? { uri: profile.photoURL }
     : null;
+
+  const linkedShopName = loadingShop ? 'Carregando...' : shop?.name ?? 'Não vinculada';
 
   useEffect(() => {
     if (!userRef || !user) {
@@ -602,7 +606,6 @@ export default function ProfileScreen() {
                   value={profile.phone ? formatUtils.phoneMask(profile.phone) : 'Não informado'}
                   onPress={() => setEditingPhone(true)}
                   bordered
-                  last
                 />
               ) : (
                 <View style={[styles.editBlock, styles.rowBorder]}>
@@ -642,6 +645,8 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               )}
+
+              <DataRow label="Estética vinculada" value={linkedShopName} bordered last />
             </View>
 
             <View style={styles.sectionHeader}>
@@ -709,7 +714,7 @@ function DataRow({
 }: {
   label: string;
   value: string;
-  onPress: () => void;
+  onPress?: () => void;
   bordered?: boolean;
   last?: boolean;
 }) {
@@ -717,6 +722,7 @@ function DataRow({
     <TouchableOpacity
       style={[styles.summaryRow, bordered && styles.rowBorder, last && styles.lastSummaryRow]}
       onPress={onPress}
+      disabled={!onPress}
       activeOpacity={0.75}
     >
       <Text style={styles.summaryLabel}>{label}</Text>

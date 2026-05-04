@@ -1,63 +1,116 @@
-// src/features/appointments/screens/HistoryScreen.tsx
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  StatusBar,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Ban,
-  History,
-  TrendingUp,
-} from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops';
-import { useUserAppointments } from '../hooks/useUserAppointments';
-import { dateUtils } from '@shared/utils/date.utils';
-import { formatUtils } from '@shared/utils/format.utils';
+import { darkColors as D } from '@shared/theme';
 import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
 import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
-import { colors, spacing, radii } from '@shared/theme';
+import { useUserAppointments } from '../hooks/useUserAppointments';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
-type FilterId = 'all' | 'done' | 'no_show' | 'cancelled';
+type FilterId = 'all' | 'done' | 'cancelled' | 'no_show';
+
+type HistoryGroup = {
+  key: string;
+  label: string;
+  items: UserAppointment[];
+};
 
 const FILTER_OPTIONS: { id: FilterId; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  { id: 'done', label: 'Concluídos' },
-  { id: 'no_show', label: 'Não realizados' },
-  { id: 'cancelled', label: 'Cancelados' },
+  { id: 'all', label: 'TODOS' },
+  { id: 'done', label: 'CONCLUÍDOS' },
+  { id: 'cancelled', label: 'CANCELADOS' },
+  { id: 'no_show', label: 'NÃO REALIZADOS' },
 ];
 
-const STATUS_CONFIG: Partial<
-  Record<
-    AppointmentStatus,
-    {
-      label: string;
-      color: string;
-      icon: any;
+function getFilteredItems(items: UserAppointment[], filter: FilterId) {
+  if (filter === 'done') return items.filter(item => item.status === 'done');
+  if (filter === 'cancelled') return items.filter(item => item.status === 'cancelled');
+  if (filter === 'no_show') return items.filter(item => item.status === 'no_show');
+  return items;
+}
+
+function getMonthLabel(timestamp: number) {
+  const date = new Date(timestamp);
+  const month = date
+    .toLocaleDateString('pt-BR', { month: 'long' })
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+
+  return `${month} ${date.getFullYear()}`;
+}
+
+function getMonthKey(timestamp: number) {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getDay(timestamp: number) {
+  return String(new Date(timestamp).getDate()).padStart(2, '0');
+}
+
+function getDuration(item: UserAppointment) {
+  if (item.durationMin) return `${item.durationMin}min`;
+  if (item.endAtMs) return `${Math.max(1, Math.round((item.endAtMs - item.startAtMs) / 60000))}min`;
+  return '--';
+}
+
+function getVehicleLabel(item: UserAppointment) {
+  if (item.vehicleType === 'Carro') return item.carCategory ?? 'Carro';
+  return item.vehicleType;
+}
+
+function getStatusLabel(status: AppointmentStatus) {
+  if (status === 'done') return 'CONCLUÍDO';
+  if (status === 'no_show') return 'NÃO REALIZADO';
+  return 'CANCELADO';
+}
+
+function getCompactCurrency(value: number) {
+  return `R$ ${value.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
+}
+
+function getRowCurrency(value: number | null) {
+  if (value === null || value === undefined) return '--';
+  return `R$${value.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
+}
+
+function groupByMonth(items: UserAppointment[]) {
+  const groups = new Map<string, HistoryGroup>();
+
+  items.forEach(item => {
+    const key = getMonthKey(item.startAtMs);
+    const current = groups.get(key);
+
+    if (current) {
+      current.items.push(item);
+      return;
     }
-  >
-> = {
-  done: { label: 'Concluído', color: colors.status.success, icon: CheckCircle2 },
-  no_show: { label: 'Não realizado', color: colors.status.error, icon: XCircle },
-  cancelled: { label: 'Cancelado', color: colors.text.disabled, icon: Ban },
-};
+
+    groups.set(key, {
+      key,
+      label: getMonthLabel(item.startAtMs),
+      items: [item],
+    });
+  });
+
+  return Array.from(groups.values());
+}
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NavProp>();
@@ -73,62 +126,20 @@ export default function HistoryScreen() {
     limitN: 50,
   });
 
-  const filteredItems = filter === 'all' ? items : items.filter(it => it.status === filter);
+  const filteredItems = useMemo(() => getFilteredItems(items, filter), [filter, items]);
+  const groups = useMemo(() => groupByMonth(filteredItems), [filteredItems]);
 
-  const totalDone = items.filter(i => i.status === 'done').length;
+  const totalDone = items.filter(item => item.status === 'done').length;
   const totalSpent = items
-    .filter(i => i.status === 'done')
-    .reduce((acc, i) => acc + (i.price ?? 0), 0);
-
-  const renderItem = ({ item }: { item: UserAppointment }) => {
-    const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory
-        ? `Carro • ${item.carCategory}`
-        : item.vehicleType;
-
-    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
-    const StatusIcon = cfg.icon;
-
-    return (
-      <View style={[styles.card, { borderLeftColor: cfg.color }]}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardService} numberOfLines={1}>
-            {item.serviceLabel ?? 'Serviço'}
-          </Text>
-          <Text style={[styles.cardPrice, item.status !== 'done' && styles.cardPriceMuted]}>
-            {formatUtils.currencyCompact(item.price)}
-          </Text>
-        </View>
-
-        <View style={[styles.statusBadge, { backgroundColor: `${cfg.color}15` }]}>
-          <StatusIcon size={12} color={cfg.color} />
-          <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
-        </View>
-
-        <View style={styles.cardDivider} />
-
-        <View style={styles.cardMeta}>
-          <View style={styles.metaItem}>
-            <Calendar size={13} color={colors.text.tertiary} />
-            <Text style={styles.metaText}>{dateUtils.formatDate(item.startAtMs)}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Clock size={13} color={colors.text.tertiary} />
-            <Text style={styles.metaText}>{dateUtils.formatHour(item.startAtMs)}</Text>
-          </View>
-          <View style={styles.vehicleChip}>
-            <Text style={styles.vehicleChipText}>{subtitle}</Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
+    .filter(item => item.status === 'done')
+    .reduce((acc, item) => acc + (item.price ?? 0), 0);
 
   if (!uid) {
     return (
       <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary.main} />
+          <ActivityIndicator size="large" color={D.primary} />
         </View>
       </SafeAreaView>
     );
@@ -136,55 +147,42 @@ export default function HistoryScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <ArrowLeft size={22} color={colors.text.primary} />
+            <ArrowLeft size={20} color={D.ink} strokeWidth={2.4} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Histórico</Text>
-          <View style={styles.headerRight} />
+
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerTitle}>Histórico</Text>
+            <Text style={styles.headerMeta} numberOfLines={1}>
+              {totalDone} serviços · {getCompactCurrency(totalSpent)} investidos
+            </Text>
+          </View>
         </View>
 
-        {/* Resumo */}
-        {!loading && totalDone > 0 && (
-          <View style={styles.summary}>
-            <View style={styles.summaryItem}>
-              <TrendingUp size={15} color={colors.primary.main} />
-              <Text style={styles.summaryValue}>{totalDone}</Text>
-              <Text style={styles.summaryLabel}>serviços concluídos</Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{formatUtils.currency(totalSpent)}</Text>
-              <Text style={styles.summaryLabel}>investidos</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Filtros em ScrollView horizontal */}
-        <View style={styles.filtersWrapper}>
+        <View style={styles.filtersWrap}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filtersContent}
           >
-            {FILTER_OPTIONS.map(opt => {
-              const active = filter === opt.id;
+            {FILTER_OPTIONS.map(option => {
+              const active = filter === option.id;
               return (
                 <TouchableOpacity
-                  key={opt.id}
-                  onPress={() => setFilter(opt.id)}
+                  key={option.id}
                   style={[styles.filterPill, active && styles.filterPillActive]}
-                  activeOpacity={0.7}
+                  onPress={() => setFilter(option.id)}
+                  activeOpacity={0.78}
                 >
-                  <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                    {opt.label}
+                  <Text style={[styles.filterText, active && styles.filterTextActive]}>
+                    {option.label}
                   </Text>
                 </TouchableOpacity>
               );
@@ -192,258 +190,257 @@ export default function HistoryScreen() {
           </ScrollView>
         </View>
 
-        {/* Lista */}
-        <View style={styles.content}>
-          {loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color={colors.primary.main} />
-            </View>
-          ) : (
-            <FlatList
-              data={filteredItems}
-              keyExtractor={item => item.id}
-              renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <View style={styles.emptyIconWrap}>
-                    <History size={36} color={colors.text.disabled} />
-                  </View>
-                  <Text style={styles.emptyTitle}>Nenhum registro</Text>
-                  <Text style={styles.emptyText}>
-                    {filter === 'all'
-                      ? 'Seus serviços finalizados aparecerão aqui.'
-                      : 'Nenhum registro para este filtro.'}
-                  </Text>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={D.primary} />
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            {groups.length > 0 ? (
+              groups.map(group => (
+                <View key={group.key} style={styles.monthGroup}>
+                  <Text style={styles.monthLabel}>{group.label}</Text>
+                  {group.items.map((item, index) => (
+                    <HistoryRow key={item.id} item={item} last={index === group.items.length - 1} />
+                  ))}
                 </View>
-              }
-            />
-          )}
-        </View>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Nenhum registro</Text>
+                <Text style={styles.emptyText}>
+                  {filter === 'all'
+                    ? 'Seus serviços finalizados aparecerão aqui.'
+                    : 'Nenhum registro para este filtro.'}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        )}
       </SafeAreaView>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background.main },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+function HistoryRow({ item, last }: { item: UserAppointment; last: boolean }) {
+  const isDone = item.status === 'done';
+  const isNoShow = item.status === 'no_show';
+  const price = getRowCurrency(item.price);
 
-  // ─── Header ──────────────────────────────────────────────────────────────
+  return (
+    <View style={[styles.row, !last && styles.rowBorder]}>
+      <Text style={styles.day}>{getDay(item.startAtMs)}</Text>
+
+      <View style={styles.rowBody}>
+        <Text style={styles.serviceName} numberOfLines={1}>
+          {item.serviceLabel ?? 'Serviço'}
+        </Text>
+        <Text style={styles.serviceMeta} numberOfLines={1}>
+          {getVehicleLabel(item)} · {getDuration(item)}
+        </Text>
+      </View>
+
+      <View style={styles.priceWrap}>
+        <Text style={[styles.price, !isDone && styles.priceMuted]} numberOfLines={1}>
+          {price}
+        </Text>
+        <Text
+          style={[
+            styles.status,
+            isDone && styles.statusDone,
+            isNoShow && styles.statusNoShow,
+            item.status === 'cancelled' && styles.statusCancelled,
+          ]}
+        >
+          {getStatusLabel(item.status)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#090D0D',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   header: {
+    minHeight: 96,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.background.main,
+    gap: 13,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 24,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.main,
+    borderBottomColor: D.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background.surface,
-    borderWidth: 1,
-    borderColor: colors.border.main,
+    backgroundColor: D.card,
+    borderWidth: 1.5,
+    borderColor: D.borderStrong,
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center',
+    color: D.ink,
+    fontSize: 24,
+    lineHeight: 29,
+    fontWeight: '900',
   },
-  headerRight: { width: 40 },
-
-  // ─── Resumo ──────────────────────────────────────────────────────────────
-  summary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    backgroundColor: colors.primary.light,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: `${colors.primary.main}20`,
-  },
-  summaryItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: `${colors.primary.main}30`,
-    marginHorizontal: spacing.md,
-  },
-  summaryValue: {
-    fontSize: 16,
+  headerMeta: {
+    color: D.ink3,
+    fontSize: 15,
+    lineHeight: 20,
+    marginTop: 2,
     fontWeight: '800',
-    color: colors.primary.main,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: colors.primary.main,
-    fontWeight: '500',
-    opacity: 0.7,
+    letterSpacing: 1,
   },
 
-  // ─── Filtros ─────────────────────────────────────────────────────────────
-  filtersWrapper: {
-    marginTop: spacing.lg,
+  filtersWrap: {
+    paddingVertical: 9,
   },
   filtersContent: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
-    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
   },
   filterPill: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.border.main,
-    backgroundColor: colors.background.surface,
-  },
-  filterPillActive: {
-    backgroundColor: colors.primary.main,
-    borderColor: colors.primary.main,
-  },
-  filterPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
-  filterPillTextActive: {
-    color: colors.text.white,
-    fontWeight: '700',
-  },
-
-  // ─── Content / Lista ─────────────────────────────────────────────────────
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  listContent: { paddingBottom: spacing.xl },
-
-  // ─── Card ────────────────────────────────────────────────────────────────
-  card: {
-    backgroundColor: colors.background.card,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    borderLeftWidth: 4,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xs,
-  },
-  cardService: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
-    flex: 1,
-    marginRight: spacing.xs,
-  },
-  cardPrice: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.primary.main,
-  },
-  cardPriceMuted: { color: colors.text.tertiary },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 999,
-    marginBottom: spacing.md,
-  },
-  statusLabel: { fontSize: 12, fontWeight: '700' },
-  cardDivider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginBottom: spacing.md,
-  },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  vehicleChip: {
-    backgroundColor: colors.background.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-  },
-  vehicleChipText: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    fontWeight: '500',
-  },
-
-  // ─── Empty ───────────────────────────────────────────────────────────────
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: spacing.xl,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.background.surface,
+    minHeight: 28,
+    minWidth: 62,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border.main,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: D.border,
+    backgroundColor: 'transparent',
+  },
+  filterPillActive: {
+    backgroundColor: D.primary,
+    borderColor: D.primary,
+  },
+  filterText: {
+    color: D.ink2,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  filterTextActive: {
+    color: '#050708',
+  },
+
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 11,
+    paddingBottom: 42,
+  },
+  monthGroup: {
+    marginBottom: 24,
+  },
+  monthLabel: {
+    color: D.ink3,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 20,
+  },
+  row: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingBottom: 16,
+  },
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.075)',
+    marginBottom: 18,
+  },
+  day: {
+    width: 44,
+    color: D.ink2,
+    fontSize: 24,
+    lineHeight: 29,
+    fontWeight: '900',
+  },
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
+  },
+  serviceName: {
+    color: D.ink,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: '900',
+  },
+  serviceMeta: {
+    color: D.ink3,
+    fontSize: 15,
+    lineHeight: 19,
+    marginTop: 1,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  priceWrap: {
+    width: 88,
+    alignItems: 'flex-end',
+    paddingTop: 2,
+  },
+  price: {
+    color: D.primary,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: '900',
+  },
+  priceMuted: {
+    color: D.ink3,
+  },
+  status: {
+    fontSize: 10,
+    lineHeight: 13,
+    marginTop: 2,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  statusDone: {
+    color: D.ink3,
+  },
+  statusNoShow: {
+    color: D.accent,
+  },
+  statusCancelled: {
+    color: D.ink3,
+  },
+
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 88,
+    paddingHorizontal: 24,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    color: D.ink,
+    fontSize: 22,
+    fontWeight: '900',
+    marginBottom: 8,
   },
   emptyText: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    textAlign: 'center',
+    color: D.ink3,
+    fontSize: 15,
     lineHeight: 22,
+    textAlign: 'center',
+    fontWeight: '700',
   },
 });
