@@ -28,7 +28,7 @@ import {
 } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
-import { darkColors as D } from '@shared/theme';
+import { darkColors as D, typography as T } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useAuth } from '@features/auth';
@@ -812,7 +812,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: D.ink,
-    fontSize: 18,
+    fontFamily: T.family.medium,
+    fontSize: T.size.title,
+    lineHeight: T.lineHeight.title,
     fontWeight: '900',
   },
 
@@ -852,7 +854,8 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: '#050708',
-    fontSize: 25,
+    fontFamily: T.family.medium,
+    fontSize: T.size.titleLarge,
     fontWeight: '900',
   },
   heroInfo: {
@@ -861,14 +864,16 @@ const styles = StyleSheet.create({
   },
   name: {
     color: D.ink,
-    fontSize: 18,
-    lineHeight: 22,
+    fontFamily: T.family.medium,
+    fontSize: T.size.title,
+    lineHeight: T.lineHeight.title,
     fontWeight: '900',
   },
   email: {
     color: D.ink2,
-    fontSize: 12,
-    lineHeight: 16,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
+    lineHeight: T.lineHeight.secondary,
     marginTop: 2,
     fontWeight: '600',
   },
@@ -884,7 +889,8 @@ const styles = StyleSheet.create({
   },
   rolePillText: {
     color: D.primary,
-    fontSize: 10,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '900',
     letterSpacing: 1,
   },
@@ -898,7 +904,8 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     color: D.ink3,
-    fontSize: 12,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
@@ -924,9 +931,10 @@ const styles = StyleSheet.create({
     minHeight: 45,
   },
   summaryLabel: {
-    width: 92,
+    width: 112,
     color: D.ink3,
-    fontSize: 11,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '800',
     letterSpacing: 1.1,
     textTransform: 'uppercase',
@@ -934,7 +942,8 @@ const styles = StyleSheet.create({
   summaryValue: {
     flex: 1,
     color: D.ink,
-    fontSize: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
     textAlign: 'right',
   },
@@ -962,7 +971,9 @@ const styles = StyleSheet.create({
   textInput: {
     minHeight: 31,
     color: D.ink,
-    fontSize: 16,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '800',
     padding: 0,
   },
@@ -980,15 +991,17 @@ const styles = StyleSheet.create({
   },
   dataLabel: {
     color: D.ink3,
-    fontSize: 11,
+    fontFamily: T.family.medium,
+    fontSize: T.size.caption,
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   dataValue: {
     color: D.ink,
-    fontSize: 16,
-    lineHeight: 21,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
+    lineHeight: T.lineHeight.body,
     fontWeight: '800',
     marginTop: 3,
   },
@@ -1018,12 +1031,14 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: D.ink,
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '800',
   },
   confirmText: {
     color: '#050708',
-    fontSize: 14,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
   },
 
@@ -1045,12 +1060,14 @@ const styles = StyleSheet.create({
   },
   pendingTitle: {
     color: D.primary,
-    fontSize: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
   },
   pendingEmail: {
     color: D.ink,
-    fontSize: 12,
+    fontFamily: T.family.regular,
+    fontSize: T.size.secondary,
     marginTop: 2,
     fontWeight: '700',
   },
@@ -1073,7 +1090,8 @@ const styles = StyleSheet.create({
   settingsLabel: {
     flex: 1,
     color: D.ink,
-    fontSize: 15,
+    fontFamily: T.family.medium,
+    fontSize: T.size.body,
     fontWeight: '800',
   },
   dangerText: {
@@ -1091,7 +1109,8 @@ const styles = StyleSheet.create({
   },
   saveMiniText: {
     color: '#050708',
-    fontSize: 13,
+    fontFamily: T.family.medium,
+    fontSize: T.size.secondary,
     fontWeight: '900',
   },
   disabled: {
