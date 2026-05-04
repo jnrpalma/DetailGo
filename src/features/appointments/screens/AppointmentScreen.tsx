@@ -34,17 +34,14 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-import { useShop } from '@features/shops/context/ShopContext';
-import { useShopServices } from '@features/shops/hooks/useShopServices';
-import type { ShopService } from '@features/shops/domain/shopService.types';
-import { getShopServiceIcon } from '@features/shops/utils/shopServiceIcons';
+import { useShop, useShopServices, getShopServiceIcon } from '@features/shops';
+import type { ShopService } from '@features/shops';
 import {
   getAvailableSlotsForDay,
   createAppointmentWithCapacityCheck,
   type Slot,
-} from '@features/appointments/services/availability.service';
-import type { VehicleType, CarCategory } from '@features/appointments/domain/appointment.types';
-import { CAR_CATEGORIES } from '@features/appointments/domain/appointment.constants';
+} from '@features/appointments';
+import { CAR_CATEGORIES, type VehicleType, type CarCategory } from '@features/appointments';
 import { colors, spacing, radii } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
 import { dateUtils } from '@shared/utils/date.utils';

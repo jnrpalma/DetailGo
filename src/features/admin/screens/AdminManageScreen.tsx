@@ -31,20 +31,16 @@ import {
 
 import { colors, spacing, radii } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
-import { useShop } from '@features/shops/context/ShopContext';
-import { useShopServices } from '@features/shops/hooks/useShopServices';
-import type { ShopService } from '@features/shops/domain/shopService.types';
-import { updateShopName } from '@features/shops/services/shop.service';
 import {
+  useShop,
+  useShopServices,
+  updateShopName,
   deleteShopService,
+  getShopServiceIcon,
   updateShopService,
-} from '@features/shops/services/shopServices.service';
-import { getShopServiceIcon } from '@features/shops/utils/shopServiceIcons';
-import {
-  getShopSettings,
-  updateShopSettings,
-  type ShopSettings,
-} from '@features/settings/services/shopSettings.service';
+} from '@features/shops';
+import type { ShopService } from '@features/shops';
+import { getShopSettings, updateShopSettings, type ShopSettings } from '@features/settings';
 
 const SLOT_STEP_OPTIONS = [15, 30, 45, 60];
 

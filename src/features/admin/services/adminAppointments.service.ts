@@ -1,5 +1,5 @@
 import { AppointmentStatus } from '@features/appointments';
-import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
+import { NO_SHOW_GRACE_MS } from '@features/appointments';
 import {
   doc,
   getDoc,

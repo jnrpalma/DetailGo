@@ -43,9 +43,9 @@ import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { colors, spacing, radii } from '@shared/theme';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
-import { useShop } from '@features/shops/context/ShopContext';
+import { useShop } from '@features/shops';
 
-import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
+import type { AppointmentStatus } from '@features/appointments';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 

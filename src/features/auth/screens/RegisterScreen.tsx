@@ -29,7 +29,7 @@ import {
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
-import type { RegisterInput, UserRole } from '@features/auth/services/auth.service';
+import type { RegisterInput, UserRole } from '../services/auth.service';
 import { useForm } from '@shared/hooks/useForm';
 import { validationUtils, validationMessages } from '@shared/utils/validation.utils';
 import { formatUtils } from '@shared/utils/format.utils';

@@ -28,7 +28,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { getAuth } from '@react-native-firebase/auth';
 
 import { colors, spacing, radii } from '@shared/theme';
-import { useShop } from '@features/shops/context/ShopContext';
+import { useShop } from '@features/shops';
 import { useAuth } from '@features/auth';
 
 // ── Configurações ──────────────────────────────────────────────────────────

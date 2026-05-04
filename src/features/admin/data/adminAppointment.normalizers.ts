@@ -1,6 +1,6 @@
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
-import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
+import type { AppointmentStatus } from '@features/appointments';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;

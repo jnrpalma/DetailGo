@@ -24,7 +24,7 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-import { useShop } from '@features/shops/context/ShopContext';
+import { useShop } from '@features/shops';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';

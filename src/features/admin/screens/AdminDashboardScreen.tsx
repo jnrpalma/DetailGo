@@ -57,11 +57,10 @@ import { formatUtils } from '@shared/utils/format.utils';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
 import { UI } from '@shared/constants/app.constants';
 
-import { updateAppointmentStatus } from '@features/admin/services/adminAppointments.service';
-import { useShop } from '@features/shops/context/ShopContext';
-import { NO_SHOW_GRACE_MS } from '@features/appointments/domain/appointment.constants';
-import { getAppointmentStatusConfig } from '@features/appointments/domain/appointment.helpers';
-import type { AppointmentStatus } from '@features/appointments/domain/appointment.types';
+import { updateAppointmentStatus } from '@features/admin';
+import { useShop } from '@features/shops';
+import { NO_SHOW_GRACE_MS, getAppointmentStatusConfig } from '@features/appointments';
+import type { AppointmentStatus } from '@features/appointments';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 

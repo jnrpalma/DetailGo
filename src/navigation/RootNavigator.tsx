@@ -5,15 +5,12 @@ import { View, ActivityIndicator } from 'react-native';
 import type { RootStackParamList } from '@app/types';
 
 import { useAuth, LoginScreen, RegisterScreen } from '@features/auth';
-import DashboardScreen from '@features/dashboard/screens/DashboardScreen';
-import AppointmentScreen from '@features/appointments/screens/AppointmentScreen';
-import AdminDashboardScreen from '@features/admin/screens/AdminDashboardScreen';
-import AdminManageScreen from '@features/admin/screens/AdminManageScreen';
-import AdminHistoryScreen from '@features/admin/screens/AdminHistoryScreen';
-import { MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
-import ProfileScreen from '@features/profile/screens/ProfileScreen';
-import SubscriptionScreen from '@features/subscription/screens/SubscriptionScreen';
-import { useShop } from '@features/shops/context/ShopContext';
+import { DashboardScreen } from '@features/dashboard';
+import { AppointmentScreen, MyAppointmentsScreen, HistoryScreen } from '@features/appointments';
+import { AdminDashboardScreen, AdminManageScreen, AdminHistoryScreen } from '@features/admin';
+import { ProfileScreen } from '@features/profile';
+import { SubscriptionScreen } from '@features/subscription';
+import { useShop } from '@features/shops';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

@@ -9,4 +9,5 @@ export {
   ensureShopServices,
   updateShopService,
 } from './services/shopServices.service';
+export { getShopServiceIcon } from './utils/shopServiceIcons';
 export type { ShopService, ShopServiceIconKey } from './domain/shopService.types';

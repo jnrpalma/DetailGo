@@ -7,7 +7,7 @@ import {
   register as svcRegister,
   signOutUser as svcSignOut,
   type RegisterInput,
-} from '@features/auth/services/auth.service';
+} from '../services/auth.service';
 
 export type { RegisterInput };
 

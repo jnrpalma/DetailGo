@@ -38,13 +38,10 @@ import {
 import { darkColors as D } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
 import { useAuth } from '@features/auth';
-import { useShop } from '@features/shops/context/ShopContext';
-import { useShopServices } from '@features/shops/hooks/useShopServices';
-import { joinShop } from '@features/shops/services/joinShop.service';
-import { getShopServiceIcon } from '@features/shops/utils/shopServiceIcons';
-import { useDashboardAppointments } from '@features/appointments/hooks/useDashboardAppointments';
+import { useShop, useShopServices, joinShop, getShopServiceIcon } from '@features/shops';
+import { useDashboardAppointments } from '@features/appointments';
 import type { RootStackParamList } from '@app/types';
-import type { UserAppointment } from '@features/appointments/domain/appointment.types';
+import type { UserAppointment } from '@features/appointments';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 

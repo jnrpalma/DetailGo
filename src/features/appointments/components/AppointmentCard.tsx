@@ -4,8 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, radii } from '@shared/theme';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
-import { getAppointmentStatusConfig } from '@features/appointments/domain/appointment.helpers';
-import { UserAppointment } from '@features/appointments/domain/appointment.types';
+import { getAppointmentStatusConfig } from '../domain/appointment.helpers';
+import { UserAppointment } from '../domain/appointment.types';
 
 type Props = {
   item: UserAppointment;

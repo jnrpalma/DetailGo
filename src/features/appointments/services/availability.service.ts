@@ -11,15 +11,8 @@ import {
   getDoc,
 } from '@react-native-firebase/firestore';
 
-import {
-  getShopSettings,
-  type ShopSettings,
-} from '@features/settings/services/shopSettings.service';
-import type {
-  VehicleType,
-  CarCategory,
-  AppointmentStatus,
-} from '@features/appointments/domain/appointment.types';
+import { getShopSettings, type ShopSettings } from '@features/settings';
+import type { VehicleType, CarCategory, AppointmentStatus } from '../domain/appointment.types';
 import { dateUtils } from '@shared/utils/date.utils';
 
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;

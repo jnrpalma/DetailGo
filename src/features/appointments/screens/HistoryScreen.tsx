@@ -26,7 +26,7 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-import { useShop } from '@features/shops/context/ShopContext';
+import { useShop } from '@features/shops';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
