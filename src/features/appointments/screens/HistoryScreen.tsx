@@ -16,7 +16,7 @@ import { ArrowLeft } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops';
-import { darkColors as D, typography as T } from '@shared/theme';
+import { typography as T, useAppTheme, type AppColors } from '@shared/theme';
 import { HISTORY_APPOINTMENT_SET } from '../domain/appointment.constants';
 import type { AppointmentStatus, UserAppointment } from '../domain/appointment.types';
 import { useUserAppointments } from '../hooks/useUserAppointments';
@@ -31,10 +31,10 @@ type HistoryGroup = {
 };
 
 const FILTER_OPTIONS: { id: FilterId; label: string }[] = [
-  { id: 'all', label: 'TODOS' },
-  { id: 'done', label: 'CONCLUÍDOS' },
-  { id: 'cancelled', label: 'CANCELADOS' },
-  { id: 'no_show', label: 'NÃO REALIZADOS' },
+  { id: 'all', label: 'Todos' },
+  { id: 'done', label: 'Concluídos' },
+  { id: 'cancelled', label: 'Cancelados' },
+  { id: 'no_show', label: 'Não realizados' },
 ];
 
 function getFilteredItems(items: UserAppointment[], filter: FilterId) {
@@ -49,10 +49,9 @@ function getMonthLabel(timestamp: number) {
   const month = date
     .toLocaleDateString('pt-BR', { month: 'long' })
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase();
+    .replace(/[\u0300-\u036f]/g, '');
 
-  return `${month} ${date.getFullYear()}`;
+  return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${date.getFullYear()}`;
 }
 
 function getMonthKey(timestamp: number) {
@@ -76,9 +75,9 @@ function getVehicleLabel(item: UserAppointment) {
 }
 
 function getStatusLabel(status: AppointmentStatus) {
-  if (status === 'done') return 'CONCLUÍDO';
-  if (status === 'no_show') return 'NÃO REALIZADO';
-  return 'CANCELADO';
+  if (status === 'done') return 'Concluído';
+  if (status === 'no_show') return 'Não realizado';
+  return 'Cancelado';
 }
 
 function getCompactCurrency(value: number) {
@@ -114,6 +113,8 @@ function groupByMonth(items: UserAppointment[]) {
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NavProp>();
+  const { colors: D, isLight } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const auth = getAuth();
   const uid = auth.currentUser?.uid;
   const { shopId } = useShop();
@@ -137,7 +138,7 @@ export default function HistoryScreen() {
   if (!uid) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={D.primary} />
         </View>
@@ -147,7 +148,7 @@ export default function HistoryScreen() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -223,6 +224,8 @@ export default function HistoryScreen() {
 }
 
 function HistoryRow({ item, last }: { item: UserAppointment; last: boolean }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const isDone = item.status === 'done';
   const isNoShow = item.status === 'no_show';
   const price = getRowCurrency(item.price);
@@ -259,199 +262,198 @@ function HistoryRow({ item, last }: { item: UserAppointment; last: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#090D0D',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+function createStyles(D: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: D.bg,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  header: {
-    minHeight: 96,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: D.border,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    lineHeight: T.lineHeight.titleLarge,
-    fontWeight: '900',
-  },
-  headerMeta: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    marginTop: 2,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
+    header: {
+      minHeight: 96,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 13,
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: 24,
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+    },
+    backButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+    },
+    headerCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    headerTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      lineHeight: T.lineHeight.titleLarge,
+      fontWeight: '800',
+    },
+    headerMeta: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      marginTop: 2,
+      fontWeight: '600',
+    },
 
-  filtersWrap: {
-    paddingVertical: 9,
-  },
-  filtersContent: {
-    gap: 8,
-    paddingHorizontal: 20,
-  },
-  filterPill: {
-    minHeight: 28,
-    minWidth: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: D.border,
-    backgroundColor: 'transparent',
-  },
-  filterPillActive: {
-    backgroundColor: D.primary,
-    borderColor: D.primary,
-  },
-  filterText: {
-    color: D.ink2,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
-  filterTextActive: {
-    color: '#050708',
-  },
+    filtersWrap: {
+      paddingVertical: 9,
+    },
+    filtersContent: {
+      gap: 8,
+      paddingHorizontal: 20,
+    },
+    filterPill: {
+      minHeight: 28,
+      minWidth: 62,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: D.border,
+      backgroundColor: 'transparent',
+    },
+    filterPillActive: {
+      backgroundColor: D.primary,
+      borderColor: D.primary,
+    },
+    filterText: {
+      color: D.ink2,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '600',
+    },
+    filterTextActive: {
+      color: D.onPrimary,
+    },
 
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 11,
-    paddingBottom: 42,
-  },
-  monthGroup: {
-    marginBottom: 24,
-  },
-  monthLabel: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 20,
-  },
-  row: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingBottom: 16,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.075)',
-    marginBottom: 18,
-  },
-  day: {
-    width: 44,
-    color: D.ink2,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    lineHeight: T.lineHeight.titleLarge,
-    fontWeight: '900',
-  },
-  rowBody: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 8,
-  },
-  serviceName: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    lineHeight: T.lineHeight.bodyLarge,
-    fontWeight: '900',
-  },
-  serviceMeta: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    marginTop: 1,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  priceWrap: {
-    width: 88,
-    alignItems: 'flex-end',
-    paddingTop: 2,
-  },
-  price: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    lineHeight: T.lineHeight.bodyLarge,
-    fontWeight: '900',
-  },
-  priceMuted: {
-    color: D.ink3,
-  },
-  status: {
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    lineHeight: T.lineHeight.caption,
-    marginTop: 2,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  statusDone: {
-    color: D.ink3,
-  },
-  statusNoShow: {
-    color: D.accent,
-  },
-  statusCancelled: {
-    color: D.ink3,
-  },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 11,
+      paddingBottom: 42,
+    },
+    monthGroup: {
+      marginBottom: 24,
+    },
+    monthLabel: {
+      color: D.ink2,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '700',
+      marginBottom: 20,
+    },
+    row: {
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingBottom: 16,
+    },
+    rowBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+      marginBottom: 18,
+    },
+    day: {
+      width: 44,
+      color: D.ink2,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      lineHeight: T.lineHeight.titleLarge,
+      fontWeight: '800',
+    },
+    rowBody: {
+      flex: 1,
+      minWidth: 0,
+      paddingRight: 8,
+    },
+    serviceName: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      lineHeight: T.lineHeight.bodyLarge,
+      fontWeight: '800',
+    },
+    serviceMeta: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      marginTop: 1,
+      fontWeight: '500',
+    },
+    priceWrap: {
+      width: 88,
+      alignItems: 'flex-end',
+      paddingTop: 2,
+    },
+    price: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      lineHeight: T.lineHeight.bodyLarge,
+      fontWeight: '800',
+    },
+    priceMuted: {
+      color: D.ink3,
+    },
+    status: {
+      fontFamily: T.family.medium,
+      fontSize: T.size.caption,
+      lineHeight: T.lineHeight.caption,
+      marginTop: 2,
+      fontWeight: '700',
+      textAlign: 'right',
+    },
+    statusDone: {
+      color: D.ink3,
+    },
+    statusNoShow: {
+      color: D.accent,
+    },
+    statusCancelled: {
+      color: D.ink3,
+    },
 
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 88,
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  emptyText: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.body,
-    lineHeight: T.lineHeight.body,
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-});
+    emptyState: {
+      alignItems: 'center',
+      paddingTop: 88,
+      paddingHorizontal: 24,
+    },
+    emptyTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      fontWeight: '800',
+      marginBottom: 8,
+    },
+    emptyText: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.body,
+      lineHeight: T.lineHeight.body,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+  });
+}

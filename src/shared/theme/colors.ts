@@ -64,6 +64,7 @@ export const darkColors = {
   primary: '#D4FF3D',
   primaryDark: '#B6E300',
   primaryLight: 'rgba(212,255,61,0.12)',
+  onPrimary: '#050708',
 
   // Borda
   border: 'rgba(255,255,255,0.08)',
@@ -86,3 +87,42 @@ export const darkColors = {
 } as const;
 
 export type DarkColorPalette = typeof darkColors;
+export type AppColors = {
+  readonly [Key in keyof typeof darkColors]: Key extends 'status'
+    ? { readonly [StatusKey in keyof typeof darkColors.status]: string }
+    : string;
+};
+
+// 3. Garage Light
+// Tema claro do redesign: limpo, frio e com contraste suave.
+export const lightColors = {
+  bg: '#F7FAF9',
+  surface: '#EEF5F2',
+  card: '#FFFFFF',
+
+  ink: '#182326',
+  ink2: '#516268',
+  ink3: '#86979D',
+
+  primary: '#2F6F7E',
+  primaryDark: '#245A66',
+  primaryLight: 'rgba(47,111,126,0.12)',
+  onPrimary: '#FFFFFF',
+
+  border: 'rgba(24,35,38,0.08)',
+  borderStrong: 'rgba(24,35,38,0.14)',
+  borderFocus: 'rgba(47,111,126,0.38)',
+
+  accent: '#E3523B',
+
+  status: {
+    success: '#2F7D59',
+    error: '#E3523B',
+    warning: '#B7791F',
+    info: '#2F6F7E',
+  },
+
+  overlay: 'rgba(24,35,38,0.34)',
+} as const;
+
+export type LightColorPalette = typeof lightColors;

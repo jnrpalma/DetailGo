@@ -35,7 +35,7 @@ import {
   User,
 } from 'lucide-react-native';
 
-import { darkColors as D, typography as T } from '@shared/theme';
+import { typography as T, useAppTheme, type AppColors } from '@shared/theme';
 import { UI } from '@shared/constants/app.constants';
 import { useAuth } from '@features/auth';
 import { useShop, useShopServices, joinShop, getShopServiceIcon } from '@features/shops';
@@ -56,13 +56,15 @@ type UserProfile = {
 
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'BOM DIA';
-  if (hour < 18) return 'BOA TARDE';
-  return 'BOA NOITE';
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
 }
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NavProp>();
+  const { colors: D, isLight } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const auth = getAuth();
   const user = auth.currentUser!;
   const uid = user.uid;
@@ -199,7 +201,7 @@ export default function DashboardScreen() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <ScrollView
           style={styles.scroll}
@@ -254,9 +256,9 @@ export default function DashboardScreen() {
                 <Text style={styles.profileName} numberOfLines={1}>
                   {displayName}
                 </Text>
-                <Text style={styles.profileEmail} numberOfLines={1}>
-                  {user.email}
-                </Text>
+                <View style={styles.profileRolePill}>
+                  <Text style={styles.profileRoleText}>Cliente</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -295,7 +297,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionKicker}>SERVIÇOS</Text>
+            <Text style={styles.sectionKicker}>Serviços</Text>
           </View>
 
           {loadingServices ? (
@@ -336,7 +338,7 @@ export default function DashboardScreen() {
 
           <View style={styles.upcomingHeader}>
             <Text style={styles.upcomingTitle}>Próximos serviços</Text>
-            <Text style={styles.upcomingCount}>{upcomingAppointments.length} ATIVOS</Text>
+            <Text style={styles.upcomingCount}>{upcomingAppointments.length} ativos</Text>
           </View>
 
           {loadingAppointments ? (
@@ -487,7 +489,7 @@ export default function DashboardScreen() {
                 activeOpacity={0.8}
               >
                 {joiningShop ? (
-                  <ActivityIndicator color="#0B0D0E" />
+                  <ActivityIndicator color={D.onPrimary} />
                 ) : (
                   <Text style={styles.modalBtnText}>Vincular minha conta</Text>
                 )}
@@ -515,6 +517,9 @@ function AppointmentRow({
   last: boolean;
   onPress: () => void;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <TouchableOpacity
       style={[styles.appointmentRow, !last && styles.appointmentRowBorder]}
@@ -549,6 +554,9 @@ function BottomNavItem({
   active?: boolean;
   onPress?: () => void;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <TouchableOpacity
       style={styles.bottomNavItem}
@@ -573,6 +581,9 @@ function DrawerItem({
   onPress: () => void;
   danger?: boolean;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <TouchableOpacity style={styles.drawerItem} onPress={onPress} activeOpacity={0.7}>
       {icon}
@@ -581,586 +592,595 @@ function DrawerItem({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: D.bg },
-  scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 16 },
+function createStyles(D: AppColors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: D.bg },
+    scroll: { flex: 1 },
+    scrollContent: { paddingBottom: 16 },
 
-  heroSurface: {
-    minHeight: 190,
-    borderBottomWidth: 1,
-    borderBottomColor: D.borderStrong,
-    overflow: 'hidden',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-  },
-  heroGlow: {
-    position: 'absolute',
-    width: 180,
-    height: 140,
-    right: -55,
-    top: 9,
-    borderRadius: 90,
-    backgroundColor: 'rgba(129,166,31,0.22)',
-  },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  squareBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.035)',
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-  },
-  brand: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-    letterSpacing: 4,
-    marginLeft: 4,
-  },
-  notificationDot: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    right: 9,
-    top: 8,
-    backgroundColor: D.primary,
-  },
-  profileBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  avatarWrap: {
-    width: 72,
-    height: 72,
-    position: 'relative',
-  },
-  avatarImg: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  avatarInitials: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: D.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitialsText: {
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    fontWeight: '900',
-    color: '#050708',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#050708',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: D.bg,
-  },
-  profileInfo: { flex: 1 },
-  greeting: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '700',
-    letterSpacing: 0.9,
-    marginBottom: 3,
-  },
-  profileName: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    lineHeight: T.lineHeight.titleLarge,
-    fontWeight: '900',
-  },
-  profileEmail: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-    marginTop: 2,
-  },
+    heroSurface: {
+      minHeight: 190,
+      borderBottomWidth: 1,
+      borderBottomColor: D.borderStrong,
+      overflow: 'hidden',
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 20,
+    },
+    heroGlow: {
+      position: 'absolute',
+      width: 180,
+      height: 140,
+      right: -55,
+      top: 9,
+      borderRadius: 90,
+      backgroundColor: D.primaryLight,
+    },
+    topBar: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+    },
+    squareBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.surface,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+    },
+    brand: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '800',
+      letterSpacing: 4,
+      marginLeft: 4,
+    },
+    notificationDot: {
+      position: 'absolute',
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      right: 9,
+      top: 8,
+      backgroundColor: D.primary,
+    },
+    profileBlock: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    avatarWrap: {
+      width: 82,
+      height: 82,
+      position: 'relative',
+    },
+    avatarImg: {
+      width: 82,
+      height: 82,
+      borderRadius: 41,
+    },
+    avatarInitials: {
+      width: 82,
+      height: 82,
+      borderRadius: 41,
+      backgroundColor: D.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitialsText: {
+      fontFamily: T.family.medium,
+      fontSize: T.size.display,
+      fontWeight: '800',
+      color: D.onPrimary,
+    },
+    cameraBadge: {
+      position: 'absolute',
+      right: -2,
+      bottom: -2,
+      width: 29,
+      height: 29,
+      borderRadius: 15,
+      backgroundColor: D.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: D.bg,
+    },
+    profileInfo: { flex: 1 },
+    greeting: {
+      color: D.ink3,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '600',
+      marginBottom: 3,
+    },
+    profileName: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      lineHeight: T.lineHeight.titleLarge,
+      fontWeight: '800',
+    },
+    profileRolePill: {
+      alignSelf: 'flex-start',
+      marginTop: 6,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: D.primaryLight,
+      borderWidth: 1,
+      borderColor: D.borderFocus,
+    },
+    profileRoleText: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.caption,
+      lineHeight: T.lineHeight.caption,
+      fontWeight: '700',
+    },
 
-  joinCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(212,255,61,0.11)',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: D.borderFocus,
-    padding: 15,
-    marginHorizontal: 20,
-    marginTop: 14,
-    gap: 12,
-  },
-  joinIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#050708',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  joinCardText: { flex: 1 },
-  joinCardTitle: {
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '800',
-    color: D.primary,
-    marginBottom: 2,
-  },
-  joinCardDesc: {
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    color: D.primary,
-    opacity: 0.78,
-  },
+    joinCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: D.primaryLight,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: D.borderFocus,
+      padding: 15,
+      marginHorizontal: 20,
+      marginTop: 14,
+      gap: 12,
+    },
+    joinIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: D.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    joinCardText: { flex: 1 },
+    joinCardTitle: {
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+      color: D.primary,
+      marginBottom: 2,
+    },
+    joinCardDesc: {
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      color: D.primary,
+      opacity: 0.78,
+    },
 
-  scheduleCard: {
-    minHeight: 72,
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 18,
-    paddingHorizontal: 18,
-    borderRadius: 18,
-    backgroundColor: D.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    shadowColor: D.primary,
-    shadowOpacity: 0.22,
-    shadowOffset: { width: 0, height: 9 },
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  scheduleIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#050708',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scheduleTextWrap: { flex: 1 },
-  scheduleTitle: {
-    color: '#050708',
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    fontWeight: '900',
-    lineHeight: T.lineHeight.bodyLarge,
-  },
-  scheduleSubtitle: {
-    color: 'rgba(5,7,8,0.62)',
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  scheduleArrow: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#050708',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    scheduleCard: {
+      minHeight: 72,
+      marginHorizontal: 20,
+      marginTop: 16,
+      marginBottom: 18,
+      paddingHorizontal: 18,
+      borderRadius: 18,
+      backgroundColor: D.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      shadowColor: D.primary,
+      shadowOpacity: 0.22,
+      shadowOffset: { width: 0, height: 9 },
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    scheduleIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: D.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scheduleTextWrap: { flex: 1 },
+    scheduleTitle: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      fontWeight: '800',
+      lineHeight: T.lineHeight.bodyLarge,
+    },
+    scheduleSubtitle: {
+      color: D.onPrimary,
+      opacity: 0.72,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      fontWeight: '500',
+      marginTop: 2,
+    },
+    scheduleArrow: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: D.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  sectionHeader: {
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 11,
-  },
-  sectionKicker: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
-  servicesRail: {
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    gap: 10,
-    paddingBottom: 18,
-  },
-  servicesLoading: {
-    height: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  servicesEmpty: {
-    marginHorizontal: 20,
-    height: 72,
-    borderRadius: 15,
-    backgroundColor: D.card,
-    borderWidth: 1,
-    borderColor: D.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 17,
-  },
-  servicesEmptyText: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '800',
-  },
-  serviceCard: {
-    width: 104,
-    height: 104,
-    borderRadius: 18,
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  serviceIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  serviceIconActive: {
-    borderColor: D.primary,
-  },
-  serviceLabel: {
-    color: D.ink2,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
+    sectionHeader: {
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 11,
+    },
+    sectionKicker: {
+      color: D.ink2,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
+    servicesRail: {
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      gap: 10,
+      paddingBottom: 18,
+    },
+    servicesLoading: {
+      height: 100,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    servicesEmpty: {
+      marginHorizontal: 20,
+      height: 72,
+      borderRadius: 15,
+      backgroundColor: D.card,
+      borderWidth: 1,
+      borderColor: D.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 17,
+    },
+    servicesEmptyText: {
+      color: D.ink3,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '800',
+    },
+    serviceCard: {
+      width: 104,
+      height: 104,
+      borderRadius: 18,
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    serviceIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    serviceIconActive: {
+      borderColor: D.primary,
+    },
+    serviceLabel: {
+      color: D.ink2,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
 
-  upcomingHeader: {
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  upcomingTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    fontWeight: '900',
-    lineHeight: T.lineHeight.bodyLarge,
-  },
-  upcomingCount: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-  },
-  loadingWrap: {
-    marginHorizontal: 20,
-    minHeight: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appointmentsCard: {
-    marginHorizontal: 20,
-    borderRadius: 17,
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-    overflow: 'hidden',
-  },
-  appointmentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  appointmentRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: D.border,
-  },
-  appointmentIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    backgroundColor: '#050708',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appointmentInfo: { flex: 1 },
-  appointmentTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  appointmentMeta: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    fontWeight: '700',
-  },
-  appointmentPrice: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
-  emptyCard: {
-    marginHorizontal: 20,
-    minHeight: 224,
-    borderRadius: 20,
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: D.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 26,
-  },
-  emptyIconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    backgroundColor: '#050708',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  emptyPlus: {
-    position: 'absolute',
-    right: -4,
-    top: -4,
-    width: 19,
-    height: 19,
-    borderRadius: 10,
-    backgroundColor: D.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyPlusText: {
-    color: '#050708',
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-    lineHeight: T.lineHeight.secondary,
-  },
-  emptyTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    fontWeight: '900',
-    marginBottom: 10,
-  },
-  emptyText: {
-    color: D.ink2,
-    fontFamily: T.family.regular,
-    fontSize: T.size.body,
-    fontWeight: '500',
-    lineHeight: T.lineHeight.body,
-    textAlign: 'center',
-  },
-  emptyButton: {
-    height: 36,
-    minWidth: 120,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: D.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 15,
-  },
-  emptyButtonText: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '900',
-  },
+    upcomingHeader: {
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    upcomingTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      fontWeight: '800',
+      lineHeight: T.lineHeight.bodyLarge,
+    },
+    upcomingCount: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      fontWeight: '500',
+    },
+    loadingWrap: {
+      marginHorizontal: 20,
+      minHeight: 180,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    appointmentsCard: {
+      marginHorizontal: 20,
+      borderRadius: 17,
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+      overflow: 'hidden',
+    },
+    appointmentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      gap: 10,
+    },
+    appointmentRowBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+    },
+    appointmentIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 13,
+      backgroundColor: D.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    appointmentInfo: { flex: 1 },
+    appointmentTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    appointmentMeta: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      fontWeight: '500',
+    },
+    appointmentPrice: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
+    emptyCard: {
+      marginHorizontal: 20,
+      minHeight: 224,
+      borderRadius: 20,
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: D.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 26,
+    },
+    emptyIconWrap: {
+      width: 68,
+      height: 68,
+      borderRadius: 20,
+      backgroundColor: D.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 15,
+    },
+    emptyPlus: {
+      position: 'absolute',
+      right: -4,
+      top: -4,
+      width: 19,
+      height: 19,
+      borderRadius: 10,
+      backgroundColor: D.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyPlusText: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+      lineHeight: T.lineHeight.secondary,
+    },
+    emptyTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      fontWeight: '800',
+      marginBottom: 10,
+    },
+    emptyText: {
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.body,
+      fontWeight: '500',
+      lineHeight: T.lineHeight.body,
+      textAlign: 'center',
+    },
+    emptyButton: {
+      height: 36,
+      minWidth: 120,
+      borderRadius: 18,
+      borderWidth: 2,
+      borderColor: D.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 15,
+    },
+    emptyButtonText: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+    },
 
-  bottomNav: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 86,
-    backgroundColor: '#050708',
-    borderTopWidth: 1,
-    borderTopColor: D.borderStrong,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-start',
-    paddingTop: 14,
-  },
-  bottomNavItem: {
-    width: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomNavLabel: {
-    marginTop: 4,
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '900',
-  },
-  bottomNavLabelActive: {
-    color: D.primary,
-  },
+    bottomNav: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 86,
+      backgroundColor: D.surface,
+      borderTopWidth: 1,
+      borderTopColor: D.borderStrong,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'flex-start',
+      paddingTop: 14,
+    },
+    bottomNavItem: {
+      width: 96,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bottomNavLabel: {
+      marginTop: 4,
+      color: D.ink3,
+      fontFamily: T.family.medium,
+      fontSize: T.size.caption,
+      fontWeight: '700',
+    },
+    bottomNavLabelActive: {
+      color: D.primary,
+    },
 
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
-  drawer: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: UI.MENU_WIDTH,
-    backgroundColor: '#111416',
-    borderRightWidth: 1,
-    borderRightColor: D.border,
-    paddingTop: 60,
-  },
-  drawerHeader: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: D.border,
-  },
-  drawerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: D.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  drawerAvatarText: {
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '800',
-    color: '#0B0D0E',
-  },
-  drawerName: {
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '700',
-    color: D.ink,
-    marginBottom: 2,
-  },
-  drawerEmail: { fontFamily: T.family.regular, fontSize: T.size.secondary, color: D.ink3 },
-  drawerMenu: { paddingTop: 12 },
-  drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-  },
-  drawerItemText: {
-    fontFamily: T.family.regular,
-    fontSize: T.size.body,
-    fontWeight: '500',
-    color: D.ink,
-  },
-  drawerItemDanger: { color: D.accent },
-  drawerDivider: { height: 1, backgroundColor: D.border, marginVertical: 8 },
+    overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: D.overlay },
+    drawer: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: UI.MENU_WIDTH,
+      backgroundColor: D.surface,
+      borderRightWidth: 1,
+      borderRightColor: D.border,
+      paddingTop: 60,
+    },
+    drawerHeader: {
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+    },
+    drawerAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: D.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
+    drawerAvatarText: {
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+      color: D.onPrimary,
+    },
+    drawerName: {
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+      color: D.ink,
+      marginBottom: 2,
+    },
+    drawerEmail: { fontFamily: T.family.regular, fontSize: T.size.secondary, color: D.ink3 },
+    drawerMenu: { paddingTop: 12 },
+    drawerItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+    },
+    drawerItemText: {
+      fontFamily: T.family.regular,
+      fontSize: T.size.body,
+      fontWeight: '500',
+      color: D.ink,
+    },
+    drawerItemDanger: { color: D.accent },
+    drawerDivider: { height: 1, backgroundColor: D.border, marginVertical: 8 },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalBox: {
-    backgroundColor: '#1A1D20',
-    borderRadius: 20,
-    padding: 24,
-    width: '100%',
-    maxWidth: 360,
-    borderWidth: 1,
-    borderColor: D.border,
-  },
-  modalTitle: {
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    fontWeight: '800',
-    color: D.ink,
-    marginBottom: 6,
-  },
-  modalDesc: {
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    color: D.ink2,
-    lineHeight: T.lineHeight.secondary,
-    marginBottom: 18,
-  },
-  modalInput: {
-    borderWidth: 1.5,
-    borderColor: D.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    fontWeight: '800',
-    color: D.ink,
-    textAlign: 'center',
-    letterSpacing: 6,
-    marginBottom: 14,
-    backgroundColor: D.card,
-  },
-  modalBtn: {
-    height: 48,
-    backgroundColor: D.primary,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  modalBtnDisabled: { opacity: 0.35 },
-  modalBtnText: {
-    color: '#0B0D0E',
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '700',
-  },
-  modalCancel: { alignItems: 'center', paddingVertical: 8 },
-  modalCancelText: {
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    color: D.ink3,
-    fontWeight: '600',
-  },
-});
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: D.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalBox: {
+      backgroundColor: D.card,
+      borderRadius: 20,
+      padding: 24,
+      width: '100%',
+      maxWidth: 360,
+      borderWidth: 1,
+      borderColor: D.border,
+    },
+    modalTitle: {
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      fontWeight: '700',
+      color: D.ink,
+      marginBottom: 6,
+    },
+    modalDesc: {
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      color: D.ink2,
+      lineHeight: T.lineHeight.secondary,
+      marginBottom: 18,
+    },
+    modalInput: {
+      borderWidth: 1.5,
+      borderColor: D.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      fontWeight: '600',
+      color: D.ink,
+      textAlign: 'center',
+      letterSpacing: 6,
+      marginBottom: 14,
+      backgroundColor: D.card,
+    },
+    modalBtn: {
+      height: 48,
+      backgroundColor: D.primary,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
+    modalBtnDisabled: { opacity: 0.35 },
+    modalBtnText: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+    },
+    modalCancel: { alignItems: 'center', paddingVertical: 8 },
+    modalCancelText: {
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      color: D.ink3,
+      fontWeight: '600',
+    },
+  });
+}
