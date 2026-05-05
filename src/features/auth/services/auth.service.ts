@@ -13,10 +13,6 @@ import {
   setDoc,
   serverTimestamp,
   collection,
-  query,
-  where,
-  getDocs,
-  limit,
   Timestamp,
 } from '@react-native-firebase/firestore';
 import { mapFirebaseAuthError } from '@shared/utils/firebase.utils';
@@ -43,18 +39,6 @@ export type AuthResult =
       inviteCode?: string;
     }
   | { ok: false; message: string; code?: string };
-
-async function findShopByCode(inviteCode: string): Promise<string | null> {
-  const db = getFirestore();
-  const qy = query(
-    collection(db, 'shops'),
-    where('code', '==', inviteCode.toUpperCase().trim()),
-    limit(1),
-  );
-  const snap = await getDocs(qy);
-  if (snap.empty) return null;
-  return snap.docs[0].id;
-}
 
 async function registerAsOwner(uid: string, data: RegisterInput): Promise<string> {
   const db = getFirestore();

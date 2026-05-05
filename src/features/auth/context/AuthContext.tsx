@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { getAuth } from '@react-native-firebase/auth';
 import {
   subscribeAuth,
   signIn as svcSignIn,

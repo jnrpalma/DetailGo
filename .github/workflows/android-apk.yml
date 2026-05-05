@@ -1,0 +1,122 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: Tipo de APK
+        required: true
+        default: release
+        type: choice
+        options:
+          - release
+          - debug
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Gera APK manual
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout do codigo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Configura Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Instala dependencias
+        run: npm ci
+
+      - name: Prepara google-services.json temporario
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+          elif [ ! -f android/app/google-services.json ]; then
+            cat > android/app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "detailgo-ci",
+              "storage_bucket": "detailgo-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.testapp"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "ci-placeholder"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+          fi
+
+      - name: Prepara debug keystore temporaria
+        shell: bash
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore android/app/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Gera APK
+        id: build
+        working-directory: android
+        shell: bash
+        run: |
+          chmod +x gradlew
+
+          if [ "${{ inputs.build_type }}" = "debug" ]; then
+            ./gradlew assembleDebug --no-daemon
+            echo "apk_path=app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
+            echo "artifact_name=DetailGo-debug" >> "$GITHUB_OUTPUT"
+          else
+            ./gradlew assembleRelease --no-daemon
+            echo "apk_path=app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
+            echo "artifact_name=DetailGo-release" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publica APK como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.artifact_name }}
+          path: android/${{ steps.build.outputs.apk_path }}
+          if-no-files-found: error
