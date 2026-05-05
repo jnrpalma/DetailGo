@@ -17,7 +17,7 @@ import { ArrowLeft } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
 import { useShop } from '@features/shops';
-import { darkColors as D, typography as T } from '@shared/theme';
+import { typography as T, useAppTheme, type AppColors } from '@shared/theme';
 import { useUserAppointments } from '../hooks/useUserAppointments';
 import type { UserAppointment } from '../domain/appointment.types';
 import { ACTIVE_APPOINTMENT_SET } from '../domain/appointment.constants';
@@ -60,13 +60,13 @@ function isToday(timestamp: number) {
 }
 
 function getDateLabel(timestamp: number) {
-  if (isToday(timestamp)) return 'HOJE';
+  if (isToday(timestamp)) return 'Hoje';
 
   const date = new Date(timestamp);
   const weekday = date
     .toLocaleDateString('pt-BR', { weekday: 'short' })
     .replace('.', '')
-    .toUpperCase();
+    .toLowerCase();
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
 
@@ -75,6 +75,8 @@ function getDateLabel(timestamp: number) {
 
 export default function MyAppointmentsScreen() {
   const navigation = useNavigation<NavProp>();
+  const { colors: D, isLight } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const auth = getAuth();
   const uid = auth.currentUser?.uid;
   const { shopId } = useShop();
@@ -129,7 +131,7 @@ export default function MyAppointmentsScreen() {
   if (!uid) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={D.primary} />
         </View>
@@ -139,7 +141,7 @@ export default function MyAppointmentsScreen() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -209,6 +211,8 @@ function AppointmentCard({
   isCancelling: boolean;
   onCancel: () => void;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const isInProgress = item.status === 'in_progress';
   const rules = getAppointmentRules(item);
 
@@ -218,7 +222,7 @@ function AppointmentCard({
         <View style={[styles.statusPill, isInProgress && styles.statusPillActive]}>
           {isInProgress && <View style={styles.statusDot} />}
           <Text style={[styles.statusText, isInProgress && styles.statusTextActive]}>
-            {isInProgress ? 'EM ANDAMENTO' : 'AGENDADO'}
+            {isInProgress ? 'Em andamento' : 'Agendado'}
           </Text>
         </View>
 
@@ -263,238 +267,237 @@ function AppointmentCard({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#090D0D',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+function createStyles(D: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: D.bg,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  header: {
-    minHeight: 96,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: D.border,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    lineHeight: T.lineHeight.titleLarge,
-    fontWeight: '900',
-  },
-  headerMeta: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    marginTop: 2,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
+    header: {
+      minHeight: 96,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 13,
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: 24,
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+    },
+    backButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+    },
+    headerCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    headerTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      lineHeight: T.lineHeight.titleLarge,
+      fontWeight: '800',
+    },
+    headerMeta: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      marginTop: 2,
+      fontWeight: '600',
+    },
 
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-  },
-  listContent: {
-    paddingBottom: 40,
-  },
-  separator: {
-    height: 20,
-  },
-  card: {
-    minHeight: 188,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-  },
-  cardInProgress: {
-    borderLeftWidth: 4,
-    borderLeftColor: D.primary,
-  },
-  cardTop: {
-    minHeight: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  statusPill: {
-    minHeight: 30,
-    borderRadius: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-    backgroundColor: 'rgba(255,255,255,0.035)',
-  },
-  statusPillActive: {
-    borderColor: D.primary,
-    backgroundColor: 'rgba(212,255,61,0.08)',
-  },
-  statusDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: D.primary,
-  },
-  statusText: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    lineHeight: T.lineHeight.caption,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  statusTextActive: {
-    color: D.primary,
-  },
-  timeWrap: {
-    alignItems: 'flex-end',
-    marginTop: -3,
-  },
-  time: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    lineHeight: T.lineHeight.titleLarge,
-    fontWeight: '900',
-  },
-  dateLabel: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  serviceName: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.bodyLarge,
-    lineHeight: T.lineHeight.bodyLarge,
-    fontWeight: '900',
-  },
-  serviceMeta: {
-    color: D.ink2,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    fontWeight: '700',
-  },
-  cardDivider: {
-    height: 1,
-    marginTop: 18,
-    marginBottom: 16,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.075)',
-  },
-  cardBottom: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  price: {
-    color: D.ink2,
-    fontFamily: T.family.regular,
-    fontSize: T.size.body,
-    lineHeight: T.lineHeight.body,
-    fontWeight: '700',
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  actionButton: {
-    minWidth: 118,
-    minHeight: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-  },
-  cancelButton: {
-    borderColor: 'rgba(255,92,57,0.55)',
-    backgroundColor: 'rgba(255,92,57,0.07)',
-  },
-  cancelText: {
-    color: D.accent,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
-  disabled: {
-    opacity: 0.48,
-  },
+    content: {
+      flex: 1,
+      paddingHorizontal: 16,
+      paddingTop: 18,
+    },
+    listContent: {
+      paddingBottom: 40,
+    },
+    separator: {
+      height: 20,
+    },
+    card: {
+      minHeight: 188,
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 20,
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+    },
+    cardInProgress: {
+      borderLeftWidth: 4,
+      borderLeftColor: D.primary,
+    },
+    cardTop: {
+      minHeight: 40,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    statusPill: {
+      minHeight: 30,
+      borderRadius: 15,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 14,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+      backgroundColor: D.surface,
+    },
+    statusPillActive: {
+      borderColor: D.primary,
+      backgroundColor: D.primaryLight,
+    },
+    statusDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      backgroundColor: D.primary,
+    },
+    statusText: {
+      color: D.ink3,
+      fontFamily: T.family.medium,
+      fontSize: T.size.caption,
+      lineHeight: T.lineHeight.caption,
+      fontWeight: '600',
+    },
+    statusTextActive: {
+      color: D.primary,
+    },
+    timeWrap: {
+      alignItems: 'flex-end',
+      marginTop: -3,
+    },
+    time: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      lineHeight: T.lineHeight.titleLarge,
+      fontWeight: '800',
+    },
+    dateLabel: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '500',
+    },
+    serviceName: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.bodyLarge,
+      lineHeight: T.lineHeight.bodyLarge,
+      fontWeight: '800',
+    },
+    serviceMeta: {
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '700',
+    },
+    cardDivider: {
+      height: 1,
+      marginTop: 18,
+      marginBottom: 16,
+      borderStyle: 'dashed',
+      borderWidth: 1,
+      borderColor: D.border,
+    },
+    cardBottom: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    price: {
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.body,
+      lineHeight: T.lineHeight.body,
+      fontWeight: '700',
+    },
+    actions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    actionButton: {
+      minWidth: 118,
+      minHeight: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+    },
+    cancelButton: {
+      borderColor: D.accent,
+      backgroundColor: D.surface,
+    },
+    cancelText: {
+      color: D.accent,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
+    disabled: {
+      opacity: 0.48,
+    },
 
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 72,
-    paddingHorizontal: 24,
-  },
-  emptyStateTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.title,
-    lineHeight: T.lineHeight.title,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    color: D.ink3,
-    fontFamily: T.family.regular,
-    fontSize: T.size.body,
-    lineHeight: T.lineHeight.body,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  emptyStateButton: {
-    minHeight: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    backgroundColor: D.primary,
-  },
-  emptyStateButtonText: {
-    color: '#050708',
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '900',
-  },
-});
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 72,
+      paddingHorizontal: 24,
+    },
+    emptyStateTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.title,
+      lineHeight: T.lineHeight.title,
+      fontWeight: '800',
+      marginBottom: 8,
+    },
+    emptyStateText: {
+      color: D.ink3,
+      fontFamily: T.family.regular,
+      fontSize: T.size.body,
+      lineHeight: T.lineHeight.body,
+      textAlign: 'center',
+      marginBottom: 24,
+    },
+    emptyStateButton: {
+      minHeight: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      backgroundColor: D.primary,
+    },
+    emptyStateButtonText: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      fontWeight: '700',
+    },
+  });
+}

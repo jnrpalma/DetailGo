@@ -33,7 +33,7 @@ import type { RegisterInput, UserRole } from '../services/auth.service';
 import { useForm } from '@shared/hooks/useForm';
 import { validationUtils, validationMessages } from '@shared/utils/validation.utils';
 import { formatUtils } from '@shared/utils/format.utils';
-import { darkColors as D } from '@shared/theme';
+import { useAppTheme, type AppColors } from '@shared/theme';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -67,6 +67,8 @@ const ACCOUNT_TYPES = [
 
 export default function RegisterScreen() {
   const navigation = useNavigation<NavProp>();
+  const { colors: D, isLight } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const { register } = useAuth();
 
   const [accountType, setAccountType] = useState<UserRole | null>(null);
@@ -145,6 +147,8 @@ export default function RegisterScreen() {
         message: validationMessages.confirmPassword,
       });
     }
+    // Mantem o comportamento existente do useForm: registrar a regra apenas uma vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values.password]);
 
   const canSubmit = useMemo(() => {
@@ -213,7 +217,7 @@ export default function RegisterScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -239,7 +243,7 @@ export default function RegisterScreen() {
                   activeOpacity={0.85}
                 >
                   <View style={[styles.typeIconWrap, sel && styles.typeIconWrapSel]}>
-                    <type.Icon size={20} color={sel ? '#0B0D0E' : D.ink} />
+                    <type.Icon size={20} color={sel ? D.onPrimary : D.ink} />
                   </View>
                   <View style={styles.typeCardBody}>
                     <View style={styles.typeCardTop}>
@@ -251,7 +255,7 @@ export default function RegisterScreen() {
                     <Text style={styles.typeCardDesc}>{type.desc}</Text>
                   </View>
                   <View style={[styles.typeRadio, sel && styles.typeRadioSel]}>
-                    {sel && <CheckCircle2 size={14} color="#0B0D0E" />}
+                    {sel && <CheckCircle2 size={14} color={D.onPrimary} />}
                   </View>
                 </TouchableOpacity>
               );
@@ -286,7 +290,7 @@ export default function RegisterScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -418,14 +422,14 @@ export default function RegisterScreen() {
             activeOpacity={0.85}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#0B0D0E" />
+              <ActivityIndicator color={D.onPrimary} />
             ) : (
               <>
                 <Text style={styles.btnText}>
                   {isOwner ? 'Criar estética e conta' : 'Criar conta'}
                 </Text>
                 <View style={styles.btnArrow}>
-                  <ArrowRight size={18} color="#0B0D0E" />
+                  <ArrowRight size={18} color={D.onPrimary} />
                 </View>
               </>
             )}
@@ -475,6 +479,9 @@ function DField({
   secureTextEntry?: boolean;
   containerStyle?: any;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <View style={[styles.fieldWrap, containerStyle]}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -501,253 +508,255 @@ function DField({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: D.bg,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: 22,
-    paddingTop: 60,
-    paddingBottom: 24,
-  },
+function createStyles(D: AppColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: D.bg,
+    },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: 22,
+      paddingTop: 60,
+      paddingBottom: 24,
+    },
 
-  // ── Step 1
-  step1Header: {
-    marginBottom: 28,
-  },
-  stepIndicator: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: D.ink3,
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  step1Title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: D.ink,
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  step1Sub: {
-    fontSize: 14,
-    color: D.ink2,
-    lineHeight: 20,
-  },
-  typeCards: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  typeCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: D.card,
-    borderWidth: 1,
-    borderColor: D.border,
-  },
-  typeCardSel: {
-    backgroundColor: D.primaryLight,
-    borderColor: D.primary,
-  },
-  typeIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeIconWrapSel: {
-    backgroundColor: D.primary,
-  },
-  typeCardBody: {
-    flex: 1,
-  },
-  typeCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  typeCardLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: D.ink,
-  },
-  typeCardLabelSel: {
-    color: D.ink,
-  },
-  typeCardBadge: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: D.primary,
-    letterSpacing: 0.5,
-  },
-  typeCardDesc: {
-    fontSize: 12,
-    color: D.ink2,
-    lineHeight: 18,
-  },
-  typeRadio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: D.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  typeRadioSel: {
-    backgroundColor: D.primary,
-    borderColor: D.primary,
-  },
-  trialBox: {
-    padding: 14,
-    backgroundColor: 'rgba(212,255,61,0.04)',
-    borderWidth: 1,
-    borderColor: D.border,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    marginBottom: 24,
-  },
-  trialLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: D.ink3,
-    letterSpacing: 0.5,
-    marginBottom: 5,
-  },
-  trialDesc: {
-    fontSize: 12,
-    color: D.ink2,
-    lineHeight: 18,
-  },
+    // ── Step 1
+    step1Header: {
+      marginBottom: 28,
+    },
+    stepIndicator: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: D.ink3,
+      letterSpacing: 0.5,
+      marginBottom: 10,
+    },
+    step1Title: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: D.ink,
+      letterSpacing: -0.5,
+      marginBottom: 6,
+    },
+    step1Sub: {
+      fontSize: 14,
+      color: D.ink2,
+      lineHeight: 20,
+    },
+    typeCards: {
+      gap: 10,
+      marginBottom: 16,
+    },
+    typeCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      padding: 16,
+      borderRadius: 16,
+      backgroundColor: D.card,
+      borderWidth: 1,
+      borderColor: D.border,
+    },
+    typeCardSel: {
+      backgroundColor: D.primaryLight,
+      borderColor: D.primary,
+    },
+    typeIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: D.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    typeIconWrapSel: {
+      backgroundColor: D.primary,
+    },
+    typeCardBody: {
+      flex: 1,
+    },
+    typeCardTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    typeCardLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: D.ink,
+    },
+    typeCardLabelSel: {
+      color: D.ink,
+    },
+    typeCardBadge: {
+      fontSize: 9,
+      fontWeight: '600',
+      color: D.primary,
+      letterSpacing: 0.5,
+    },
+    typeCardDesc: {
+      fontSize: 12,
+      color: D.ink2,
+      lineHeight: 18,
+    },
+    typeRadio: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.5,
+      borderColor: D.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    typeRadioSel: {
+      backgroundColor: D.primary,
+      borderColor: D.primary,
+    },
+    trialBox: {
+      padding: 14,
+      backgroundColor: D.primaryLight,
+      borderWidth: 1,
+      borderColor: D.border,
+      borderStyle: 'dashed',
+      borderRadius: 12,
+      marginBottom: 24,
+    },
+    trialLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: D.ink3,
+      letterSpacing: 0.5,
+      marginBottom: 5,
+    },
+    trialDesc: {
+      fontSize: 12,
+      color: D.ink2,
+      lineHeight: 18,
+    },
 
-  // ── Step 2
-  step2Header: {
-    marginBottom: 24,
-  },
-  step2Title: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: D.ink,
-    letterSpacing: -0.8,
-    lineHeight: 32,
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  typePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: D.primaryLight,
-    borderWidth: 1,
-    borderColor: 'rgba(212,255,61,0.2)',
-  },
-  typePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: D.primary,
-  },
+    // ── Step 2
+    step2Header: {
+      marginBottom: 24,
+    },
+    step2Title: {
+      fontSize: 30,
+      fontWeight: '700',
+      color: D.ink,
+      letterSpacing: -0.8,
+      lineHeight: 32,
+      marginBottom: 12,
+      marginTop: 8,
+    },
+    typePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: D.primaryLight,
+      borderWidth: 1,
+      borderColor: D.borderFocus,
+    },
+    typePillText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: D.primary,
+    },
 
-  // ── Fields
-  fields: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  col: {
-    flex: 1,
-  },
-  fieldWrap: {
-    gap: 5,
-  },
-  fieldLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: D.ink3,
-    letterSpacing: 0.5,
-  },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: D.card,
-    borderWidth: 1,
-    borderColor: D.border,
-    paddingHorizontal: 14,
-  },
-  fieldError: {
-    borderColor: D.accent,
-  },
-  fieldInput: {
-    flex: 1,
-    fontSize: 14,
-    color: D.ink,
-    fontWeight: '500',
-  },
-  fieldErrorText: {
-    fontSize: 11,
-    color: D.accent,
-    marginTop: 2,
-  },
+    // ── Fields
+    fields: {
+      gap: 12,
+      marginBottom: 24,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    col: {
+      flex: 1,
+    },
+    fieldWrap: {
+      gap: 5,
+    },
+    fieldLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: D.ink3,
+      letterSpacing: 0.5,
+    },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      height: 50,
+      borderRadius: 12,
+      backgroundColor: D.card,
+      borderWidth: 1,
+      borderColor: D.border,
+      paddingHorizontal: 14,
+    },
+    fieldError: {
+      borderColor: D.accent,
+    },
+    fieldInput: {
+      flex: 1,
+      fontSize: 14,
+      color: D.ink,
+      fontWeight: '500',
+    },
+    fieldErrorText: {
+      fontSize: 11,
+      color: D.accent,
+      marginTop: 2,
+    },
 
-  // ── CTA
-  cta: {
-    gap: 16,
-  },
-  btn: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: D.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 22,
-  },
-  btnDisabled: {
-    opacity: 0.35,
-  },
-  btnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0B0D0E',
-  },
-  btnArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginText: {
-    fontSize: 14,
-    color: D.ink2,
-  },
-  loginLink: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: D.primary,
-  },
-});
+    // ── CTA
+    cta: {
+      gap: 16,
+    },
+    btn: {
+      height: 54,
+      borderRadius: 14,
+      backgroundColor: D.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 22,
+    },
+    btnDisabled: {
+      opacity: 0.35,
+    },
+    btnText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: D.onPrimary,
+    },
+    btnArrow: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: D.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loginRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loginText: {
+      fontSize: 14,
+      color: D.ink2,
+    },
+    loginLink: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: D.primary,
+    },
+  });
+}

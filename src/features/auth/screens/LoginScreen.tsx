@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,7 @@ import Svg, { Path as SvgPath } from 'react-native-svg';
 
 import type { RootStackParamList } from '@app/types';
 import { useAuth } from '@features/auth';
-import { darkColors as D } from '@shared/theme';
+import { useAppTheme, type AppColors } from '@shared/theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const HERO_H = Math.round(SCREEN_H * 0.52);
@@ -29,6 +29,8 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavProp>();
+  const { colors: D, isLight } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const { signIn } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -62,7 +64,7 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
@@ -76,13 +78,13 @@ export default function LoginScreen() {
             {/* Superfície da pista (fill muito sutil) */}
             <SvgPath
               d="M 420 520 C 390 370, 260 240, 130 160 C 60 118, -30 90, -70 55 L -70 -5 C -20 32, 80 68, 170 122 C 300 200, 410 360, 420 520 Z"
-              fill="rgba(255,255,255,0.025)"
+              fill={D.primaryLight}
             />
 
             {/* Borda externa da pista */}
             <SvgPath
               d="M 420 520 C 390 370, 260 240, 130 160 C 60 118, -30 90, -70 55"
-              stroke="rgba(255,255,255,0.22)"
+              stroke={D.borderStrong}
               strokeWidth={2}
               fill="none"
               strokeLinecap="round"
@@ -91,7 +93,7 @@ export default function LoginScreen() {
             {/* Borda interna da pista */}
             <SvgPath
               d="M 240 520 C 220 390, 155 280, 75 215 C 28 180, -18 162, -70 148"
-              stroke="rgba(255,255,255,0.10)"
+              stroke={D.border}
               strokeWidth={1.5}
               fill="none"
               strokeLinecap="round"
@@ -100,7 +102,7 @@ export default function LoginScreen() {
             {/* Linha de corrida — tracejada neon */}
             <SvgPath
               d="M 325 520 C 305 380, 210 260, 103 188 C 48 155, -22 138, -70 102"
-              stroke="rgba(212,255,61,0.28)"
+              stroke={D.borderFocus}
               strokeWidth={1.2}
               strokeDasharray="26 14"
               fill="none"
@@ -110,25 +112,25 @@ export default function LoginScreen() {
             {/* Marcadores de kerb externos (3 traços curtos) */}
             <SvgPath
               d="M 370 490 L 358 488"
-              stroke="rgba(255,255,255,0.25)"
+              stroke={D.borderStrong}
               strokeWidth={2}
               strokeLinecap="round"
             />
             <SvgPath
               d="M 330 420 L 320 412"
-              stroke="rgba(255,255,255,0.2)"
+              stroke={D.borderStrong}
               strokeWidth={2}
               strokeLinecap="round"
             />
             <SvgPath
               d="M 270 340 L 260 328"
-              stroke="rgba(255,255,255,0.15)"
+              stroke={D.border}
               strokeWidth={1.5}
               strokeLinecap="round"
             />
             <SvgPath
               d="M 190 268 L 180 256"
-              stroke="rgba(255,255,255,0.12)"
+              stroke={D.border}
               strokeWidth={1.5}
               strokeLinecap="round"
             />
@@ -147,7 +149,7 @@ export default function LoginScreen() {
 
             <Text style={styles.heroTitle}>
               {'DETAIL'}
-              <Text style={{ color: D.primary }}>{'·'}</Text>
+              <Text style={styles.heroDot}>{'·'}</Text>
               {'\nGO.'}
             </Text>
 
@@ -233,12 +235,12 @@ export default function LoginScreen() {
             activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color="#0B0D0E" />
+              <ActivityIndicator color={D.onPrimary} />
             ) : (
               <>
                 <Text style={styles.btnText}>Entrar na garagem</Text>
                 <View style={styles.btnArrow}>
-                  <ArrowRight size={18} color="#0B0D0E" />
+                  <ArrowRight size={18} color={D.onPrimary} />
                 </View>
               </>
             )}
@@ -261,176 +263,181 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: D.bg,
-  },
+function createStyles(D: AppColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: D.bg,
+    },
 
-  // ── Hero
-  hero: {
-    backgroundColor: '#000',
-    overflow: 'hidden',
-    borderBottomWidth: 1,
-    borderBottomColor: D.border,
-  },
-  glowGreen: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    top: -100,
-    right: -80,
-    borderRadius: 150,
-    backgroundColor: 'rgba(212,255,61,0.14)',
-  },
-  glowRed: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    bottom: -60,
-    left: -60,
-    borderRadius: 100,
-    backgroundColor: 'rgba(255,92,57,0.09)',
-  },
-  heroContent: {
-    position: 'absolute',
-    bottom: 28,
-    left: 24,
-    right: 24,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: D.primaryLight,
-    alignSelf: 'flex-start',
-    marginBottom: 14,
-  },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: D.primary,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: D.primary,
-    letterSpacing: 0.5,
-  },
-  heroTitle: {
-    fontSize: 60,
-    fontWeight: '800',
-    color: D.ink,
-    letterSpacing: -2,
-    lineHeight: 58,
-    marginBottom: 12,
-  },
-  heroSub: {
-    fontSize: 13,
-    color: D.ink2,
-    lineHeight: 20,
-    maxWidth: 240,
-  },
+    // ── Hero
+    hero: {
+      backgroundColor: D.bg,
+      overflow: 'hidden',
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+    },
+    glowGreen: {
+      position: 'absolute',
+      width: 300,
+      height: 300,
+      top: -100,
+      right: -80,
+      borderRadius: 150,
+      backgroundColor: D.primaryLight,
+    },
+    glowRed: {
+      position: 'absolute',
+      width: 200,
+      height: 200,
+      bottom: -60,
+      left: -60,
+      borderRadius: 100,
+      backgroundColor: D.surface,
+    },
+    heroContent: {
+      position: 'absolute',
+      bottom: 28,
+      left: 24,
+      right: 24,
+    },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: D.primaryLight,
+      alignSelf: 'flex-start',
+      marginBottom: 14,
+    },
+    badgeDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: D.primary,
+    },
+    badgeText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: D.primary,
+      letterSpacing: 0.5,
+    },
+    heroTitle: {
+      fontSize: 60,
+      fontWeight: '800',
+      color: D.ink,
+      letterSpacing: -2,
+      lineHeight: 58,
+      marginBottom: 12,
+    },
+    heroDot: {
+      color: D.primary,
+    },
+    heroSub: {
+      fontSize: 13,
+      color: D.ink2,
+      lineHeight: 20,
+      maxWidth: 240,
+    },
 
-  // ── Form
-  form: {
-    padding: 22,
-    gap: 14,
-  },
-  fieldWrap: {
-    gap: 6,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  fieldLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: D.ink3,
-    letterSpacing: 0.5,
-  },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: D.card,
-    borderWidth: 1,
-    borderColor: D.border,
-    paddingHorizontal: 14,
-  },
-  fieldError: {
-    borderColor: D.accent,
-  },
-  fieldInput: {
-    flex: 1,
-    fontSize: 15,
-    color: D.ink,
-    fontWeight: '500',
-  },
-  forgotText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: D.primary,
-  },
+    // ── Form
+    form: {
+      padding: 22,
+      gap: 14,
+    },
+    fieldWrap: {
+      gap: 6,
+    },
+    labelRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    fieldLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: D.ink3,
+      letterSpacing: 0.5,
+    },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: D.card,
+      borderWidth: 1,
+      borderColor: D.border,
+      paddingHorizontal: 14,
+    },
+    fieldError: {
+      borderColor: D.accent,
+    },
+    fieldInput: {
+      flex: 1,
+      fontSize: 15,
+      color: D.ink,
+      fontWeight: '500',
+    },
+    forgotText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: D.primary,
+    },
 
-  // ── Button
-  btn: {
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: D.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    marginTop: 8,
-  },
-  btnDisabled: {
-    opacity: 0.35,
-  },
-  btnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0B0D0E',
-  },
-  btnArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    // ── Button
+    btn: {
+      height: 56,
+      borderRadius: 14,
+      backgroundColor: D.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 22,
+      marginTop: 8,
+    },
+    btnDisabled: {
+      opacity: 0.35,
+    },
+    btnText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: D.onPrimary,
+    },
+    btnArrow: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: D.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  // ── Footer
-  registerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  registerText: {
-    fontSize: 14,
-    color: D.ink2,
-  },
-  registerLink: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: D.primary,
-  },
-  footer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    color: D.ink3,
-  },
-});
+    // ── Footer
+    registerRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 6,
+    },
+    registerText: {
+      fontSize: 14,
+      color: D.ink2,
+    },
+    registerLink: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: D.primary,
+    },
+    footer: {
+      paddingVertical: 20,
+      alignItems: 'center',
+    },
+    footerText: {
+      fontSize: 12,
+      color: D.ink3,
+    },
+  });
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from '@features/auth';
 import { ShopProvider } from '@features/shops/context/ShopContext';
+import { ThemeProvider } from '@shared/theme';
 import BootSplash from 'react-native-bootsplash';
 import RootNavigator from './src/navigation/RootNavigator';
 
@@ -22,12 +23,14 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <ShopProvider>
-        <NavigationContainer>
-          <RootNavigator />
-        </NavigationContainer>
-      </ShopProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ShopProvider>
+          <NavigationContainer>
+            <RootNavigator />
+          </NavigationContainer>
+        </ShopProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

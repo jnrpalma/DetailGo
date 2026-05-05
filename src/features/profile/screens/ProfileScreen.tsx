@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, Check, ChevronRight, RefreshCw, X } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, Moon, RefreshCw, Sun, X } from 'lucide-react-native';
 
 import { getAuth } from '@react-native-firebase/auth';
 import {
@@ -28,7 +28,7 @@ import {
 } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
-import { darkColors as D, typography as T } from '@shared/theme';
+import { typography as T, useAppTheme, type AppColors } from '@shared/theme';
 import type { RootStackParamList } from '@app/types';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useAuth } from '@features/auth';
@@ -56,6 +56,8 @@ function toDigits(value: string) {
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NavProp>();
+  const { colors: D, isLight, toggleTheme } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
   const db = getFirestore();
   const authInstance = getAuth();
   const user = authInstance.currentUser;
@@ -417,7 +419,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={D.primary} />
         </View>
@@ -427,7 +429,7 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.container}
@@ -456,20 +458,21 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.heroInfo}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {displayName}
-                </Text>
-                <Text style={styles.email} numberOfLines={1}>
-                  {profile.email || user?.email}
-                </Text>
-                <View style={styles.rolePill}>
-                  <Text style={styles.rolePillText}>CLIENTE</Text>
+                <View style={styles.heroTopLine}>
+                  <View style={styles.heroTextBlock}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {displayName}
+                    </Text>
+                  </View>
+                  <View style={styles.rolePill}>
+                    <Text style={styles.rolePillText}>Cliente</Text>
+                  </View>
                 </View>
               </View>
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>DADOS PESSOAIS</Text>
+              <Text style={styles.sectionLabel}>Dados pessoais</Text>
             </View>
 
             <View style={styles.card}>
@@ -508,10 +511,10 @@ export default function ProfileScreen() {
                       disabled={saving}
                     >
                       {saving ? (
-                        <ActivityIndicator size="small" color="#050708" />
+                        <ActivityIndicator size="small" color={D.onPrimary} />
                       ) : (
                         <>
-                          <Check size={16} color="#050708" />
+                          <Check size={16} color={D.onPrimary} />
                           <Text style={styles.confirmText}>Salvar</Text>
                         </>
                       )}
@@ -565,10 +568,10 @@ export default function ProfileScreen() {
                       disabled={updatingEmail}
                     >
                       {updatingEmail ? (
-                        <ActivityIndicator size="small" color="#050708" />
+                        <ActivityIndicator size="small" color={D.onPrimary} />
                       ) : (
                         <>
-                          <Check size={16} color="#050708" />
+                          <Check size={16} color={D.onPrimary} />
                           <Text style={styles.confirmText}>Confirmar</Text>
                         </>
                       )}
@@ -592,9 +595,9 @@ export default function ProfileScreen() {
                     activeOpacity={0.75}
                   >
                     {checkingConfirm ? (
-                      <ActivityIndicator size="small" color="#050708" />
+                      <ActivityIndicator size="small" color={D.onPrimary} />
                     ) : (
-                      <RefreshCw size={16} color="#050708" />
+                      <RefreshCw size={16} color={D.onPrimary} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -634,10 +637,10 @@ export default function ProfileScreen() {
                       disabled={saving}
                     >
                       {saving ? (
-                        <ActivityIndicator size="small" color="#050708" />
+                        <ActivityIndicator size="small" color={D.onPrimary} />
                       ) : (
                         <>
-                          <Check size={16} color="#050708" />
+                          <Check size={16} color={D.onPrimary} />
                           <Text style={styles.confirmText}>Salvar</Text>
                         </>
                       )}
@@ -650,7 +653,7 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>CONTA</Text>
+              <Text style={styles.sectionLabel}>Conta</Text>
             </View>
 
             <View style={styles.card}>
@@ -663,6 +666,7 @@ export default function ProfileScreen() {
                 label="Suporte"
                 onPress={() => Alert.alert('Suporte', 'Fale com a equipe DetailGo pelo suporte.')}
               />
+              <ThemeSettingsRow isLight={isLight} onToggle={toggleTheme} />
               <SettingsRow label="Sair" onPress={handleSignOut} danger last />
             </View>
 
@@ -684,6 +688,9 @@ function ProfileTextInput({
   last?: boolean;
   floating?: boolean;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <View
       style={[
@@ -718,6 +725,9 @@ function DataRow({
   bordered?: boolean;
   last?: boolean;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <TouchableOpacity
       style={[styles.summaryRow, bordered && styles.rowBorder, last && styles.lastSummaryRow]}
@@ -744,6 +754,9 @@ function SettingsRow({
   danger?: boolean;
   last?: boolean;
 }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
+
   return (
     <TouchableOpacity
       style={[styles.settingsRow, !last && styles.rowBorder]}
@@ -756,369 +769,434 @@ function SettingsRow({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#090D0D',
-  },
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+function ThemeSettingsRow({ isLight, onToggle }: { isLight: boolean; onToggle: () => void }) {
+  const { colors: D } = useAppTheme();
+  const styles = useMemo(() => createStyles(D), [D]);
 
-  header: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: D.border,
-  },
-  squareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-  },
-  squareButtonGhost: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: D.primaryLight,
-    borderWidth: 1,
-    borderColor: D.borderFocus,
-  },
-  headerTextWrap: {
-    flex: 1,
-  },
-  headerKicker: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    lineHeight: T.lineHeight.caption,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  headerTitle: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.title,
-    lineHeight: T.lineHeight.title,
-    fontWeight: '900',
-  },
+  return (
+    <TouchableOpacity style={[styles.themeRow, styles.rowBorder]} onPress={onToggle}>
+      <Text style={styles.settingsLabel}>{isLight ? 'Tema claro' : 'Tema escuro'}</Text>
+      <View style={[styles.themeToggle, isLight && styles.themeToggleActive]}>
+        <View style={[styles.themeToggleThumb, isLight && styles.themeToggleThumbActive]}>
+          {isLight ? (
+            <Sun size={15} color={D.onPrimary} strokeWidth={2.4} />
+          ) : (
+            <Moon size={15} color={D.primary} strokeWidth={2.4} />
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  hero: {
-    minHeight: 74,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 4,
-  },
-  heroGlow: {
-    position: 'absolute',
-    width: 170,
-    height: 110,
-    right: -54,
-    top: -34,
-    borderRadius: 85,
-    backgroundColor: 'rgba(212,255,61,0.13)',
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: D.primary,
-  },
-  avatarImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  avatarText: {
-    color: '#050708',
-    fontFamily: T.family.medium,
-    fontSize: T.size.titleLarge,
-    fontWeight: '900',
-  },
-  heroInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.title,
-    lineHeight: T.lineHeight.title,
-    fontWeight: '900',
-  },
-  email: {
-    color: D.ink2,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    lineHeight: T.lineHeight.secondary,
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  rolePill: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: D.primaryLight,
-    borderWidth: 1,
-    borderColor: D.borderFocus,
-  },
-  rolePillText: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
+function createStyles(D: AppColors) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: D.bg,
+    },
+    container: {
+      flex: 1,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
 
-  sectionHeader: {
-    minHeight: 38,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingBottom: 10,
-  },
-  sectionLabel: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  card: {
-    borderRadius: 14,
-    backgroundColor: D.card,
-    borderWidth: 1.5,
-    borderColor: D.borderStrong,
-    overflow: 'hidden',
-  },
-  rowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: D.border,
-  },
-  summaryRow: {
-    minHeight: 46,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 16,
-  },
-  lastSummaryRow: {
-    minHeight: 45,
-  },
-  summaryLabel: {
-    width: 112,
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  summaryValue: {
-    flex: 1,
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
+    header: {
+      minHeight: 64,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 12,
+      gap: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: D.border,
+    },
+    squareButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.surface,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+    },
+    squareButtonGhost: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.primaryLight,
+      borderWidth: 1,
+      borderColor: D.borderFocus,
+    },
+    headerTextWrap: {
+      flex: 1,
+    },
+    headerKicker: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.caption,
+      lineHeight: T.lineHeight.caption,
+      fontWeight: '700',
+      letterSpacing: 1.2,
+    },
+    headerTitle: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.title,
+      lineHeight: T.lineHeight.title,
+      fontWeight: '800',
+    },
 
-  inputRow: {
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  floatingInput: {
-    minHeight: 64,
-    borderRadius: 14,
-    backgroundColor: D.surface,
-    borderWidth: 1,
-    borderColor: D.borderStrong,
-    marginBottom: 10,
-  },
-  inputTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  textInput: {
-    minHeight: 31,
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    lineHeight: T.lineHeight.body,
-    fontWeight: '800',
-    padding: 0,
-  },
-  dataRow: {
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dataTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  dataLabel: {
-    color: D.ink3,
-    fontFamily: T.family.medium,
-    fontSize: T.size.caption,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  dataValue: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    lineHeight: T.lineHeight.body,
-    fontWeight: '800',
-    marginTop: 3,
-  },
-  editBlock: {
-    padding: 14,
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionButton: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  cancelButton: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: D.borderStrong,
-  },
-  confirmButton: {
-    backgroundColor: D.primary,
-  },
-  actionText: {
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '800',
-  },
-  confirmText: {
-    color: '#050708',
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 24,
+    },
+    hero: {
+      minHeight: 74,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 4,
+    },
+    heroGlow: {
+      position: 'absolute',
+      width: 170,
+      height: 110,
+      right: -54,
+      top: -34,
+      borderRadius: 85,
+      backgroundColor: D.primaryLight,
+    },
+    avatar: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.primary,
+    },
+    avatarImage: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+    },
+    avatarText: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.titleLarge,
+      fontWeight: '800',
+    },
+    heroInfo: {
+      flex: 1,
+      minWidth: 0,
+    },
+    heroTopLine: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    heroTextBlock: {
+      flex: 1,
+      minWidth: 0,
+    },
+    name: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.title,
+      lineHeight: T.lineHeight.title,
+      fontWeight: '800',
+    },
+    email: {
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      marginTop: 2,
+      fontWeight: '500',
+    },
+    rolePill: {
+      alignSelf: 'center',
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: D.primaryLight,
+      borderWidth: 1,
+      borderColor: D.borderFocus,
+    },
+    rolePillText: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.caption,
+      fontWeight: '700',
+    },
 
-  pendingBox: {
-    marginHorizontal: 14,
-    marginBottom: 14,
-    padding: 12,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: D.primaryLight,
-    borderWidth: 1,
-    borderColor: D.borderFocus,
-  },
-  pendingTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pendingTitle: {
-    color: D.primary,
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
-  pendingEmail: {
-    color: D.ink,
-    fontFamily: T.family.regular,
-    fontSize: T.size.secondary,
-    marginTop: 2,
-    fontWeight: '700',
-  },
-  verifyButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: D.primary,
-  },
+    sectionHeader: {
+      minHeight: 38,
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      paddingBottom: 10,
+    },
+    sectionLabel: {
+      color: D.ink2,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '700',
+    },
+    card: {
+      borderRadius: 14,
+      backgroundColor: D.card,
+      borderWidth: 1.5,
+      borderColor: D.borderStrong,
+      overflow: 'hidden',
+    },
+    rowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: D.border,
+    },
+    summaryRow: {
+      minHeight: 46,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      paddingHorizontal: 16,
+    },
+    lastSummaryRow: {
+      minHeight: 45,
+    },
+    summaryLabel: {
+      width: 112,
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '500',
+    },
+    summaryValue: {
+      flex: 1,
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '600',
+      textAlign: 'right',
+    },
 
-  settingsRow: {
-    minHeight: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-  },
-  settingsLabel: {
-    flex: 1,
-    color: D.ink,
-    fontFamily: T.family.medium,
-    fontSize: T.size.body,
-    fontWeight: '800',
-  },
-  dangerText: {
-    color: D.accent,
-  },
+    inputRow: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    floatingInput: {
+      minHeight: 64,
+      borderRadius: 14,
+      backgroundColor: D.surface,
+      borderWidth: 1,
+      borderColor: D.borderStrong,
+      marginBottom: 10,
+    },
+    inputTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    textInput: {
+      minHeight: 31,
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      lineHeight: T.lineHeight.body,
+      fontWeight: '600',
+      padding: 0,
+    },
+    dataRow: {
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    dataTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    dataLabel: {
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '500',
+    },
+    dataValue: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.body,
+      lineHeight: T.lineHeight.body,
+      fontWeight: '600',
+      marginTop: 3,
+    },
+    editBlock: {
+      padding: 14,
+    },
+    editActions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    actionButton: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    cancelButton: {
+      backgroundColor: D.surface,
+      borderWidth: 1,
+      borderColor: D.borderStrong,
+    },
+    confirmButton: {
+      backgroundColor: D.primary,
+    },
+    actionText: {
+      color: D.ink,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '600',
+    },
+    confirmText: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
 
-  saveMiniButton: {
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 13,
-    borderRadius: 12,
-    backgroundColor: D.primary,
-  },
-  saveMiniText: {
-    color: '#050708',
-    fontFamily: T.family.medium,
-    fontSize: T.size.secondary,
-    fontWeight: '900',
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  footerSpace: {
-    height: 38,
-  },
-});
+    pendingBox: {
+      marginHorizontal: 14,
+      marginBottom: 14,
+      padding: 12,
+      borderRadius: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: D.primaryLight,
+      borderWidth: 1,
+      borderColor: D.borderFocus,
+    },
+    pendingTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    pendingTitle: {
+      color: D.primary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
+    pendingEmail: {
+      color: D.ink,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      marginTop: 2,
+      fontWeight: '500',
+    },
+    verifyButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.primary,
+    },
+
+    settingsRow: {
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+    },
+    settingsLabel: {
+      flex: 1,
+      color: D.ink2,
+      fontFamily: T.family.regular,
+      fontSize: T.size.secondary,
+      lineHeight: T.lineHeight.secondary,
+      fontWeight: '500',
+    },
+    themeRow: {
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+    },
+    themeToggle: {
+      width: 56,
+      height: 32,
+      borderRadius: 16,
+      padding: 3,
+      justifyContent: 'center',
+      backgroundColor: D.surface,
+      borderWidth: 1,
+      borderColor: D.borderStrong,
+    },
+    themeToggleActive: {
+      backgroundColor: D.primaryLight,
+      borderColor: D.borderFocus,
+    },
+    themeToggleThumb: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: D.card,
+      borderWidth: 1,
+      borderColor: D.borderStrong,
+    },
+    themeToggleThumbActive: {
+      alignSelf: 'flex-end',
+      backgroundColor: D.primary,
+      borderColor: D.primary,
+    },
+    dangerText: {
+      color: D.accent,
+    },
+
+    saveMiniButton: {
+      minHeight: 34,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 13,
+      borderRadius: 12,
+      backgroundColor: D.primary,
+    },
+    saveMiniText: {
+      color: D.onPrimary,
+      fontFamily: T.family.medium,
+      fontSize: T.size.secondary,
+      fontWeight: '700',
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+    footerSpace: {
+      height: 38,
+    },
+  });
+}
