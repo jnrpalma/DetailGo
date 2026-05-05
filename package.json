@@ -16,7 +16,10 @@
     "release:minor": "standard-version --release-as minor",
     "release:major": "standard-version --release-as major",
     "release:patch": "standard-version --release-as patch",
-    "release:dry": "standard-version --dry-run"
+    "release:dry": "standard-version --dry-run",
+    "apk:debug": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -BuildType debug",
+    "apk:release": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -BuildType release",
+    "apk:release:clean": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1 -BuildType release -Clean"
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "^8.4.5",
