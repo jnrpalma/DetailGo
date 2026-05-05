@@ -88,6 +88,9 @@ yarn-error.log
 # Testing
 /coverage
 
+# Generated APKs
+/dist/apk/
+
 # Yarn
 .yarn/*
 !.yarn/patches
