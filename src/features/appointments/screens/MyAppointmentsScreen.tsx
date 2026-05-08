@@ -25,6 +25,12 @@ import { cancelAppointment, getAppointmentRules } from '../services/appointment.
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
+const appointmentSeparatorStyle = { height: 20 };
+
+function AppointmentSeparator() {
+  return <View style={appointmentSeparatorStyle} />;
+}
+
 function getDuration(item: UserAppointment) {
   if (item.durationMin) return `${item.durationMin} min`;
   if (item.endAtMs)
@@ -176,7 +182,7 @@ export default function MyAppointmentsScreen() {
                   onCancel={() => handleCancel(item)}
                 />
               )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              ItemSeparatorComponent={AppointmentSeparator}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={

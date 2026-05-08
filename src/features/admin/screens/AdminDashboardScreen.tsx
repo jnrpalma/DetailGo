@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -51,7 +51,7 @@ import {
 } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-import { colors, spacing, radii, borders } from '@shared/theme';
+import { colors, spacing, radii } from '@shared/theme';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
@@ -80,6 +80,10 @@ type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.
 
 const AVATAR_SIZE = UI.AVATAR_SIZE;
 const MENU_W = UI.MENU_WIDTH;
+
+function AppointmentSeparator() {
+  return <View style={{ height: spacing.md }} />;
+}
 
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<Nav>();
@@ -157,28 +161,31 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const fillMissingNamesAndUpdate = async (list: AdminAppointment[]) => {
-    const updated: AdminAppointment[] = [];
-    await Promise.all(
-      list.map(async it => {
-        if (it.customerName && it.customerName !== 'Cliente') {
-          updated.push(it);
-          return;
-        }
+  const fillMissingNamesAndUpdate = useCallback(
+    async (list: AdminAppointment[]) => {
+      const updated: AdminAppointment[] = [];
+      await Promise.all(
+        list.map(async it => {
+          if (it.customerName && it.customerName !== 'Cliente') {
+            updated.push(it);
+            return;
+          }
 
-        const name = await fetchCustomerName(it.customerUid);
-        if (shopId) {
-          try {
-            await updateDoc(doc(db, 'shops', shopId, 'appointments', it.id), {
-              customerName: name,
-            });
-          } catch {}
-        }
-        updated.push({ ...it, customerName: name });
-      }),
-    );
-    return updated.sort((a, b) => a.startAtMs - b.startAtMs);
-  };
+          const name = await fetchCustomerName(it.customerUid);
+          if (shopId) {
+            try {
+              await updateDoc(doc(db, 'shops', shopId, 'appointments', it.id), {
+                customerName: name,
+              });
+            } catch {}
+          }
+          updated.push({ ...it, customerName: name });
+        }),
+      );
+      return updated.sort((a, b) => a.startAtMs - b.startAtMs);
+    },
+    [db, fetchCustomerName, shopId],
+  );
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -249,7 +256,7 @@ export default function AdminDashboardScreen() {
     );
 
     return () => unsub();
-  }, [db, user?.uid, shopId, weekStartMs, weekEndMs, fetchCustomerName]);
+  }, [db, user?.uid, shopId, weekStartMs, weekEndMs, fillMissingNamesAndUpdate]);
 
   if (!user?.uid) {
     return (
@@ -315,7 +322,7 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const WeekHeaderPremium = () => {
+  const renderWeekHeaderPremium = () => {
     const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
     const startDate = new Date(weekStartMs);
     const endDate = new Date(weekEndMs);
@@ -607,10 +614,10 @@ export default function AdminDashboardScreen() {
                 data={appointmentsWeek}
                 keyExtractor={item => item.id}
                 renderItem={renderAppointment}
-                ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+                ItemSeparatorComponent={AppointmentSeparator}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
-                ListHeaderComponent={<WeekHeaderPremium />}
+                ListHeaderComponent={renderWeekHeaderPremium()}
                 ListEmptyComponent={
                   <View style={styles.emptyState}>
                     <Calendar size={48} color={colors.text.disabled} />

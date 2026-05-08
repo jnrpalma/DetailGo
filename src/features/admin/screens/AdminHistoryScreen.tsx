@@ -66,6 +66,10 @@ const FILTER_OPTIONS: { id: FilterId; label: string }[] = [
   { id: 'cancelled', label: 'Cancelados' },
 ];
 
+function AppointmentSeparator() {
+  return <View style={{ height: spacing.md }} />;
+}
+
 const STATUS_CONFIG: Partial<
   Record<
     AppointmentStatus,
@@ -347,7 +351,7 @@ export default function AdminHistoryScreen() {
               data={displayItems}
               keyExtractor={it => it.id}
               renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+              ItemSeparatorComponent={AppointmentSeparator}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               onEndReachedThreshold={0.4}
