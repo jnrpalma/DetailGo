@@ -88,7 +88,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     );
 
     return unsub;
-  }, [user?.uid]);
+  }, [db, user?.uid]);
 
   useEffect(() => {
     if (!shopId) {
@@ -113,7 +113,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     );
 
     return unsub;
-  }, [shopId]);
+  }, [db, shopId]);
 
   const loading = loadingUser || loadingShop;
   const { isSubscriptionActive, trialDaysLeft } = computeSubscription(shop);

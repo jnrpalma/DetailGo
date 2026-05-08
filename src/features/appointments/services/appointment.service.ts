@@ -7,7 +7,6 @@ import {
 } from '@react-native-firebase/firestore';
 import { getAuth } from '@react-native-firebase/auth';
 import type { AppointmentStatus } from '../domain/appointment.types';
-import { NO_SHOW_GRACE_MS } from '../domain/appointment.constants';
 import { mapFirestoreError } from '@shared/utils/firebase.utils';
 
 export type CancelAppointmentResult =
