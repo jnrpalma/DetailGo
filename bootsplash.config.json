@@ -1,7 +1,7 @@
 {
-  "background": "#050404",
-  "logo": "assets/images/logo@4x.png",
+  "background": "#050606",
+  "logo": "assets/images/logo-splash-native.svg",
   "logoWidth": 120,
   "assetsPath": "assets/bootsplash",
-  "platforms": ["android", "android12"]
+  "platforms": ["android", "android12", "ios"]
 }

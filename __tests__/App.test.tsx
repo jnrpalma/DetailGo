@@ -7,14 +7,27 @@ import ReactTestRenderer from 'react-test-renderer';
 
 jest.mock('@features/auth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({ user: null, initializing: false }),
 }));
 
 jest.mock('@features/shops/context/ShopContext', () => ({
   ShopProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useShop: () => ({ loading: false }),
 }));
 
 jest.mock('@shared/theme', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  darkColors: {
+    accent: '#FF5C39',
+    ink: '#F5F7F8',
+    ink2: '#A8B0B4',
+    primary: '#D4FF3D',
+  },
+  typography: {
+    family: {
+      medium: 'sans-serif-medium',
+    },
+  },
 }));
 
 jest.mock('@react-navigation/native', () => ({
