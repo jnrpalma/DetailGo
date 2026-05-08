@@ -3,6 +3,10 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { colors, spacing, radii } from '@shared/theme';
 
+function OptionSeparator() {
+  return <View style={{ height: spacing.sm }} />;
+}
+
 type Option<T extends string> = { label: string; value: T };
 
 type Props<T extends string> = {
@@ -37,7 +41,7 @@ export default function SelectModal<T extends string>({
           <FlatList
             data={options}
             keyExtractor={it => it.value}
-            ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+            ItemSeparatorComponent={OptionSeparator}
             contentContainerStyle={{ paddingBottom: spacing.lg }}
             renderItem={({ item }) => {
               const selected = item.value === value;

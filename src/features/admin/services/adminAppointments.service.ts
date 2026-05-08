@@ -47,7 +47,6 @@ export async function updateAppointmentStatus(params: {
   const qy = query(userCol, where('appointmentId', '==', appointmentId));
   const snap = await getDocs(qy);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const payload: Record<string, any> = {
     status,
     updatedAt: serverTimestamp(),

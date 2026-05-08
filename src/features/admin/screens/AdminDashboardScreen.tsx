@@ -81,6 +81,10 @@ type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.
 const AVATAR_SIZE = UI.AVATAR_SIZE;
 const MENU_W = UI.MENU_WIDTH;
 
+function AppointmentSeparator() {
+  return <View style={{ height: spacing.md }} />;
+}
+
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<Nav>();
   const auth = getAuth();
@@ -318,7 +322,7 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const WeekHeaderPremium = () => {
+  const renderWeekHeaderPremium = () => {
     const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
     const startDate = new Date(weekStartMs);
     const endDate = new Date(weekEndMs);
@@ -610,10 +614,10 @@ export default function AdminDashboardScreen() {
                 data={appointmentsWeek}
                 keyExtractor={item => item.id}
                 renderItem={renderAppointment}
-                ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+                ItemSeparatorComponent={AppointmentSeparator}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
-                ListHeaderComponent={<WeekHeaderPremium />}
+                ListHeaderComponent={renderWeekHeaderPremium()}
                 ListEmptyComponent={
                   <View style={styles.emptyState}>
                     <Calendar size={48} color={colors.text.disabled} />
