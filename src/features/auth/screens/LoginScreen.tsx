@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -23,6 +25,7 @@ import { useAppTheme, type AppColors } from '@shared/theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const HERO_H = Math.round(SCREEN_H * 0.48);
+const BADGE_LABELS = ['Agendamentos', 'Serviços', 'Gestão', 'Clientes'];
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -37,10 +40,75 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
+  const [badgeIndex, setBadgeIndex] = useState(0);
+  const badgeOpacity = useRef(new Animated.Value(1)).current;
+  const badgeTranslateY = useRef(new Animated.Value(0)).current;
+  const badgeDotScale = useRef(new Animated.Value(1)).current;
 
   const isValidEmail = email.includes('@') && email.includes('.');
   const isValidPassword = password.length >= 6;
   const isValid = isValidEmail && isValidPassword;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(badgeDotScale, {
+          toValue: 1.45,
+          duration: 760,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgeDotScale, {
+          toValue: 1,
+          duration: 760,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    pulse.start();
+
+    const interval = setInterval(() => {
+      Animated.parallel([
+        Animated.timing(badgeOpacity, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgeTranslateY, {
+          toValue: -8,
+          duration: 180,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setBadgeIndex(current => (current + 1) % BADGE_LABELS.length);
+        badgeTranslateY.setValue(8);
+
+        Animated.parallel([
+          Animated.timing(badgeOpacity, {
+            toValue: 1,
+            duration: 260,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(badgeTranslateY, {
+            toValue: 0,
+            duration: 260,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }, 1800);
+
+    return () => {
+      clearInterval(interval);
+      pulse.stop();
+    };
+  }, [badgeDotScale, badgeOpacity, badgeTranslateY]);
 
   const handleLogin = async () => {
     if (!isValid) return;
@@ -95,8 +163,18 @@ export default function LoginScreen() {
 
           <View style={styles.heroContent}>
             <View style={styles.badge}>
-              <View style={styles.badgeDot} />
-              <Text style={styles.badgeText}>Estética automotiva</Text>
+              <Animated.View style={[styles.badgeDot, { transform: [{ scale: badgeDotScale }] }]} />
+              <Animated.Text
+                style={[
+                  styles.badgeText,
+                  {
+                    opacity: badgeOpacity,
+                    transform: [{ translateY: badgeTranslateY }],
+                  },
+                ]}
+              >
+                {BADGE_LABELS[badgeIndex]}
+              </Animated.Text>
             </View>
 
             <Text style={styles.heroTitle}>
@@ -265,12 +343,14 @@ function createStyles(D: AppColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      width: 176,
+      height: 34,
       paddingHorizontal: 16,
-      paddingVertical: 7,
       borderRadius: 999,
       backgroundColor: D.primaryLight,
       alignSelf: 'flex-start',
       marginBottom: 26,
+      overflow: 'hidden',
     },
     badgeDot: {
       width: 6,
@@ -283,6 +363,7 @@ function createStyles(D: AppColors) {
       fontWeight: '800',
       color: D.primary,
       letterSpacing: 0.8,
+      lineHeight: 18,
     },
     heroTitle: {
       fontSize: 70,
