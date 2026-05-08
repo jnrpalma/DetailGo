@@ -29,13 +29,27 @@ jest.mock('../src/navigation/RootNavigator', () => () => null);
 
 import App from '../App';
 
-test('renders correctly', async () => {
+beforeEach(() => {
   jest.useFakeTimers();
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+});
+
+test('renders correctly', async () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer;
 
   await ReactTestRenderer.act(async () => {
-    ReactTestRenderer.create(<App />);
-    jest.runAllTimers();
+    renderer = ReactTestRenderer.create(<App />);
   });
 
-  jest.useRealTimers();
+  await ReactTestRenderer.act(async () => {
+    jest.advanceTimersByTime(2000);
+    await Promise.resolve();
+  });
+
+  await ReactTestRenderer.act(async () => {
+    renderer.unmount();
+  });
 });
