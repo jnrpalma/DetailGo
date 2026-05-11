@@ -102,20 +102,13 @@ export default function AdminDrawer({ visible, slideAnim, onClose }: Props) {
             label="Gerenciar loja"
             onPress={() => navigate('AdminManage')}
           />
-
-          <View style={styles.drawerDivider} />
-
-          <DrawerItem
-            icon={<User size={18} color={D.ink2} />}
-            label="Perfil do proprietário"
-            sublabel={email}
-          />
+          <DrawerItem icon={<User size={18} color={D.primary} />} label="Perfil" />
 
           <View style={styles.drawerDivider} />
 
           <DrawerItem
             icon={<LogOut size={18} color={D.accent} />}
-            label="Sair da conta"
+            label="Sair"
             onPress={handleSignOut}
             danger
           />
@@ -125,17 +118,15 @@ export default function AdminDrawer({ visible, slideAnim, onClose }: Props) {
   );
 }
 
-// ── Item do drawer ────────────────────────────────────────────
+// ── Item do drawer — igual ao cliente ────────────────────────
 function DrawerItem({
   icon,
   label,
-  sublabel,
   onPress,
   danger,
 }: {
   icon: React.ReactNode;
   label: string;
-  sublabel?: string;
   onPress?: () => void;
   danger?: boolean;
 }) {
@@ -147,10 +138,7 @@ function DrawerItem({
       disabled={!onPress}
     >
       {icon}
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.drawerItemText, danger && styles.drawerItemDanger]}>{label}</Text>
-        {sublabel ? <Text style={styles.drawerItemSublabel}>{sublabel}</Text> : null}
-      </View>
+      <Text style={[styles.drawerItemText, danger && styles.drawerItemDanger]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -206,7 +194,7 @@ const styles = StyleSheet.create({
   },
   shopBadgeText: { fontSize: 11, fontWeight: '700', color: D.primary },
 
-  // Menu
+  // Menu — idêntico ao drawer do cliente
   drawerMenu: { paddingTop: 8, flex: 1 },
   drawerItem: {
     flexDirection: 'row',
@@ -216,12 +204,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   drawerItemText: { fontSize: 15, fontWeight: '500', color: D.ink },
-  drawerItemSublabel: { fontSize: 11, color: D.ink3, marginTop: 1 },
   drawerItemDanger: { color: D.accent },
   drawerDivider: {
     height: 1,
     backgroundColor: D.border,
-    marginVertical: 4,
-    marginHorizontal: 20,
+    marginVertical: 8,
   },
 });
