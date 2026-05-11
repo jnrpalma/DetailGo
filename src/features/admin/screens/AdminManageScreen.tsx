@@ -27,8 +27,10 @@ import {
   ChevronDown,
   Pencil,
   Trash2,
+  LogOut,
 } from 'lucide-react-native';
 
+import { getAuth } from '@react-native-firebase/auth';
 import { colors, spacing, radii } from '@shared/theme';
 import { formatUtils } from '@shared/utils/format.utils';
 import {
@@ -78,6 +80,24 @@ function parseLines(value: string): string[] {
 export default function AdminManageScreen() {
   const navigation = useNavigation();
   const { shopId, shop } = useShop();
+  const auth = getAuth();
+
+  const handleSignOut = async () => {
+    Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await auth.signOut();
+          } catch {
+            Alert.alert('Erro', 'Falha ao sair da conta.');
+          }
+        },
+      },
+    ]);
+  };
 
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -756,6 +776,12 @@ export default function AdminManageScreen() {
             )}
           </View>
 
+          {/* ── Sair ── */}
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
+            <LogOut size={18} color={colors.status.error} />
+            <Text style={styles.signOutText}>Sair da conta</Text>
+          </TouchableOpacity>
+
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       </SafeAreaView>
@@ -1140,5 +1166,21 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: colors.text.white,
+  },
+  signOutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    height: 52,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.status.error,
+    backgroundColor: colors.background.card,
+  },
+  signOutText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.status.error,
   },
 });

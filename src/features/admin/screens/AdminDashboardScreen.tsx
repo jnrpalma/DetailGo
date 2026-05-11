@@ -2,10 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   FlatList,
-  Image,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,13 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LinearGradient from 'react-native-linear-gradient';
-
-import {
-  launchImageLibrary,
-  type ImageLibraryOptions,
-  type Asset,
-} from 'react-native-image-picker';
 import { getAuth } from '@react-native-firebase/auth';
 import {
   collection,
@@ -32,57 +22,57 @@ import {
   query,
   updateDoc,
   where,
-  setDoc,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
-
-import {
-  User as UserIcon,
-  History,
-  LogOut,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  PlayCircle,
-  Settings,
-} from 'lucide-react-native';
+import { History, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
 
 import type { RootStackParamList } from '@app/types';
-import { colors, spacing, radii } from '@shared/theme';
+import { darkColors, spacing, radii } from '@shared/theme';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
-import { UI } from '@shared/constants/app.constants';
 
 import { updateAppointmentStatus } from '@features/admin';
 import { useShop } from '@features/shops';
-import { NO_SHOW_GRACE_MS, getAppointmentStatusConfig } from '@features/appointments';
+import { NO_SHOW_GRACE_MS } from '@features/appointments';
 import type { AppointmentStatus } from '@features/appointments';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
 import { normalizeAdminAppointmentFromGlobal } from '../data/adminAppointment.normalizers';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-type UserProfile = {
-  firstName?: string;
-  lastName?: string;
-
-  photoURL?: string;
-
-  photoB64?: string;
-  role?: 'owner' | 'customer';
-};
-
 type QDoc = FirebaseFirestoreTypes.QueryDocumentSnapshot<FirebaseFirestoreTypes.DocumentData>;
 
-const AVATAR_SIZE = UI.AVATAR_SIZE;
-const MENU_W = UI.MENU_WIDTH;
+const WEEK_DAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+
+// Sunday-start week helpers (matches design: DOM → SAB)
+function weekStartSun(anchor: Date): number {
+  const d = new Date(anchor);
+  d.setDate(d.getDate() - d.getDay());
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function weekEndSun(anchor: Date): number {
+  const d = new Date(weekStartSun(anchor));
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+function isSameWeekSun(a: Date, b: Date): boolean {
+  return weekStartSun(a) === weekStartSun(b);
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear()
+  );
+}
 
 function AppointmentSeparator() {
-  return <View style={{ height: spacing.md }} />;
+  return <View style={{ height: spacing.sm }} />;
 }
 
 export default function AdminDashboardScreen() {
@@ -90,76 +80,31 @@ export default function AdminDashboardScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
   const db = getFirestore();
-  const { shopId } = useShop();
-
-  const [profile, setProfile] = useState<UserProfile>({});
-  const [saving, setSaving] = useState<'cover' | 'avatar' | null>(null);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-MENU_W)).current;
+  const { shopId, shop } = useShop();
 
   const [appointmentsWeek, setAppointmentsWeek] = useState<AdminAppointment[]>([]);
+  const [doneThisWeek, setDoneThisWeek] = useState<AdminAppointment[]>([]);
+  const [donePrevWeekCount, setDonePrevWeekCount] = useState(0);
   const [loadingWeek, setLoadingWeek] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const noShowMarkedRef = useRef<Set<string>>(new Set());
 
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
 
-  const weekStartMs = useMemo(() => dateUtils.startOfWeek(weekAnchor), [weekAnchor]);
-  const weekEndMs = useMemo(() => dateUtils.endOfWeek(weekAnchor), [weekAnchor]);
+  const weekStartMs = useMemo(() => weekStartSun(weekAnchor), [weekAnchor]);
+  const weekEndMs = useMemo(() => weekEndSun(weekAnchor), [weekAnchor]);
+  const isCurrentWeek = useMemo(() => isSameWeekSun(weekAnchor, new Date()), [weekAnchor]);
 
   const { fetchCustomerName } = useCustomerName();
 
-  const toggleMenu = () => {
-    if (menuVisible) {
-      Animated.timing(slideAnim, {
-        toValue: -MENU_W,
-        duration: UI.DRAWER_ANIMATION_DURATION,
-        useNativeDriver: true,
-      }).start(() => setMenuVisible(false));
+  useEffect(() => {
+    if (isCurrentWeek) {
+      setSelectedDay(new Date());
     } else {
-      setMenuVisible(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: UI.DRAWER_ANIMATION_DURATION,
-        useNativeDriver: true,
-      }).start();
+      setSelectedDay(new Date(weekStartMs));
     }
-  };
-
-  const pickAsBase64 = async () => {
-    const opts: ImageLibraryOptions = {
-      mediaType: 'photo',
-      selectionLimit: 1,
-      includeBase64: true,
-      quality: 0.6,
-      maxWidth: 640,
-      maxHeight: 640,
-    };
-
-    const res = await launchImageLibrary(opts);
-    if (res.didCancel) return null;
-
-    const a: Asset | undefined = res.assets?.[0];
-    if (!a?.base64) return null;
-
-    const mime = a.type?.startsWith('image/') ? a.type : 'image/jpeg';
-    return `data:${mime};base64,${a.base64}`;
-  };
-
-  const saveAvatar = async () => {
-    try {
-      const b64 = await pickAsBase64();
-      if (!b64) return;
-
-      setSaving('avatar');
-      await setDoc(doc(getFirestore(), 'users', user!.uid), { photoB64: b64 }, { merge: true });
-      setProfile(p => ({ ...p, photoB64: b64 }));
-    } catch (e: any) {
-      Alert.alert('Erro', `Falha ao salvar a foto de perfil.\n${e?.code ?? ''}`);
-    } finally {
-      setSaving(null);
-    }
-  };
+  }, [isCurrentWeek, weekStartMs]);
 
   const fillMissingNamesAndUpdate = useCallback(
     async (list: AdminAppointment[]) => {
@@ -170,7 +115,6 @@ export default function AdminDashboardScreen() {
             updated.push(it);
             return;
           }
-
           const name = await fetchCustomerName(it.customerUid);
           if (shopId) {
             try {
@@ -187,27 +131,12 @@ export default function AdminDashboardScreen() {
     [db, fetchCustomerName, shopId],
   );
 
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const unsubProfile = onSnapshot(
-      doc(db, 'users', user.uid),
-      snap => {
-        const data = snap.data() as UserProfile | undefined;
-        if (data) setProfile(data);
-      },
-      () => {},
-    );
-
-    return () => unsubProfile();
-  }, [db, user?.uid]);
-
+  // Active appointments (scheduled + in_progress) for the week → agenda list
   useEffect(() => {
     if (!user?.uid || !shopId) return;
-
     setLoadingWeek(true);
 
-    const qyWeek = query(
+    const q = query(
       collection(db, 'shops', shopId, 'appointments'),
       where('status', 'in', ['scheduled', 'in_progress']),
       where('startAtMs', '>=', weekStartMs),
@@ -216,7 +145,7 @@ export default function AdminDashboardScreen() {
     );
 
     const unsub = onSnapshot(
-      qyWeek,
+      q,
       async snap => {
         const base = snap.docs
           .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
@@ -258,34 +187,106 @@ export default function AdminDashboardScreen() {
     return () => unsub();
   }, [db, user?.uid, shopId, weekStartMs, weekEndMs, fillMissingNamesAndUpdate]);
 
+  // Done appointments for KPI stats
+  useEffect(() => {
+    if (!shopId) return;
+
+    const q = query(
+      collection(db, 'shops', shopId, 'appointments'),
+      where('status', '==', 'done'),
+      where('startAtMs', '>=', weekStartMs),
+      where('startAtMs', '<=', weekEndMs),
+      orderBy('startAtMs', 'asc'),
+    );
+
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const list = snap.docs
+          .map((d: QDoc) => normalizeAdminAppointmentFromGlobal(d))
+          .filter(Boolean) as AdminAppointment[];
+        setDoneThisWeek(list);
+      },
+      () => {},
+    );
+
+    return () => unsub();
+  }, [db, shopId, weekStartMs, weekEndMs]);
+
+  // Previous week done count for delta comparison
+  useEffect(() => {
+    if (!shopId) return;
+
+    const ms7d = 7 * 24 * 60 * 60 * 1000;
+    const prevStart = weekStartMs - ms7d;
+    const prevEnd = weekEndMs - ms7d;
+
+    const q = query(
+      collection(db, 'shops', shopId, 'appointments'),
+      where('status', '==', 'done'),
+      where('startAtMs', '>=', prevStart),
+      where('startAtMs', '<=', prevEnd),
+      orderBy('startAtMs', 'asc'),
+    );
+
+    const unsub = onSnapshot(
+      q,
+      snap => setDonePrevWeekCount(snap.size),
+      () => {},
+    );
+
+    return () => unsub();
+  }, [db, shopId, weekStartMs, weekEndMs]);
+
+  // KPI computations
+  const weekServicesCount = doneThisWeek.length;
+  const deltaVsPrev = weekServicesCount - donePrevWeekCount;
+  const avgTicket = useMemo(() => {
+    if (doneThisWeek.length === 0) return 0;
+    return doneThisWeek.reduce((s, a) => s + (a.price ?? 0), 0) / doneThisWeek.length;
+  }, [doneThisWeek]);
+
+  // Appointments filtered to selected day
+  const agendaList = useMemo(
+    () => appointmentsWeek.filter(item => isSameDay(new Date(item.startAtMs), selectedDay)),
+    [appointmentsWeek, selectedDay],
+  );
+
+  // Per-day appointment count for day strip
+  const countPerDay = useMemo(() => {
+    const sunDate = new Date(weekStartMs);
+    return WEEK_DAYS.map((_, i) => {
+      const dayDate = dateUtils.addDays(sunDate, i);
+      return appointmentsWeek.filter(item => isSameDay(new Date(item.startAtMs), dayDate)).length;
+    });
+  }, [appointmentsWeek, weekStartMs]);
+
   if (!user?.uid) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.main} />
-        </View>
+        <ActivityIndicator size="large" color={darkColors.primary} style={{ flex: 1 }} />
       </SafeAreaView>
     );
   }
 
-  const avatarSource = profile.photoB64
-    ? { uri: profile.photoB64 }
-    : profile.photoURL
-    ? { uri: profile.photoURL }
-    : user.photoURL
-    ? { uri: user.photoURL }
-    : undefined;
+  const shopName = shop?.name?.toUpperCase() ?? '';
+  const today = new Date();
+  const isSelectedToday = isSameDay(selectedDay, today);
+  const headerTitle = isSelectedToday
+    ? `Hoje, ${WEEK_DAYS[selectedDay.getDay()]} ${selectedDay.getDate()}`
+    : `${WEEK_DAYS[selectedDay.getDay()]}, ${selectedDay.getDate()}`;
 
-  const fullName = profile.firstName
-    ? `${profile.firstName} ${profile.lastName ?? ''}`
-    : user.displayName ?? 'Administrador';
-
-  const alertCannotWork = () => {
-    Alert.alert(
-      'Serviço não realizado',
-      'Já passaram 15 minutos do horário marcado.\nEsse agendamento é considerado NÃO REALIZADO e não pode mais ser iniciado/concluído.',
-    );
-  };
+  const weekStart = new Date(weekStartMs);
+  const weekEnd = new Date(weekEndMs);
+  const mStart = weekStart
+    .toLocaleString('pt-BR', { month: 'short' })
+    .replace('.', '')
+    .toUpperCase();
+  const mEnd = weekEnd.toLocaleString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase();
+  const periodText =
+    mStart === mEnd
+      ? `${weekStart.getDate()} – ${weekEnd.getDate()} ${mStart}`
+      : `${weekStart.getDate()} ${mStart} — ${weekEnd.getDate()} ${mEnd}`;
 
   const doUpdate = async (item: AdminAppointment, next: AppointmentStatus) => {
     if (updatingId || !shopId) return;
@@ -298,7 +299,6 @@ export default function AdminDashboardScreen() {
         status: next,
       });
     } catch (e: any) {
-      console.error(e);
       Alert.alert(
         'Erro',
         e?.code === 'APPOINTMENT_EXPIRED' ? 'Agendamento expirado.' : 'Não foi possível atualizar.',
@@ -308,384 +308,197 @@ export default function AdminDashboardScreen() {
     }
   };
 
-  const navigateFromMenu = (route: keyof RootStackParamList) => {
-    toggleMenu();
-    navigation.navigate(route);
-  };
+  const renderAppointment = ({ item }: { item: AdminAppointment }) => {
+    const vehicle =
+      item.vehicleType === 'Carro' && item.carCategory ? item.carCategory : item.vehicleType;
 
-  const handleSignOut = async () => {
-    try {
-      toggleMenu();
-      await auth.signOut();
-    } catch {
-      Alert.alert('Erro', 'Falha ao sair da conta');
-    }
-  };
+    const expired = dateUtils.isExpired(item.startAtMs, NO_SHOW_GRACE_MS);
+    const isInProgress = item.status === 'in_progress';
+    const isActive = isInProgress && !expired;
+    const durationMin = item.endAtMs ? Math.round((item.endAtMs - item.startAtMs) / 60000) : null;
 
-  const renderWeekHeaderPremium = () => {
-    const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
-    const startDate = new Date(weekStartMs);
-    const endDate = new Date(weekEndMs);
-
-    const startDay = startDate.getDate();
-    const endDay = endDate.getDate();
-
-    const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
-    const endMonth = endDate.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
-    const startYear = startDate.getFullYear();
-    const endYear = endDate.getFullYear();
-
-    let periodText = '';
-    if (startMonth === endMonth && startYear === endYear) {
-      periodText = `${startDay}–${endDay} ${startMonth} ${startYear}`;
-    } else if (startYear === endYear) {
-      periodText = `${startDay} ${startMonth} – ${endDay} ${endMonth} ${startYear}`;
-    } else {
-      periodText = `${startDay} ${startMonth} ${startYear} – ${endDay} ${endMonth} ${endYear}`;
-    }
-
-    const totalAppointments = appointmentsWeek.length;
+    const onPress = () => {
+      if (expired && item.status === 'scheduled') {
+        Alert.alert(
+          'Serviço não realizado',
+          'Já passaram 15 minutos do horário. Agendamento considerado NÃO REALIZADO.',
+        );
+        return;
+      }
+      if (item.status === 'scheduled') doUpdate(item, 'in_progress');
+      else if (item.status === 'in_progress') doUpdate(item, 'done');
+    };
 
     return (
-      <View style={styles.premiumContainer}>
-        <View style={styles.premiumHeader}>
-          <View style={styles.premiumTitleContainer}>
-            <Text style={styles.premiumSubtitle}>AGENDAMENTOS</Text>
-            <Text style={styles.premiumTitle}>{periodText}</Text>
+      <View style={styles.agendaRow}>
+        <View style={styles.agendaTimeCol}>
+          <Text style={styles.agendaHour}>{dateUtils.formatHour(item.startAtMs)}</Text>
+          {durationMin !== null && <Text style={styles.agendaDuration}>{durationMin}m</Text>}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.agendaCard, isActive && styles.agendaCardActive]}
+          onPress={onPress}
+          activeOpacity={0.75}
+          disabled={!!updatingId}
+        >
+          <View style={styles.agendaCardContent}>
+            <Text style={styles.agendaService} numberOfLines={1}>
+              {item.serviceLabel ?? 'Serviço'}
+            </Text>
+            <Text style={styles.agendaClient} numberOfLines={1}>
+              {item.customerName} · {vehicle}
+            </Text>
           </View>
-          <View style={styles.premiumCount}>
-            <Text style={styles.premiumCountText}>{totalAppointments}</Text>
-            <Text style={styles.premiumCountLabel}>agend.</Text>
+
+          {updatingId === item.id ? (
+            <ActivityIndicator size="small" color={darkColors.primary} />
+          ) : (
+            isActive && <View style={styles.agendaDot} />
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const ListHeader = (
+    <>
+      {/* ── Header ─────────────────────────────── */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerMeta}>ADMIN{shopName ? ` · ${shopName}` : ''}</Text>
+          <Text style={styles.headerTitle}>{headerTitle}</Text>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('AdminHistory')}
+            activeOpacity={0.7}
+          >
+            <History size={20} color={darkColors.ink2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('AdminManage')}
+            activeOpacity={0.7}
+          >
+            <SlidersHorizontal size={20} color={darkColors.ink2} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── KPI Cards ──────────────────────────── */}
+      <View style={styles.kpiRow}>
+        <View style={[styles.kpiCard, { flex: 1.1 }]}>
+          <Text style={styles.kpiLabel}>SERVIÇOS · SEMANA</Text>
+          <View style={styles.kpiValueRow}>
+            <Text style={styles.kpiNumber}>{weekServicesCount}</Text>
+            <Text style={styles.kpiUnit}> realizados</Text>
+          </View>
+          {deltaVsPrev !== 0 && (
+            <Text
+              style={[
+                styles.kpiDelta,
+                { color: deltaVsPrev > 0 ? darkColors.primary : darkColors.status.error },
+              ]}
+            >
+              {deltaVsPrev > 0 ? '▲' : '▼'} {deltaVsPrev > 0 ? '+' : ''}
+              {deltaVsPrev} vs semana passada
+            </Text>
+          )}
+        </View>
+
+        <View style={[styles.kpiCard, { flex: 1 }]}>
+          <Text style={styles.kpiLabel}>TICKET MÉDIO</Text>
+          <Text style={styles.kpiAvg}>{formatUtils.currency(avgTicket)}</Text>
+          <Text style={styles.kpiSub}>últimos 7 dias</Text>
+        </View>
+      </View>
+
+      {/* ── Week Strip ─────────────────────────── */}
+      <View style={styles.weekStrip}>
+        <View style={styles.weekNav}>
+          <Text style={styles.weekPeriod}>{periodText}</Text>
+          <View style={styles.weekNavBtns}>
+            <TouchableOpacity
+              style={styles.weekNavBtn}
+              onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
+              activeOpacity={0.7}
+            >
+              <ChevronLeft size={16} color={darkColors.ink2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.weekNavBtn}
+              onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
+              activeOpacity={0.7}
+            >
+              <ChevronRight size={16} color={darkColors.ink2} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.premiumNav}>
-          <TouchableOpacity
-            style={styles.premiumNavButton}
-            onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, -7))}
-            activeOpacity={0.7}
-          >
-            <ChevronLeft size={16} color={colors.primary.main} />
-            <Text style={styles.premiumNavText}>Anterior</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.premiumNavToday}
-            onPress={() => setWeekAnchor(new Date())}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.premiumNavTodayText}>Hoje</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.premiumNavButton}
-            onPress={() => setWeekAnchor(prev => dateUtils.addDays(prev, 7))}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.premiumNavText}>Próxima</Text>
-            <ChevronRight size={16} color={colors.primary.main} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.premiumProgress}>
-          <View
-            style={[styles.premiumProgressBar, { width: `${(new Date().getDay() / 6) * 100}%` }]}
-          />
-        </View>
-
-        <View style={styles.premiumDays}>
-          {weekDays.map((day, index) => {
-            const dayDate = dateUtils.addDays(startDate, index);
-            const dayNumber = dayDate.getDate();
-            const isToday = dateUtils.isCurrentWeek(weekAnchor) && dateUtils.isToday(dayDate);
-
-            const dayAppointments = appointmentsWeek.filter(item => {
-              const itemDate = new Date(item.startAtMs);
-              return (
-                itemDate.getDate() === dayNumber &&
-                itemDate.getMonth() === dayDate.getMonth() &&
-                itemDate.getFullYear() === dayDate.getFullYear()
-              );
-            }).length;
+        <View style={styles.weekDays}>
+          {WEEK_DAYS.map((day, i) => {
+            const dayDate = dateUtils.addDays(weekStart, i);
+            const isSelected = isSameDay(dayDate, selectedDay);
+            const count = countPerDay[i];
 
             return (
               <TouchableOpacity
                 key={day}
-                style={[styles.premiumDay, isToday && styles.premiumDayToday]}
+                style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+                onPress={() => setSelectedDay(new Date(dayDate))}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.premiumDayName, isToday && styles.premiumDayTextToday]}>
-                  {day}
+                <Text style={[styles.dayName, isSelected && styles.dayTextSelected]}>{day}</Text>
+                <Text style={[styles.dayNumber, isSelected && styles.dayTextSelected]}>
+                  {dayDate.getDate()}
                 </Text>
-                <Text style={[styles.premiumDayNumber, isToday && styles.premiumDayTextToday]}>
-                  {dayNumber}
+                <Text
+                  style={[
+                    styles.dayCount,
+                    isSelected && styles.dayCountSelected,
+                    count === 0 && styles.dayCountZero,
+                  ]}
+                >
+                  {count}
                 </Text>
-                <View
-                  style={[styles.premiumDayDot, dayAppointments > 0 && styles.premiumDayDotActive]}
-                />
               </TouchableOpacity>
             );
           })}
         </View>
       </View>
-    );
-  };
 
-  const renderAppointment = ({ item }: { item: AdminAppointment }) => {
-    const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory
-        ? `Carro • ${item.carCategory}`
-        : item.vehicleType;
-
-    const expired = dateUtils.isExpired(item.startAtMs, NO_SHOW_GRACE_MS);
-    const isNoShow = item.status === 'scheduled' && expired;
-    const displayStatus: AppointmentStatus = isNoShow ? 'no_show' : item.status;
-
-    const statusConfig = getAppointmentStatusConfig(displayStatus);
-
-    const getStatusIcon = () => {
-      switch (displayStatus) {
-        case 'done':
-          return CheckCircle2;
-        case 'in_progress':
-          return Clock;
-        case 'no_show':
-          return XCircle;
-        default:
-          return Calendar;
-      }
-    };
-
-    const StatusIcon = getStatusIcon();
-
-    const action =
-      displayStatus === 'scheduled' && !isNoShow
-        ? {
-            label: 'Começar',
-            icon: PlayCircle,
-            next: 'in_progress' as AppointmentStatus,
-            color: colors.status.warning,
-          }
-        : displayStatus === 'in_progress'
-        ? {
-            label: 'Concluir',
-            icon: CheckCircle2,
-            next: 'done' as AppointmentStatus,
-            color: colors.status.success,
-          }
-        : null;
-
-    const canPress = !isNoShow && updatingId !== item.id;
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.serviceName} numberOfLines={2}>
-              {item.serviceLabel ?? 'Serviço'}
-            </Text>
-            <View style={[styles.statusBadge, { backgroundColor: `${statusConfig.color}20` }]}>
-              <StatusIcon size={14} color={statusConfig.color} />
-              <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                {statusConfig.label}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.clientName} numberOfLines={1}>
-            👤 {item.customerName}
-          </Text>
-
-          <View style={styles.detailsRow}>
-            <View style={styles.detailItem}>
-              <Calendar size={14} color={colors.text.tertiary} />
-              <Text style={styles.detailText}>{dateUtils.formatDate(item.startAtMs)}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Clock size={14} color={colors.text.tertiary} />
-              <Text style={styles.detailText}>{dateUtils.formatHour(item.startAtMs)}</Text>
-            </View>
-          </View>
-
-          <View style={styles.vehicleBadge}>
-            <Text style={styles.vehicleText}>{subtitle}</Text>
-          </View>
-
-          <View style={styles.cardFooter}>
-            <Text style={styles.price}>{formatUtils.currency(item.price)}</Text>
-            {action && (
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  { backgroundColor: action.color },
-                  (!canPress || isNoShow) && styles.actionButtonDisabled,
-                ]}
-                onPress={() => (isNoShow ? alertCannotWork() : doUpdate(item, action.next))}
-                disabled={!canPress || isNoShow}
-                activeOpacity={0.7}
-              >
-                {updatingId === item.id ? (
-                  <ActivityIndicator size="small" color={colors.text.white} />
-                ) : (
-                  <>
-                    <action.icon size={16} color={colors.text.white} />
-                    <Text style={styles.actionButtonText}>{action.label}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
-    );
-  };
+      {/* ── Section label ──────────────────────── */}
+      <Text style={styles.sectionLabel}>AGENDA · DA SEMANA</Text>
+    </>
+  );
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary.main} />
+      <StatusBar barStyle="light-content" backgroundColor={darkColors.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        <View style={styles.container}>
-          <LinearGradient
-            colors={[colors.primary.main, colors.secondary.main]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
-            <View style={styles.headerTop}>
-              <TouchableOpacity onPress={toggleMenu} style={styles.menuButton} activeOpacity={0.7}>
-                <View style={styles.menuIcon}>
-                  <View style={styles.menuBar} />
-                  <View style={[styles.menuBar, { width: 20 }]} />
-                  <View style={[styles.menuBar, { width: 16 }]} />
-                </View>
-              </TouchableOpacity>
-
-              <Text style={styles.brand}>DETAILGO</Text>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('AdminHistory')}
-                style={styles.notificationButton}
-                activeOpacity={0.7}
-              >
-                <History size={22} color={colors.text.white} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.profileSection}>
-              <TouchableOpacity
-                onPress={saveAvatar}
-                style={styles.avatarWrapper}
-                activeOpacity={0.9}
-              >
-                {avatarSource ? (
-                  <Image source={avatarSource} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <UserIcon size={40} color={colors.primary.main} />
-                  </View>
-                )}
-                {saving === 'avatar' && (
-                  <View style={styles.avatarLoading}>
-                    <ActivityIndicator color={colors.primary.main} />
-                  </View>
-                )}
-                <View style={styles.cameraBadge}>
-                  <Text style={styles.cameraBadgeText}>📷</Text>
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{fullName}</Text>
-                <Text style={styles.userEmail}>{user.email}</Text>
-                <View style={styles.adminBadge}>
-                  <Text style={styles.adminBadgeText}>Proprietário</Text>
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
-
-          <View style={styles.content}>
-            {loadingWeek ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary.main} />
+        <FlatList
+          data={agendaList}
+          keyExtractor={item => item.id}
+          renderItem={renderAppointment}
+          ItemSeparatorComponent={AppointmentSeparator}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={
+            loadingWeek ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={darkColors.primary} />
               </View>
             ) : (
-              <FlatList
-                data={appointmentsWeek}
-                keyExtractor={item => item.id}
-                renderItem={renderAppointment}
-                ItemSeparatorComponent={AppointmentSeparator}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                ListHeaderComponent={renderWeekHeaderPremium()}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Calendar size={48} color={colors.text.disabled} />
-                    <Text style={styles.emptyStateTitle}>Nenhum agendamento</Text>
-                    <Text style={styles.emptyStateText}>
-                      Não há serviços agendados para esta semana.
-                    </Text>
-                  </View>
-                }
-              />
-            )}
-          </View>
-        </View>
-
-        {menuVisible && (
-          <>
-            <Pressable style={styles.overlay} onPress={toggleMenu} />
-            <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
-              <View style={styles.drawerHeader}>
-                <View style={styles.drawerUserInfo}>
-                  <Text style={styles.drawerUserName}>{fullName}</Text>
-                  <Text style={styles.drawerUserEmail}>{user.email}</Text>
-                  {profile.role === 'owner' && (
-                    <View style={styles.drawerAdminBadge}>
-                      <Text style={styles.drawerAdminBadgeText}>Proprietário</Text>
-                    </View>
-                  )}
-                </View>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Sem agendamentos</Text>
+                <Text style={styles.emptyText}>Nenhum serviço para este dia.</Text>
               </View>
-
-              <View style={styles.drawerContent}>
-                <TouchableOpacity
-                  style={styles.drawerItem}
-                  onPress={() => navigateFromMenu('AdminDashboard')}
-                >
-                  <Calendar size={22} color={colors.primary.main} />
-                  <Text style={styles.drawerItemText}>Dashboard</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.drawerItem}
-                  onPress={() => navigateFromMenu('AdminHistory')}
-                >
-                  <History size={22} color={colors.primary.main} />
-                  <Text style={styles.drawerItemText}>Histórico</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.drawerItem}
-                  onPress={() => navigateFromMenu('AdminManage')}
-                >
-                  <Settings size={22} color={colors.primary.main} />
-                  <Text style={styles.drawerItemText}>Gerenciar</Text>
-                </TouchableOpacity>
-
-                <View style={styles.drawerDivider} />
-
-                <TouchableOpacity
-                  style={[styles.drawerItem, styles.drawerLogout]}
-                  onPress={handleSignOut}
-                >
-                  <LogOut size={22} color={colors.status.error} />
-                  <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Sair</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </>
-        )}
+            )
+          }
+        />
       </SafeAreaView>
     </>
   );
@@ -694,486 +507,274 @@ export default function AdminDashboardScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: colors.background.main,
-  },
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 32,
-    borderBottomLeftRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  menuButton: {
-    padding: spacing.xs,
-  },
-  menuIcon: {
-    width: 24,
-    height: 20,
-    justifyContent: 'space-between',
-  },
-  menuBar: {
-    height: 2,
-    width: 24,
-    backgroundColor: colors.text.white,
-    borderRadius: 2,
-  },
-  brand: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text.white,
-    letterSpacing: 1.5,
-  },
-  notificationButton: {
-    padding: spacing.xs,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  avatarWrapper: {
-    position: 'relative',
-  },
-  avatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    borderWidth: 3,
-    borderColor: colors.text.white,
-  },
-  avatarPlaceholder: {
-    backgroundColor: colors.text.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary.main,
-    borderWidth: 2,
-    borderColor: colors.text.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraBadgeText: {
-    fontSize: 14,
-    color: colors.text.white,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.white,
-    marginBottom: 2,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 4,
-  },
-  adminBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    alignSelf: 'flex-start',
-  },
-  adminBadgeText: {
-    color: colors.text.white,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    backgroundColor: darkColors.bg,
   },
   listContent: {
-    paddingBottom: spacing.xl,
-    paddingTop: spacing.xs,
+    paddingBottom: 40,
   },
-  premiumContainer: {
-    backgroundColor: colors.background.card,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  premiumHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  premiumTitleContainer: {
-    flex: 1,
-  },
-  premiumSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.text.tertiary,
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  premiumTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  premiumCount: {
-    alignItems: 'flex-end',
-    marginLeft: spacing.xs,
-  },
-  premiumCountText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.primary.main,
-    lineHeight: 20,
-  },
-  premiumCountLabel: {
-    fontSize: 10,
-    color: colors.text.tertiary,
-    fontWeight: '500',
-  },
-  premiumNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: 4,
-  },
-  premiumNavButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  premiumNavText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary.main,
-  },
-  premiumNavToday: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.primary.main,
-    borderRadius: radii.sm,
-    flex: 1,
-    alignItems: 'center',
-  },
-  premiumNavTodayText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.white,
-  },
-  premiumProgress: {
-    height: 3,
-    backgroundColor: colors.background.surface,
-    borderRadius: 1.5,
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-  },
-  premiumProgressBar: {
-    height: '100%',
-    backgroundColor: colors.primary.main,
-    borderRadius: 1.5,
-  },
-  premiumDays: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 2,
-  },
-  premiumDay: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-    borderRadius: radii.sm,
-  },
-  premiumDayToday: {
-    backgroundColor: colors.primary.light,
-  },
-  premiumDayName: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.text.tertiary,
-    marginBottom: 1,
-  },
-  premiumDayNumber: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  premiumDayTextToday: {
-    color: colors.primary.main,
-  },
-  premiumDayDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'transparent',
-  },
-  premiumDayDotActive: {
-    backgroundColor: colors.primary.main,
-  },
-  card: {
-    backgroundColor: colors.background.card,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  cardContent: {
-    padding: spacing.md,
-  },
-  cardHeader: {
+
+  // ── Header ──────────────────────────────────────
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.xs,
-    flexWrap: 'wrap',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  headerMeta: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: darkColors.ink3,
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: darkColors.ink,
+    letterSpacing: -0.3,
+  },
+  headerActions: {
+    flexDirection: 'row',
     gap: spacing.xs,
+    marginTop: 4,
   },
-  serviceName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
-    flex: 1,
-    marginRight: spacing.xs,
-  },
-  statusBadge: {
-    flexDirection: 'row',
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: darkColors.card,
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.sm,
-    gap: 4,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  clientName: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: spacing.sm,
-    fontWeight: '500',
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minWidth: 80,
-  },
-  detailText: {
-    fontSize: 13,
-    color: colors.text.tertiary,
-    fontWeight: '500',
-  },
-  vehicleBadge: {
-    backgroundColor: colors.background.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.sm,
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.border.main,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.sm,
+    borderColor: darkColors.border,
   },
-  vehicleText: {
-    fontSize: 12,
-    color: colors.text.tertiary,
+
+  // ── KPI Cards ────────────────────────────────────
+  kpiRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  kpiCard: {
+    backgroundColor: darkColors.card,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: darkColors.border,
+  },
+  kpiLabel: {
+    fontSize: 10,
     fontWeight: '600',
+    color: darkColors.ink3,
+    letterSpacing: 0.6,
+    marginBottom: spacing.xs,
   },
-  cardFooter: {
+  kpiValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+  },
+  kpiNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: darkColors.ink,
+    lineHeight: 36,
+  },
+  kpiUnit: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: darkColors.ink2,
+    marginBottom: 4,
+  },
+  kpiDelta: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  kpiAvg: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: darkColors.ink,
+    lineHeight: 32,
+    marginBottom: 2,
+  },
+  kpiSub: {
+    fontSize: 11,
+    color: darkColors.ink3,
+    fontWeight: '500',
+  },
+
+  // ── Week Strip ───────────────────────────────────
+  weekStrip: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  weekNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.border.main,
-    paddingTop: spacing.md,
-    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  price: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.primary.main,
+  weekPeriod: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: darkColors.ink2,
+    letterSpacing: 0.2,
   },
-  actionButton: {
+  weekNavBtns: {
     flexDirection: 'row',
+    gap: 4,
+  },
+  weekNavBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: darkColors.card,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: darkColors.border,
+  },
+  weekDays: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  dayCell: {
+    flex: 1,
+    alignItems: 'center',
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
-    minWidth: 100,
-    justifyContent: 'center',
-    elevation: 2,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  actionButtonDisabled: {
-    opacity: 0.5,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  actionButtonText: {
-    color: colors.text.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.background.surface,
-    borderRadius: radii.lg,
+    backgroundColor: darkColors.card,
     borderWidth: 1,
-    borderColor: colors.border.main,
+    borderColor: darkColors.border,
   },
-  emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
+  dayCellSelected: {
+    backgroundColor: darkColors.primary,
+    borderColor: darkColors.primary,
   },
-  emptyStateText: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay,
-  },
-  drawer: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: MENU_W,
-    backgroundColor: colors.background.main,
-    borderTopRightRadius: radii.lg,
-    borderBottomRightRadius: radii.lg,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 2, height: 0 },
-    elevation: 8,
-  },
-  drawerHeader: {
-    padding: spacing.lg,
-    paddingTop: 48,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.main,
-  },
-  drawerUserInfo: {
-    gap: spacing.xs,
-  },
-  drawerUserName: {
-    fontSize: 18,
+  dayName: {
+    fontSize: 9,
     fontWeight: '700',
-    color: colors.text.primary,
+    color: darkColors.ink3,
+    letterSpacing: 0.3,
+    marginBottom: 2,
   },
-  drawerUserEmail: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    marginBottom: spacing.xs,
+  dayNumber: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: darkColors.ink,
+    marginBottom: 2,
   },
-  drawerAdminBadge: {
-    backgroundColor: colors.primary.light,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    alignSelf: 'flex-start',
+  dayTextSelected: {
+    color: darkColors.onPrimary,
   },
-  drawerAdminBadgeText: {
-    color: colors.primary.main,
-    fontSize: 12,
+  dayCount: {
+    fontSize: 11,
     fontWeight: '600',
+    color: darkColors.primary,
   },
-  drawerContent: {
-    padding: spacing.md,
+  dayCountSelected: {
+    color: darkColors.onPrimary,
   },
-  drawerItem: {
+  dayCountZero: {
+    color: darkColors.ink3,
+  },
+
+  // ── Section label ────────────────────────────────
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: darkColors.ink3,
+    letterSpacing: 0.8,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+
+  // ── Agenda rows ──────────────────────────────────
+  agendaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    gap: 14,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
   },
-  drawerItemText: {
-    fontSize: 16,
+  agendaTimeCol: {
+    width: 48,
+    alignItems: 'flex-start',
+  },
+  agendaHour: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: darkColors.ink,
+    lineHeight: 18,
+  },
+  agendaDuration: {
+    fontSize: 11,
+    color: darkColors.ink3,
     fontWeight: '500',
-    color: colors.text.primary,
+    marginTop: 1,
   },
-  drawerDivider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginVertical: spacing.md,
+  agendaCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: darkColors.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: darkColors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 68,
   },
-  drawerLogout: {
-    marginTop: 'auto',
+  agendaCardActive: {
+    borderColor: darkColors.primary,
   },
-  drawerLogoutText: {
-    color: colors.status.error,
+  agendaCardContent: {
+    flex: 1,
+  },
+  agendaService: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: darkColors.ink,
+    marginBottom: 3,
+  },
+  agendaClient: {
+    fontSize: 13,
+    color: darkColors.ink3,
+    fontWeight: '400',
+  },
+  agendaDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: darkColors.primary,
+    marginLeft: spacing.sm,
+  },
+
+  // ── Loading / Empty ──────────────────────────────
+  loadingBox: {
+    paddingVertical: 48,
+    alignItems: 'center',
+  },
+  emptyState: {
+    marginHorizontal: spacing.lg,
+    paddingVertical: 40,
+    alignItems: 'center',
+    backgroundColor: darkColors.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: darkColors.border,
+  },
+  emptyTitle: {
+    fontSize: 15,
     fontWeight: '600',
+    color: darkColors.ink2,
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: darkColors.ink3,
   },
 });
