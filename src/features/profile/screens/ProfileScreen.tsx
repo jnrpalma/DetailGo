@@ -116,6 +116,9 @@ export default function ProfileScreen() {
     ? { uri: profile.photoURL }
     : null;
 
+  const { userRole } = useShop();
+  const isOwner = userRole === 'owner';
+
   const linkedShopName = loadingShop ? 'Carregando...' : shop?.name ?? 'Não vinculada';
 
   useEffect(() => {
@@ -465,7 +468,7 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                   <View style={styles.rolePill}>
-                    <Text style={styles.rolePillText}>Cliente</Text>
+                    <Text style={styles.rolePillText}>{isOwner ? 'Proprietário' : 'Cliente'}</Text>
                   </View>
                 </View>
               </View>
@@ -649,7 +652,12 @@ export default function ProfileScreen() {
                 </View>
               )}
 
-              <DataRow label="Estética vinculada" value={linkedShopName} bordered last />
+              <DataRow
+                label={isOwner ? 'Minha estética' : 'Estética vinculada'}
+                value={linkedShopName}
+                bordered
+                last
+              />
             </View>
 
             <View style={styles.sectionHeader}>

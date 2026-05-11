@@ -102,7 +102,11 @@ export default function AdminDrawer({ visible, slideAnim, onClose }: Props) {
             label="Gerenciar loja"
             onPress={() => navigate('AdminManage')}
           />
-          <DrawerItem icon={<User size={18} color={D.primary} />} label="Perfil" />
+          <DrawerItem
+            icon={<User size={18} color={D.primary} />}
+            label="Perfil"
+            onPress={() => navigate('AdminProfile')}
+          />
 
           <View style={styles.drawerDivider} />
 
