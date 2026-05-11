@@ -1,31 +1,19 @@
-// src/features/admin/screens/AdminHistoryScreen.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   ScrollView,
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
   StatusBar,
+  SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Ban,
-  History,
-  TrendingUp,
-  User,
-} from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 
-import { getAuth } from '@react-native-firebase/auth';
 import {
   collection,
   getDocs,
@@ -39,11 +27,10 @@ import {
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
-import { dateUtils } from '@shared/utils/date.utils';
-import { formatUtils } from '@shared/utils/format.utils';
-import { colors, spacing, radii } from '@shared/theme';
+import { darkColors as D } from '@shared/theme';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
 import { useShop } from '@features/shops';
+import { getAuth } from '@react-native-firebase/auth';
 
 import type { AppointmentStatus } from '@features/appointments';
 import type { AdminAppointment } from '../domain/adminAppointment.types';
@@ -56,55 +43,67 @@ interface FirebaseError extends Error {
 }
 
 const ALL_HISTORY_STATUSES: AppointmentStatus[] = ['done', 'no_show', 'cancelled'];
-
 type FilterId = 'all' | 'done' | 'no_show' | 'cancelled';
 
-const FILTER_OPTIONS: { id: FilterId; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  { id: 'done', label: 'Concluídos' },
-  { id: 'no_show', label: 'Não realizados' },
-  { id: 'cancelled', label: 'Cancelados' },
+const FILTERS: { id: FilterId; label: string }[] = [
+  { id: 'all', label: 'TODOS' },
+  { id: 'done', label: 'CONCLUÍDOS' },
+  { id: 'no_show', label: 'NÃO REALIZADOS' },
+  { id: 'cancelled', label: 'CANCELADOS' },
 ];
 
-function AppointmentSeparator() {
-  return <View style={{ height: spacing.md }} />;
+const PAGE_SIZE = 30;
+const db = getFirestore();
+
+const MONTHS_PT = [
+  'JANEIRO',
+  'FEVEREIRO',
+  'MARÇO',
+  'ABRIL',
+  'MAIO',
+  'JUNHO',
+  'JULHO',
+  'AGOSTO',
+  'SETEMBRO',
+  'OUTUBRO',
+  'NOVEMBRO',
+  'DEZEMBRO',
+];
+
+function monthLabel(ms: number): string {
+  const d = new Date(ms);
+  return `${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const STATUS_CONFIG: Partial<
-  Record<
-    AppointmentStatus,
-    {
-      label: string;
-      color: string;
-      icon: any;
-    }
-  >
-> = {
-  done: { label: 'Concluído', color: colors.status.success, icon: CheckCircle2 },
-  no_show: { label: 'Não realizado', color: colors.status.error, icon: XCircle },
-  cancelled: { label: 'Cancelado', color: colors.text.disabled, icon: Ban },
-};
+function groupByMonth(items: AdminAppointment[]) {
+  const groups: Record<string, { title: string; data: AdminAppointment[] }> = {};
+  items.forEach(item => {
+    const key = monthLabel(item.startAtMs);
+    if (!groups[key]) groups[key] = { title: key, data: [] };
+    groups[key].data.push(item);
+  });
+  return Object.values(groups);
+}
 
-const PAGE_SIZE = 30;
+function formatRevenue(value: number): string {
+  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+  return `R$ ${value.toFixed(0)}`;
+}
 
 export default function AdminHistoryScreen() {
   const navigation = useNavigation();
   const auth = getAuth();
   const user = auth.currentUser;
-  const db = getFirestore();
   const { shopId } = useShop();
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<AdminAppointment[]>([]);
   const [filter, setFilter] = useState<FilterId>('all');
   const [loadingMore, setLoadingMore] = useState(false);
-
-  // 👈 ARMAZENA OS TOTAIS DO ÚLTIMO CARREGAMENTO COMPLETO
   const [totals, setTotals] = useState({ done: 0, revenue: 0 });
 
   const lastDocRef = useRef<QDoc | null>(null);
   const canLoadMoreRef = useRef(true);
-
   const { fetchCustomerName } = useCustomerName();
 
   const statusSet = useMemo((): AppointmentStatus[] => {
@@ -114,24 +113,25 @@ export default function AdminHistoryScreen() {
     return ALL_HISTORY_STATUSES;
   }, [filter]);
 
-  // 👈 ATUALIZA OS TOTAIS SEMPRE QUE ITEMS MUDAR
   useEffect(() => {
-    const doneCount = items.filter(i => i.status === 'done').length;
-    const revenue = items
-      .filter(i => i.status === 'done')
-      .reduce((acc, i) => acc + (i.price ?? 0), 0);
-
-    setTotals({ done: doneCount, revenue });
+    const doneItems = items.filter(i => i.status === 'done');
+    setTotals({
+      done: doneItems.length,
+      revenue: doneItems.reduce((acc, i) => acc + (i.price ?? 0), 0),
+    });
   }, [items]);
 
-  const enrichWithNames = async (list: AdminAppointment[]): Promise<AdminAppointment[]> =>
-    Promise.all(
-      list.map(async it => {
-        if (it.customerName && it.customerName !== 'Cliente') return it;
-        const name = await fetchCustomerName(it.customerUid);
-        return { ...it, customerName: name };
-      }),
-    );
+  const enrichWithNames = useCallback(
+    async (list: AdminAppointment[]): Promise<AdminAppointment[]> =>
+      Promise.all(
+        list.map(async it => {
+          if (it.customerName && it.customerName !== 'Cliente') return it;
+          const name = await fetchCustomerName(it.customerUid);
+          return { ...it, customerName: name };
+        }),
+      ),
+    [fetchCustomerName],
+  );
 
   useEffect(() => {
     if (!user?.uid || !shopId) return;
@@ -163,13 +163,8 @@ export default function AdminHistoryScreen() {
         setLoading(false);
       },
       (error: FirebaseError) => {
-        console.error('AdminHistory snapshot error:', error);
-
         if (error.code === 'failed-precondition') {
-          Alert.alert(
-            '⚠️ Índice necessário',
-            'O Firestore precisa de um índice para esta consulta. Acesse o console do Firebase e crie um índice composto com status (ascendente) e startAtMs (descendente).',
-          );
+          Alert.alert('⚠️ Índice necessário', 'Crie um índice composto no Firebase Console.');
         } else {
           Alert.alert('Erro', 'Falha ao carregar histórico.');
         }
@@ -178,13 +173,12 @@ export default function AdminHistoryScreen() {
     );
 
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, shopId, statusSet]);
+  }, [user?.uid, shopId, statusSet, enrichWithNames]);
 
   const loadMore = async () => {
     if (loadingMore || !canLoadMoreRef.current || !lastDocRef.current || !shopId) return;
+    setLoadingMore(true);
     try {
-      setLoadingMore(true);
       const qy = query(
         collection(db, 'shops', shopId, 'appointments'),
         where('status', 'in', statusSet),
@@ -210,410 +204,310 @@ export default function AdminHistoryScreen() {
     }
   };
 
-  const handleFilterChange = (newFilter: FilterId) => {
-    if (newFilter === filter) return;
-    setFilter(newFilter);
-  };
-
-  const renderItem = ({ item }: { item: AdminAppointment }) => {
-    const subtitle =
-      item.vehicleType === 'Carro' && item.carCategory
-        ? `Carro • ${item.carCategory}`
-        : item.vehicleType;
-
-    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.cancelled!;
-    const StatusIcon = cfg.icon;
-
-    return (
-      <View style={[styles.card, { borderLeftColor: cfg.color }]}>
-        <View style={styles.cardTop}>
-          <Text style={styles.cardService} numberOfLines={1}>
-            {item.serviceLabel ?? 'Serviço'}
-          </Text>
-          <Text style={[styles.cardPrice, item.status !== 'done' && styles.cardPriceMuted]}>
-            {formatUtils.currencyCompact(item.price)}
-          </Text>
-        </View>
-
-        <View style={[styles.statusBadge, { backgroundColor: `${cfg.color}15` }]}>
-          <StatusIcon size={12} color={cfg.color} />
-          <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
-        </View>
-
-        <View style={styles.cardDivider} />
-
-        <View style={styles.clientRow}>
-          <User size={13} color={colors.text.tertiary} />
-          <Text style={styles.clientName} numberOfLines={1}>
-            {item.customerName}
-          </Text>
-        </View>
-
-        <View style={styles.cardMeta}>
-          <View style={styles.metaItem}>
-            <Calendar size={13} color={colors.text.tertiary} />
-            <Text style={styles.metaText}>{dateUtils.formatDate(item.startAtMs)}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Clock size={13} color={colors.text.tertiary} />
-            <Text style={styles.metaText}>{dateUtils.formatHour(item.startAtMs)}</Text>
-          </View>
-          <View style={styles.vehicleChip}>
-            <Text style={styles.vehicleChipText}>{subtitle}</Text>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  if (!user?.uid) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.primary.main} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // 👈 FILTRA OS ITENS PARA EXIBIÇÃO NA LISTA
-  const displayItems = filter === 'all' ? items : items.filter(item => item.status === filter);
-
-  // 👈 RESUMO SEMPRE VISÍVEL, usando totals (que são persistentes)
-  const showSummary = totals.done > 0;
+  const displayItems = filter === 'all' ? items : items.filter(i => i.status === filter);
+  const sections = groupByMonth(displayItems);
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background.main} />
+      <StatusBar barStyle="light-content" backgroundColor={D.bg} />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.backBtn}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <ArrowLeft size={22} color={colors.text.primary} />
+            <ArrowLeft size={20} color={D.ink} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Histórico Admin</Text>
-          <View style={styles.headerRight} />
-        </View>
-
-        {/* Resumo - SEMPRE VISÍVEL, nunca some */}
-        {showSummary && (
-          <View style={styles.summary}>
-            <View style={styles.summaryItem}>
-              <TrendingUp size={15} color={colors.primary.main} />
-              <Text style={styles.summaryValue}>{totals.done}</Text>
-              <Text style={styles.summaryLabel}>concluídos</Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{formatUtils.currency(totals.revenue)}</Text>
-              <Text style={styles.summaryLabel}>faturados</Text>
-            </View>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Histórico</Text>
+            {totals.done > 0 && (
+              <Text style={styles.headerSub}>
+                {totals.done} concluídos · {formatRevenue(totals.revenue)}
+              </Text>
+            )}
           </View>
-        )}
-
-        {/* Filtros em ScrollView horizontal */}
-        <View style={styles.filtersWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersContent}
-          >
-            {FILTER_OPTIONS.map(opt => {
-              const active = filter === opt.id;
-              return (
-                <TouchableOpacity
-                  key={opt.id}
-                  onPress={() => handleFilterChange(opt.id)}
-                  style={[styles.filterPill, active && styles.filterPillActive]}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
         </View>
 
-        {/* Lista */}
-        <View style={styles.content}>
-          {loading && displayItems.length === 0 ? (
-            <View style={styles.centered}>
-              <ActivityIndicator color={colors.primary.main} />
-            </View>
-          ) : (
-            <FlatList
-              data={displayItems}
-              keyExtractor={it => it.id}
-              renderItem={renderItem}
-              ItemSeparatorComponent={AppointmentSeparator}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              onEndReachedThreshold={0.4}
-              onEndReached={loadMore}
-              ListFooterComponent={
-                loadingMore ? (
-                  <View style={styles.footerLoading}>
-                    <ActivityIndicator size="small" color={colors.primary.main} />
-                  </View>
-                ) : null
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <View style={styles.emptyIconWrap}>
-                    <History size={36} color={colors.text.disabled} />
-                  </View>
-                  <Text style={styles.emptyTitle}>Nenhum registro</Text>
-                  <Text style={styles.emptyText}>
-                    {filter === 'all'
-                      ? 'Nenhum serviço finalizado ainda.'
-                      : 'Nenhum registro para este filtro.'}
-                  </Text>
+        {/* ── Filter pills ── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersRow}
+          style={styles.filtersScroll}
+        >
+          {FILTERS.map(f => {
+            const active = filter === f.id;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[styles.pill, active && styles.pillActive]}
+                onPress={() => setFilter(f.id)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.pillText, active && styles.pillTextActive]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* ── Lista ── */}
+        {loading && displayItems.length === 0 ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={D.primary} size="large" />
+          </View>
+        ) : displayItems.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.emptyText}>Nenhum registro encontrado.</Text>
+          </View>
+        ) : (
+          <SectionList
+            sections={sections}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            renderSectionHeader={({ section }) => (
+              <Text style={styles.monthLabel}>{section.title}</Text>
+            )}
+            renderItem={({ item, index, section }) => {
+              const isLast = index === section.data.length - 1;
+              return <HistoryRow item={item} isLast={isLast} />;
+            }}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.loadingMore}>
+                  <ActivityIndicator size="small" color={D.primary} />
                 </View>
-              }
-            />
-          )}
-        </View>
+              ) : null
+            }
+          />
+        )}
       </SafeAreaView>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background.main },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+// ── Row component ────────────────────────────────────────────
+function HistoryRow({ item, isLast }: { item: AdminAppointment; isLast: boolean }) {
+  const d = new Date(item.startAtMs);
+  const day = String(d.getDate()).padStart(2, '0');
+  const hour = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(
+    2,
+    '0',
+  )}`;
 
-  // ─── Header ──────────────────────────────────────────────────────────────
+  const isDone = item.status === 'done';
+  const isNoShow = item.status === 'no_show';
+  const isCancelled = item.status === 'cancelled';
+
+  const customerShort = item.customerName
+    ? item.customerName.split(' ').slice(0, 2).join(' ')
+    : 'Cliente';
+
+  const vehicleLabel = item.carCategory ?? item.vehicleType ?? '';
+
+  return (
+    <View>
+      <View style={styles.row}>
+        {/* Dia + hora */}
+        <View style={styles.rowDate}>
+          <Text style={styles.rowDay}>{day}</Text>
+          <Text style={styles.rowHour}>{hour}</Text>
+        </View>
+
+        {/* Serviço + cliente */}
+        <View style={styles.rowInfo}>
+          <Text style={styles.rowService} numberOfLines={1}>
+            {item.serviceLabel ?? 'Serviço'}
+          </Text>
+          <Text style={styles.rowCustomer} numberOfLines={1}>
+            {customerShort}
+            {vehicleLabel ? ` · ${vehicleLabel}` : ''}
+          </Text>
+        </View>
+
+        {/* Preço / status */}
+        <View style={styles.rowRight}>
+          {isDone && <Text style={styles.rowPrice}>R$ {item.price ?? 0}</Text>}
+          {isNoShow && (
+            <>
+              <Text style={styles.rowNoShowDash}>–</Text>
+              <Text style={styles.rowNoShowLabel}>NÃO REALIZADO</Text>
+            </>
+          )}
+          {isCancelled && <Text style={styles.rowCancelled}>CANCELADO</Text>}
+        </View>
+      </View>
+
+      {/* Separador tracejado */}
+      {!isLast && <View style={styles.separator} />}
+    </View>
+  );
+}
+
+// ── Styles ───────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: D.bg },
+
+  // Header
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.background.main,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.main,
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 14,
+    gap: 14,
   },
-  backButton: {
+  backBtn: {
     width: 40,
     height: 40,
-    borderRadius: radii.md,
+    borderRadius: 12,
+    backgroundColor: D.card,
+    borderWidth: 1,
+    borderColor: D.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background.surface,
-    borderWidth: 1,
-    borderColor: colors.border.main,
+    marginTop: 2,
   },
+  headerText: { flex: 1 },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: '800',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center',
+    color: D.ink,
+    letterSpacing: -0.5,
   },
-  headerRight: { width: 40 },
-
-  // ─── Resumo ──────────────────────────────────────────────────────────────
-  summary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    backgroundColor: colors.primary.light,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderColor: `${colors.primary.main}20`,
-  },
-  summaryItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: `${colors.primary.main}30`,
-    marginHorizontal: spacing.md,
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.primary.main,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: colors.primary.main,
+  headerSub: {
+    fontSize: 13,
+    color: D.ink3,
+    marginTop: 2,
     fontWeight: '500',
-    opacity: 0.7,
   },
 
-  // ─── Filtros ─────────────────────────────────────────────────────────────
-  filtersWrapper: {
-    marginTop: spacing.lg,
+  // Filters
+  filtersScroll: { maxHeight: 44, marginBottom: 16 },
+  filtersRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+    alignItems: 'center',
   },
-  filtersContent: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
-    flexDirection: 'row',
-  },
-  filterPill: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: colors.border.main,
-    backgroundColor: colors.background.surface,
+    borderColor: D.border,
+    backgroundColor: 'transparent',
   },
-  filterPillActive: {
-    backgroundColor: colors.primary.main,
-    borderColor: colors.primary.main,
+  pillActive: {
+    backgroundColor: D.primary,
+    borderColor: D.primary,
   },
-  filterPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
-  filterPillTextActive: {
-    color: colors.text.white,
+  pillText: {
+    fontSize: 11,
     fontWeight: '700',
+    color: D.ink3,
+    letterSpacing: 0.5,
+  },
+  pillTextActive: {
+    color: '#0B0D0E',
   },
 
-  // ─── Content / Lista ─────────────────────────────────────────────────────
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  listContent: { paddingBottom: spacing.xl },
-  footerLoading: { paddingVertical: spacing.lg, alignItems: 'center' },
+  // List
+  listContent: { paddingHorizontal: 20, paddingBottom: 32 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontSize: 14, color: D.ink3 },
+  loadingMore: { paddingVertical: 20, alignItems: 'center' },
 
-  // ─── Card ────────────────────────────────────────────────────────────────
-  card: {
-    backgroundColor: colors.background.card,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-    borderLeftWidth: 4,
-    shadowColor: colors.text.primary,
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+  // Month group header
+  monthLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: D.ink3,
+    letterSpacing: 0.8,
+    marginTop: 24,
+    marginBottom: 8,
   },
-  cardTop: {
+
+  // Row
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.xs,
+    paddingVertical: 14,
+    gap: 16,
   },
-  cardService: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
-    flex: 1,
-    marginRight: spacing.xs,
+  rowDate: {
+    width: 42,
+    alignItems: 'flex-start',
   },
-  cardPrice: {
-    fontSize: 16,
+  rowDay: {
+    fontSize: 26,
     fontWeight: '800',
-    color: colors.primary.main,
+    color: D.ink,
+    letterSpacing: -1,
+    lineHeight: 28,
   },
-  cardPriceMuted: { color: colors.text.tertiary },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 999,
-    marginBottom: spacing.md,
+  rowHour: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: D.ink3,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
-  statusLabel: { fontSize: 12, fontWeight: '700' },
-  cardDivider: {
-    height: 1,
-    backgroundColor: colors.border.main,
-    marginBottom: spacing.md,
-  },
-  clientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  clientName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary,
+  rowInfo: {
     flex: 1,
+    paddingTop: 2,
   },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.md,
+  rowService: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: D.ink,
+    marginBottom: 3,
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  vehicleChip: {
-    backgroundColor: colors.background.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border.main,
-  },
-  vehicleChipText: {
+  rowCustomer: {
     fontSize: 12,
-    color: colors.text.tertiary,
+    color: D.ink3,
     fontWeight: '500',
+  },
+  rowRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingTop: 4,
+    minWidth: 80,
+  },
+  rowPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: D.primary,
+    letterSpacing: -0.3,
+  },
+  rowNoShowDash: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: D.accent,
+  },
+  rowNoShowLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: D.accent,
+    letterSpacing: 0.3,
+    marginTop: 2,
+  },
+  rowCancelled: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: D.ink3,
+    letterSpacing: 0.3,
+    marginTop: 6,
   },
 
-  // ─── Empty ───────────────────────────────────────────────────────────────
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: spacing.xl,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.background.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
+  // Dashed separator
+  separator: {
+    height: 1,
+    borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: colors.border.main,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    lineHeight: 22,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
 });
