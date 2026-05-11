@@ -1,0 +1,227 @@
+/**
+ * AdminDrawer — menu lateral do painel do proprietário.
+ * Visual idêntico ao drawer do cliente (DashboardScreen).
+ * Uso: importar em qualquer tela admin que precise de menu lateral.
+ */
+import React from 'react';
+import { Alert, Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Calendar, History, LogOut, Settings, Store, User } from 'lucide-react-native';
+import { getAuth } from '@react-native-firebase/auth';
+
+import { darkColors as D } from '@shared/theme';
+import { UI } from '@shared/constants/app.constants';
+import { useShop } from '@features/shops';
+import type { RootStackParamList } from '@app/types';
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+type Props = {
+  visible: boolean;
+  slideAnim: Animated.Value;
+  onClose: () => void;
+};
+
+export default function AdminDrawer({ visible, slideAnim, onClose }: Props) {
+  const navigation = useNavigation<Nav>();
+  const { shop } = useShop();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  const shopName = shop?.name ?? 'Minha estética';
+  const ownerName = user?.displayName ?? 'Proprietário';
+  const email = user?.email ?? '';
+
+  const initials = ownerName
+    .split(' ')
+    .map(w => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const navigate = (route: keyof RootStackParamList) => {
+    onClose();
+    navigation.navigate(route as any);
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            onClose();
+            await auth.signOut();
+          } catch {
+            Alert.alert('Erro', 'Falha ao sair da conta.');
+          }
+        },
+      },
+    ]);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <>
+      <Pressable style={styles.overlay} onPress={onClose} />
+
+      <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
+        {/* ── Perfil ── */}
+        <View style={styles.drawerHeader}>
+          <View style={styles.drawerAvatar}>
+            <Text style={styles.drawerAvatarText}>{initials}</Text>
+          </View>
+          <Text style={styles.drawerName}>{ownerName}</Text>
+          <Text style={styles.drawerEmail}>{email}</Text>
+
+          {/* Badge da estética */}
+          <View style={styles.shopBadge}>
+            <Store size={11} color={D.primary} />
+            <Text style={styles.shopBadgeText}>{shopName}</Text>
+          </View>
+        </View>
+
+        {/* ── Navegação ── */}
+        <View style={styles.drawerMenu}>
+          <DrawerItem
+            icon={<Calendar size={18} color={D.primary} />}
+            label="Agendamentos"
+            onPress={() => navigate('AdminDashboard')}
+          />
+          <DrawerItem
+            icon={<History size={18} color={D.primary} />}
+            label="Histórico"
+            onPress={() => navigate('AdminHistory')}
+          />
+          <DrawerItem
+            icon={<Settings size={18} color={D.primary} />}
+            label="Gerenciar loja"
+            onPress={() => navigate('AdminManage')}
+          />
+
+          <View style={styles.drawerDivider} />
+
+          <DrawerItem
+            icon={<User size={18} color={D.ink2} />}
+            label="Perfil do proprietário"
+            sublabel={email}
+          />
+
+          <View style={styles.drawerDivider} />
+
+          <DrawerItem
+            icon={<LogOut size={18} color={D.accent} />}
+            label="Sair da conta"
+            onPress={handleSignOut}
+            danger
+          />
+        </View>
+      </Animated.View>
+    </>
+  );
+}
+
+// ── Item do drawer ────────────────────────────────────────────
+function DrawerItem({
+  icon,
+  label,
+  sublabel,
+  onPress,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sublabel?: string;
+  onPress?: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.drawerItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+      disabled={!onPress}
+    >
+      {icon}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.drawerItemText, danger && styles.drawerItemDanger]}>{label}</Text>
+        {sublabel ? <Text style={styles.drawerItemSublabel}>{sublabel}</Text> : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ── Styles — espelha exatamente o drawer do cliente ───────────
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  drawer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: UI.MENU_WIDTH,
+    backgroundColor: D.surface,
+    borderRightWidth: 1,
+    borderRightColor: D.border,
+    paddingTop: 60,
+  },
+
+  // Header
+  drawerHeader: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: D.border,
+  },
+  drawerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: D.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  drawerAvatarText: { fontSize: 16, fontWeight: '700', color: '#0B0D0E' },
+  drawerName: { fontSize: 15, fontWeight: '700', color: D.ink, marginBottom: 2 },
+  drawerEmail: { fontSize: 12, color: D.ink3, marginBottom: 10 },
+  shopBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: D.primaryLight,
+    borderWidth: 1,
+    borderColor: 'rgba(212,255,61,0.2)',
+  },
+  shopBadgeText: { fontSize: 11, fontWeight: '700', color: D.primary },
+
+  // Menu
+  drawerMenu: { paddingTop: 8, flex: 1 },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  drawerItemText: { fontSize: 15, fontWeight: '500', color: D.ink },
+  drawerItemSublabel: { fontSize: 11, color: D.ink3, marginTop: 1 },
+  drawerItemDanger: { color: D.accent },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: D.border,
+    marginVertical: 4,
+    marginHorizontal: 20,
+  },
+});

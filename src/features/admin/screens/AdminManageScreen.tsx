@@ -776,12 +776,6 @@ export default function AdminManageScreen() {
             )}
           </View>
 
-          {/* ── Sair ── */}
-          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
-            <LogOut size={18} color={colors.status.error} />
-            <Text style={styles.signOutText}>Sair da conta</Text>
-          </TouchableOpacity>
-
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       </SafeAreaView>

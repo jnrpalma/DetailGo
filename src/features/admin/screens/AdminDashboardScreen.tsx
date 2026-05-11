@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   StyleSheet,
   Text,
@@ -9,6 +10,7 @@ import {
   View,
   StatusBar,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,10 +26,12 @@ import {
   where,
   type FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
-import { History, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
+import { History, ChevronLeft, ChevronRight, SlidersHorizontal, Menu } from 'lucide-react-native';
+import AdminDrawer from '../components/AdminDrawer';
 
 import type { RootStackParamList } from '@app/types';
 import { darkColors, spacing, radii } from '@shared/theme';
+import { UI } from '@shared/constants/app.constants';
 import { dateUtils } from '@shared/utils/date.utils';
 import { formatUtils } from '@shared/utils/format.utils';
 import { useCustomerName } from '@shared/hooks/useFirestoreCache';
@@ -91,6 +95,27 @@ export default function AdminDashboardScreen() {
 
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(() => new Date());
+
+  // ── Drawer ──
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-UI.MENU_WIDTH)).current;
+
+  const toggleDrawer = () => {
+    if (drawerVisible) {
+      Animated.timing(slideAnim, {
+        toValue: -UI.MENU_WIDTH,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(() => setDrawerVisible(false));
+    } else {
+      setDrawerVisible(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
 
   const weekStartMs = useMemo(() => weekStartSun(weekAnchor), [weekAnchor]);
   const weekEndMs = useMemo(() => weekEndSun(weekAnchor), [weekAnchor]);
@@ -365,7 +390,10 @@ export default function AdminDashboardScreen() {
     <>
       {/* ── Header ─────────────────────────────── */}
       <View style={styles.header}>
-        <View>
+        <TouchableOpacity style={styles.headerBtn} onPress={toggleDrawer} activeOpacity={0.7}>
+          <Menu size={20} color={darkColors.ink2} />
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={styles.headerMeta}>ADMIN{shopName ? ` · ${shopName}` : ''}</Text>
           <Text style={styles.headerTitle}>{headerTitle}</Text>
         </View>
@@ -500,6 +528,9 @@ export default function AdminDashboardScreen() {
           }
         />
       </SafeAreaView>
+
+      {/* ── Drawer lateral ── */}
+      <AdminDrawer visible={drawerVisible} slideAnim={slideAnim} onClose={toggleDrawer} />
     </>
   );
 }
