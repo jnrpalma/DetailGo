@@ -38,6 +38,7 @@ export default function RootNavigator() {
               <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
               <Stack.Screen name="AdminManage" component={AdminManageScreen} />
               <Stack.Screen name="AdminHistory" component={AdminHistoryScreen} />
+              <Stack.Screen name="AdminProfile" component={ProfileScreen} />
             </Stack.Group>
           ) : (
             // Owner sem assinatura → tela de pagamento
